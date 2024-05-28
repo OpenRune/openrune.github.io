@@ -81,9 +81,6 @@ Thumbs.db
 # Static exports (generated via `next export`)
 out/
 
-# NPM package lock file
-package-lock.json
-
 # Yarn integrity file
 .yarn-integrity
 
