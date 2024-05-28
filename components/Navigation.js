@@ -14,7 +14,6 @@ const Navigation = ({ sidebarVisible, setSidebarVisible }) => {
         '1': true
     });
 
-
     const items = [
         {
             label: 'Data',
@@ -33,11 +32,17 @@ const Navigation = ({ sidebarVisible, setSidebarVisible }) => {
             ]
         }
     ];
-
+    const getBaseUrl = () => {
+        if (window.location.hostname === 'openrune.github.io') {
+            const pathArray = window.location.pathname.split('/');
+            return pathArray.length > 1 ? `/${pathArray[1]}` : '';
+        }
+        return '';
+    };
 
     const CustomHeader = ({onHide}) => (
         <div className="sidebar-header">
-            <img src="/logo.png" alt="Logo" className="sidebar-logo"/>
+            <img src={`${getBaseUrl()}/logo.png`} alt="Logo" className="sidebar-logo"/>
             <button className="sidebar-close-btn p-sidebar-close p-sidebar-icon p-link" onClick={onHide}>
                 <i className="pi pi-times"></i>
             </button>

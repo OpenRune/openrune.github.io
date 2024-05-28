@@ -160,9 +160,15 @@ export function Items() {
     const [comparison, setComparison] = useState('=');
     const [selectedDate, setSelectedDate] = useState(null);
     const dateOptions = { '162': 1516859177, '222': 1716439577 }; // Example date options
-
+    const getBaseUrl = () => {
+        if (window.location.hostname === 'openrune.github.io') {
+            const pathArray = window.location.pathname.split('/');
+            return pathArray.length > 1 ? `/${pathArray[1]}` : '';
+        }
+        return '';
+    };
     useEffect(() => {
-        fetch('/items/items.json')
+        fetch(`${getBaseUrl()}/items/items.json`)
             .then(response => response.json())
             .then(data => {
                 setData(data);
@@ -243,7 +249,7 @@ export function Items() {
     const filteredItems = filterItems();
 
     const renderIcon = (rowData) => {
-        const imagePath = `/items/items-icons/${rowData.id}.png`;
+        const imagePath = `${getBaseUrl()}/items/items-icons/${rowData.id}.png`;
         return (
             <div className="image-text-container">
                 <img
@@ -258,7 +264,7 @@ export function Items() {
     };
 
     const fetchCacheData = async (id) => {
-        const url = `/items/cache-defs/${id}.json`;
+        const url = `${getBaseUrl()}/items/cache-defs/${id}.json`;
         try {
             const response = await fetch(url);
             if (!response.ok) {
