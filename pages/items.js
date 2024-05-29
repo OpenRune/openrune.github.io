@@ -1,16 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
-import { InputText } from "primereact/inputtext";
-import { Blocks } from "react-loader-spinner";
 import { Dialog } from "primereact/dialog";
 import { TabPanel, TabView } from "primereact/tabview";
-import { Button, Dropdown } from "react-bootstrap";
-import {FaCopy, FaHistory, FaInfoCircle} from 'react-icons/fa';
+import { Button } from "react-bootstrap";
+import { FaCopy, FaInfoCircle } from 'react-icons/fa';
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomOneDark } from 'react-syntax-highlighter/dist/cjs/styles/hljs';
-import { TieredMenu } from "primereact/tieredmenu";
-import { Menubar } from "primereact/menubar";
+import { Blocks } from "react-loader-spinner";
+import TableHeader from "../components/TableHeader";
 
 const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -18,128 +16,6 @@ const copyToClipboard = (text) => {
     }, () => {
         alert('Failed to copy to clipboard');
     });
-};
-
-const CustomMenuItem = ({ label }) => (
-    <div className="custom-menu-item">
-        <FaHistory style={{ marginRight: '10px' }} />
-        <span>{label}</span>
-    </div>
-);
-
-const ItemTableHeader = ({ dateOptions, resetFilters, searchText, onSearchChange, showNoted, onShowNotedChange, selectedDate, handleDateChange, comparison, handleComparisonChange }) => {
-    const [selectedComparison, setSelectedComparison] = useState('');
-    const [selectedDateFilter, setSelectedDateFilter] = useState(selectedDate);
-
-    const handleComparisonButtonClick = (value) => {
-        const newValue = selectedComparison === value ? '' : value;
-        setSelectedComparison(newValue);
-        handleComparisonChange(newValue);
-    };
-
-    const handleDateFilterChange = (value) => {
-        setSelectedDateFilter(value);
-        handleDateChange({ target: { value } });
-    };
-
-    const dateItems = Object.keys(dateOptions).map(key => ({
-        label: key,
-        value: dateOptions[key],
-        icon: selectedDateFilter === dateOptions[key] ? 'pi pi-check' : null
-    }));
-
-    const BuyMenuItems = [
-        {
-            label: (
-                <CustomMenuItem
-                    src="/buy_icon.png"
-                    label="Rev Filter"
-                />
-            ),
-            items: [
-                ...dateItems.map(item => ({
-                    label: item.label,
-                    icon: item.icon,
-                    command: () => handleDateFilterChange(item.value)
-                })),
-                {
-                    template: () => (
-                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px', width: '100%' }}>
-                            <Button
-                                style={{
-                                    margin: '0 5px',
-                                    flex: 1,
-                                    backgroundColor: selectedComparison === '=' ? 'blue' : '',
-                                    color: selectedComparison === '=' ? 'white' : ''
-                                }}
-                                onClick={() => handleComparisonButtonClick('=')}
-                            >
-                                =
-                            </Button>
-                            <Button
-                                style={{
-                                    margin: '0 5px',
-                                    flex: 1,
-                                    backgroundColor: selectedComparison === '<=' ? 'blue' : '',
-                                    color: selectedComparison === '<=' ? 'white' : ''
-                                }}
-                                onClick={() => handleComparisonButtonClick('<=')}
-                            >
-                                &lt;=
-                            </Button>
-                            <Button
-                                style={{
-                                    margin: '0 5px',
-                                    flex: 1,
-                                    backgroundColor: selectedComparison === '>=' ? 'blue' : '',
-                                    color: selectedComparison === '>=' ? 'white' : ''
-                                }}
-                                onClick={() => handleComparisonButtonClick('>=')}
-                            >
-                                &gt;=
-                            </Button>
-                        </div>
-                    )
-                }
-            ]
-        }
-    ];
-
-    return (
-        <div className="flex" style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
-            <div className="flex align-items-center double-line">
-                <div className="flex row1">
-                    <span className="p-input-icon-left" style={{ marginLeft: "10px" }}>
-                        <i className="pi pi-search" />
-                        <InputText
-                            value={searchText}
-                            onChange={onSearchChange}
-                            placeholder="Item Search"
-                        />
-                    </span>
-                    <span className="custom-checkbox" style={{ marginLeft: "10px", display: 'flex', alignItems: 'center' }}>
-                        <input
-                            type="checkbox"
-                            id="notedCheckbox"
-                            checked={showNoted}
-                            onChange={onShowNotedChange}
-                        />
-                        <label htmlFor="notedCheckbox" className="p-checkbox-label" style={{ marginLeft: "5px", fontSize: '16px' }}>
-                            Show Noted Items
-                        </label>
-                    </span>
-                    <span className="flexcenter" style={{ marginLeft: "10px" }}>
-                        <div className="custom-menubar-container">
-                            <Menubar model={BuyMenuItems} className="custom-menubar" />
-                        </div>
-                    </span>
-                    <Button style={{ marginLeft: "10px" }} onClick={resetFilters}>
-                        Reset Filters
-                    </Button>
-                </div>
-            </div>
-        </div>
-    );
 };
 
 export function Items() {
@@ -158,17 +34,13 @@ export function Items() {
     const [sortField, setSortField] = useState(null);
     const [sortOrder, setSortOrder] = useState(null);
     const [comparison, setComparison] = useState('=');
-    const [selectedDate, setSelectedDate] = useState(null);
-    const dateOptions = { '162': 1516859177, '222': 1716439577 }; // Example date options
-    const getBaseUrl = () => {
-        if (window.location.hostname === 'openrune.github.io') {
-            const pathArray = window.location.pathname.split('/');
-            return pathArray.length > 1 ? `/${pathArray[1]}` : '';
-        }
-        return '';
-    };
+    const [selectedDate, setSelectedDate] = useState("all");
+    const [dateOptions, setDateOptions] = useState({});
+
+    const buyMenuItemsRef = useRef();
+
     useEffect(() => {
-        fetch(`${getBaseUrl()}/items/items.json`)
+        fetch(`/items/items.json`)
             .then(response => response.json())
             .then(data => {
                 setData(data);
@@ -177,6 +49,15 @@ export function Items() {
             .catch(error => {
                 console.error("Error loading data: ", error);
                 setLoading(false);
+            });
+
+        fetch(`/revisions.json`)
+            .then(response => response.json())
+            .then(data => {
+                setDateOptions(data);
+            })
+            .catch(error => {
+                console.error("Error loading data: ", error);
             });
 
         const savedShowNoted = localStorage.getItem('showNoted');
@@ -225,22 +106,39 @@ export function Items() {
         return data.filter(item => {
             const matchesSearch = item.name.toLowerCase().includes(searchText.toLowerCase());
             const matchesNoted = showNoted || !item.isNoted;
-            const matchesDate = selectedDate ? compareDate(item.releaseDate, selectedDate, comparison) : true;
+            const matchesDate = selectedDate ? applyDateFilter(item.releaseDate * 1000, selectedDate, comparison) : true;
             return matchesSearch && matchesNoted && matchesDate;
         });
     };
 
-    const compareDate = (itemDate, selectedDate, comparison) => {
-        const startDate = selectedDate - (3 * 24 * 60 * 60);
-        const endDate = selectedDate + (3 * 24 * 60 * 60);
+    const applyDateFilter = (itemDate, selectedDateFilter, comparison) => {
+        if (selectedDate === "all") {
+            return true
+        }
+        const dateTolerance = 10 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
 
+        let minDate, maxDate;
+
+        if (Array.isArray(selectedDateFilter) && selectedDateFilter.length === 2) {
+            const [startDate, endDate] = selectedDateFilter;
+
+            minDate = new Date(startDate * 1000 - dateTolerance);
+            maxDate = new Date(endDate * 1000 + dateTolerance);
+            console.log(`minDate: ${minDate.toLocaleString()}`);
+            console.log(`maxDate: ${maxDate.toLocaleString()}`);
+            console.log(`itemDate: ${new Date(itemDate).toLocaleString()}`);
+        } else {
+            const date = selectedDateFilter;
+            minDate = new Date(date * 1000 - dateTolerance);
+            maxDate = new Date(date * 1000 + dateTolerance);
+        }
         switch (comparison) {
             case '=':
-                return itemDate >= startDate && itemDate <= endDate;
+                return itemDate >= minDate;
             case '>=':
-                return itemDate >= startDate;
+                return itemDate >= minDate;
             case '<=':
-                return itemDate <= endDate;
+                return itemDate <= maxDate;
             default:
                 return true;
         }
@@ -249,7 +147,7 @@ export function Items() {
     const filteredItems = filterItems();
 
     const renderIcon = (rowData) => {
-        const imagePath = `${getBaseUrl()}/items/items-icons/${rowData.id}.png`;
+        const imagePath = `/items/items-icons/${rowData.id}.png`;
         return (
             <div className="image-text-container">
                 <img
@@ -264,7 +162,7 @@ export function Items() {
     };
 
     const fetchCacheData = async (id) => {
-        const url = `${getBaseUrl()}/items/cache-defs/${id}.json`;
+        const url = `/items/cache-defs/${id}.json`;
         try {
             const response = await fetch(url);
             if (!response.ok) {
@@ -326,17 +224,8 @@ export function Items() {
             }
         }
 
-        if (sortField === 'releaseDate' && selectedDate !== null) {
-            switch (comparison) {
-                case '=':
-                    return (a.releaseDate === selectedDate ? 0 : (a.releaseDate < selectedDate ? -1 : 1)) - (b.releaseDate === selectedDate ? 0 : (b.releaseDate < selectedDate ? -1 : 1));
-                case '>=':
-                    return (a.releaseDate >= selectedDate ? 0 : -1) - (b.releaseDate >= selectedDate ? 0 : -1);
-                case '<=':
-                    return (a.releaseDate <= selectedDate ? 0 : -1) - (b.releaseDate <= selectedDate ? 0 : -1);
-                default:
-                    return a.id - b.id;  // Default sort by ID if no comparison is specified
-            }
+        if (sortField === 'releaseDate' && selectedDate !== 'all' && selectedDate !== null) {
+            return buyMenuItemsRef.current.applyDateFilter(a, b);
         }
 
         return a.id - b.id;  // Default sort by ID if no sortField or sortOrder
@@ -367,7 +256,7 @@ export function Items() {
                         display: "flex",
                         flexDirection: "row",
                         justifyContent: "center"
-                    }}>Total Items: <div style={{ color: "yellow", paddingLeft: '10px' }}> {data.length.toLocaleString()} </div></h5>
+                    }}>Total Items: <div style={{ color: "yellow", paddingLeft: '10px' }}> {filteredItems.length.toLocaleString()} </div></h5>
                 </div>
 
                 <DataTable
@@ -377,18 +266,17 @@ export function Items() {
                     showGridlines
                     stripedRows
                     header={
-                        <ItemTableHeader
+                        <TableHeader
                             dateOptions={dateOptions}
                             resetFilters={resetFilters}
                             searchText={searchText}
                             onSearchChange={onSearchChange}
                             showNoted={showNoted}
                             onShowNotedChange={onShowNotedChange}
-                            onResetFilters={resetFilters}
-                            handleComparisonChange={handleComparisonChange}
                             selectedDate={selectedDate}
                             handleDateChange={handleDateChange}
                             comparison={comparison}
+                            handleComparisonChange={handleComparisonChange}
                         />
                     }
                     paginator

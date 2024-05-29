@@ -5,7 +5,7 @@ const Index = () => {
 
     return (
         <>
-            <Items></Items>
+            Hey
         </>
     );
 };

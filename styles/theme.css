@@ -7403,6 +7403,34 @@
     align-items: center;
 }
 
+/* globals.css */
+body {
+    /* Adding a default font and background color for the body */
+    font-family: Arial, sans-serif;
+    background-color: #f0f8ff;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+    width: 8px;  /* Width of the entire scrollbar */
+    height: 8px; /* Height of the entire scrollbar */
+}
+
+::-webkit-scrollbar-track {
+    background: #cce7ff;  /* Color of the track */
+    border-radius: 10px;   /* Rounded corners */
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: #1e90ff;  /* Color of the scroll thumb */
+    border-radius: 10px;        /* Rounded corners */
+    border: 2px solid #cce7ff;  /* Padding around the thumb */
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: #0073e6;  /* Color of the scroll thumb on hover */
+}
+
 .custom-menu-image {
     width: 24px; /* Adjust the width as needed */
     height: auto; /* This ensures the image scales proportionally */

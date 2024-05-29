@@ -7,15 +7,6 @@ import React from "react";
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
 
-
-const getBaseUrl = () => {
-    if (window.location.hostname === 'openrune.github.io') {
-        const pathArray = window.location.pathname.split('/');
-        return pathArray.length > 1 ? `/${pathArray[1]}` : '';
-    }
-    return '';
-};
-
 const MyApp = ({ Component, pageProps }) => {
     const router = useRouter();
 
