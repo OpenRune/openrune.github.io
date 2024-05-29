@@ -1,6 +1,5 @@
 import React, {useState} from "react";
 import {Sidebar} from 'primereact/sidebar';
-import { useNavigate } from 'react-router-dom';
 import 'primereact/resources/themes/saga-blue/theme.css';  // or another theme of your choice
 import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
@@ -32,17 +31,10 @@ const Navigation = ({ sidebarVisible, setSidebarVisible }) => {
             ]
         }
     ];
-    const getBaseUrl = () => {
-        if (window.location.hostname === 'openrune.github.io') {
-            const pathArray = window.location.pathname.split('/');
-            return pathArray.length > 1 ? `/${pathArray[1]}` : '';
-        }
-        return '';
-    };
-
+    
     const CustomHeader = ({onHide}) => (
         <div className="sidebar-header">
-            <img src={`${getBaseUrl()}/logo.png`} alt="Logo" className="sidebar-logo"/>
+            <img src={`/logo.png`} alt="Logo" className="sidebar-logo"/>
             <button className="sidebar-close-btn p-sidebar-close p-sidebar-icon p-link" onClick={onHide}>
                 <i className="pi pi-times"></i>
             </button>
