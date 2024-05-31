@@ -7403,6 +7403,36 @@
     align-items: center;
 }
 
+.button-global {
+    margin: 0 5px;
+    flex: 1;
+    background-color: #007BFF;
+    color: white;
+    border-radius: 5px;
+    padding: 10px 20px;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s, color 0.3s;
+    font-size: 16px; /* Adjust the font size as needed */
+}
+
+.button-global:hover {
+    background-color: #0056B3;
+    color: white;
+}
+
+.button-global-selected {
+    background-color: #0056B3;
+    color: white;
+}
+
+.button-global .icon {
+    font-size: 23px; /* Adjust the font size as needed */
+    margin-right: 8px; /* Adjust the spacing as needed */
+}
+
 /* globals.css */
 body {
     /* Adding a default font and background color for the body */
@@ -14356,7 +14386,6 @@ input.p-dropdown-label {
 .custom-checkbox {
     display: flex;
     align-items: center;
-    margin-left: 10px;
 }
 
 .custom-checkbox input[type="checkbox"] {

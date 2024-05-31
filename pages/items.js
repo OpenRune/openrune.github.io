@@ -1,14 +1,103 @@
-import React, { useState, useEffect, useRef } from "react";
-import { DataTable } from "primereact/datatable";
-import { Column } from "primereact/column";
-import { Dialog } from "primereact/dialog";
-import { TabPanel, TabView } from "primereact/tabview";
-import { Button } from "react-bootstrap";
-import { FaCopy, FaInfoCircle } from 'react-icons/fa';
-import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { atomOneDark } from 'react-syntax-highlighter/dist/cjs/styles/hljs';
-import { Blocks } from "react-loader-spinner";
-import TableHeader from "../components/TableHeader";
+import React, {useState, useEffect, useRef} from "react";
+import {DataTable} from "primereact/datatable";
+import {Column} from "primereact/column";
+import {Dialog} from "primereact/dialog";
+import {TabPanel, TabView} from "primereact/tabview";
+import {Button} from "react-bootstrap";
+import {FaCog, FaCopy, FaGreaterThanEqual, FaInfoCircle} from 'react-icons/fa';
+import {Light as SyntaxHighlighter} from 'react-syntax-highlighter';
+import {atomOneDark} from 'react-syntax-highlighter/dist/cjs/styles/hljs';
+import {Blocks} from "react-loader-spinner";
+import {InputText} from "primereact/inputtext";
+import {Menubar} from "primereact/menubar";
+import RevisionFilter from "../components/RevisionFilter";
+import {RiFilterOffFill} from "react-icons/ri";
+
+const Header = ({
+                    dateOptions,
+                    resetFilters,
+                    searchText,
+                    onSearchChange,
+                    showNoted,
+                    onShowNotedChange,
+                    selectedDate,
+                    handleDateChange,
+                    comparison,
+                    handleComparisonChange
+                }) => {
+    const menuItems = [{
+        label: (<span>
+          <FaCog style={{marginRight: '5px'}}/>
+          Options
+        </span>), items: [{
+            template: () => (<div>
+                {['Noted Items', 'Null Items'].map((option) => (<label key={option} className="custom-checkbox">
+                    <input
+                        type="checkbox"
+                        value={option}
+                        checked={option === 'Noted Items' ? showNoted : false}
+                        onChange={(event) => {
+                            const isChecked = event.target.checked;
+                            if (option === 'Noted Items') {
+                                onShowNotedChange(isChecked)
+                            }
+                        }}
+                        style={{
+                            width: '25px', height: '25px'
+                        }} // Fixed width and height for the input element
+                    />
+                    <span style={{whiteSpace: 'nowrap'}}> {option}</span>
+                </label>))}
+            </div>)
+        }]
+    }];
+
+    return (
+        <div className="flex"
+             style={{display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column"}}>
+            <div className="flex align-items-center double-line">
+                <div className="flex row1">
+                    <span className="p-input-icon-left" style={{marginLeft: "10px"}}>
+                        <i className="pi pi-search"/>
+                        <InputText
+                            value={searchText}
+                            onChange={onSearchChange}
+                            placeholder="Item Search"
+                        />
+                    </span>
+                    <span className="flexcenter" style={{marginLeft: "10px"}}>
+                           <div className="custom-menubar-container" style={{display: 'inline-block'}}>
+                        <Menubar model={menuItems} className="custom-menubar"/>
+                    </div>
+                    </span>
+                    <span className="flexcenter" style={{marginLeft: "10px"}}>
+                        <RevisionFilter
+                            dateOptions={dateOptions}
+                            selectedDate={selectedDate}
+                            handleDateChange={handleDateChange}
+                            comparison={comparison}
+                            handleComparisonChange={handleComparisonChange}
+                        />
+                    </span>
+                    <Button
+                        className="button-global"
+                        onClick={resetFilters}
+                        style={{
+                            backgroundColor: '#E42C27',
+                            color: 'white',
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#D22C1F'}
+                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#E42C27'}
+                    >
+                        <RiFilterOffFill className='icon'/>
+                        Clear Filters
+                    </Button>
+
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -90,8 +179,8 @@ export function Items() {
         setSearchText(event.target.value);
     };
 
-    const onShowNotedChange = (event) => {
-        setShowNoted(event.target.checked);
+    const onShowNotedChange = (isChecked) => {
+        setShowNoted(isChecked);
     };
 
     const openDialog = (id, name) => {
@@ -155,7 +244,7 @@ export function Items() {
                     alt={rowData.name}
                     width={34}
                     height={34}
-                    style={{ margin: 4, objectFit: 'contain' }}
+                    style={{margin: 4, objectFit: 'contain'}}
                 />
             </div>
         );
@@ -196,17 +285,18 @@ export function Items() {
     const renderButton = (rowData) => {
         return (
             <Button
-                className="custom-button"
+                className={`button-global`}
                 onClick={() => openDialog(rowData.id, rowData.name)}
             >
-                <FaInfoCircle className="custom-button-icon" />
+                <FaInfoCircle className={'icon'}/>
                 Details
             </Button>
+
         );
     };
 
     const onSort = (event) => {
-        const { sortField, sortOrder } = event;
+        const {sortField, sortOrder} = event;
         setSortField(sortField);
         setSortOrder(sortOrder);
     };
@@ -251,12 +341,14 @@ export function Items() {
     } else {
         return (
             <>
-                <div className="center-div" style={{ height: '10vh' }}>
+                <div className="center-div" style={{height: '10vh'}}>
                     <h5 className="natureRune" style={{
                         display: "flex",
                         flexDirection: "row",
                         justifyContent: "center"
-                    }}>Total Items: <div style={{ color: "yellow", paddingLeft: '10px' }}> {filteredItems.length.toLocaleString()} </div></h5>
+                    }}>Total Items: <div
+                        style={{color: "yellow", paddingLeft: '10px'}}> {filteredItems.length.toLocaleString()} </div>
+                    </h5>
                 </div>
 
                 <DataTable
@@ -266,7 +358,7 @@ export function Items() {
                     showGridlines
                     stripedRows
                     header={
-                        <TableHeader
+                        <Header
                             dateOptions={dateOptions}
                             resetFilters={resetFilters}
                             searchText={searchText}
@@ -293,7 +385,7 @@ export function Items() {
                     <Column
                         body={renderIcon}
                         header="Icon"
-                        style={{ width: '50px' }}
+                        style={{width: '50px'}}
                     />
                     <Column
                         field="id"
@@ -330,18 +422,18 @@ export function Items() {
                     <Column
                         body={renderButton}
                         header="Definitions"
-                        style={{ width: '150px' }}
+                        style={{width: '150px'}}
                     />
                 </DataTable>
                 <Dialog
                     header={`Definition: ${selectedItemName}`}
                     visible={showDialog}
-                    style={{ width: '50vw' }}
+                    style={{width: '50vw'}}
                     onHide={() => setShowDialog(false)}
                 >
                     <TabView>
                         <TabPanel header={
-                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <div style={{display: 'flex', alignItems: 'center'}}>
                                 Client
                                 <Button
                                     variant="link"
@@ -355,7 +447,7 @@ export function Items() {
                                     }}
                                     onClick={() => copyToClipboard(cacheError || cacheContent)}
                                 >
-                                    <FaCopy />
+                                    <FaCopy/>
                                 </Button>
                             </div>
                         }>
@@ -364,7 +456,7 @@ export function Items() {
                             </SyntaxHighlighter>
                         </TabPanel>
                         <TabPanel header={
-                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <div style={{display: 'flex', alignItems: 'center'}}>
                                 Server
                                 <Button
                                     variant="link"
@@ -378,7 +470,7 @@ export function Items() {
                                     }}
                                     onClick={() => copyToClipboard(serverError || serverContent)}
                                 >
-                                    <FaCopy />
+                                    <FaCopy/>
                                 </Button>
                             </div>
                         }>

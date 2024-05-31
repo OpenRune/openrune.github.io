@@ -1,7 +1,8 @@
 import React, { useState, forwardRef, useImperativeHandle } from 'react';
 import { Button } from 'react-bootstrap';
 import { Menubar } from 'primereact/menubar';
-import { FaHistory } from 'react-icons/fa';
+import {FaEquals, FaGreaterThanEqual, FaHistory, FaLessThanEqual} from 'react-icons/fa';
+import Tooltip from '@material-ui/core/Tooltip';
 
 const CustomMenuItem = ({ label }) => (
     <div className="custom-menu-item">
@@ -61,39 +62,30 @@ const RevisionFilter = forwardRef(({ dateOptions, selectedDate, handleDateChange
                                 ))}
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px', width: '100%' }}>
-                                <Button
-                                    style={{
-                                        margin: '0 5px',
-                                        flex: 1,
-                                        backgroundColor: selectedComparison === '=' ? 'blue' : '',
-                                        color: selectedComparison === '=' ? 'white' : ''
-                                    }}
-                                    onClick={() => handleComparisonButtonClick('=')}
-                                >
-                                    =
-                                </Button>
-                                <Button
-                                    style={{
-                                        margin: '0 5px',
-                                        flex: 1,
-                                        backgroundColor: selectedComparison === '<=' ? 'blue' : '',
-                                        color: selectedComparison === '<=' ? 'white' : ''
-                                    }}
-                                    onClick={() => handleComparisonButtonClick('<=')}
-                                >
-                                    &lt;=
-                                </Button>
-                                <Button
-                                    style={{
-                                        margin: '0 5px',
-                                        flex: 1,
-                                        backgroundColor: selectedComparison === '>=' ? 'blue' : '',
-                                        color: selectedComparison === '>=' ? 'white' : ''
-                                    }}
-                                    onClick={() => handleComparisonButtonClick('>=')}
-                                >
-                                    &gt;=
-                                </Button>
+                                <Tooltip title="Equal to" arrow>
+                                    <Button
+                                        className={`button-global ${selectedComparison === '=' ? 'button-global-selected' : ''}`}
+                                        onClick={() => handleComparisonButtonClick('=')}
+                                    >
+                                        <FaEquals />
+                                    </Button>
+                                </Tooltip>
+                                <Tooltip title="Less than or equal to" arrow>
+                                    <Button
+                                        className={`button-global ${selectedComparison === '<=' ? 'button-global-selected' : ''}`}
+                                        onClick={() => handleComparisonButtonClick('<=')}
+                                    >
+                                        <FaLessThanEqual />
+                                    </Button>
+                                </Tooltip>
+                                <Tooltip title="Greater than or equal to" arrow>
+                                    <Button
+                                        className={`button-global ${selectedComparison === '>=' ? 'button-global-selected' : ''}`}
+                                        onClick={() => handleComparisonButtonClick('>=')}
+                                    >
+                                        <FaGreaterThanEqual />
+                                    </Button>
+                                </Tooltip>
                             </div>
                         </div>
                     )
