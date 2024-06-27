@@ -1,23 +1,23 @@
 export default {
     title: 'Home',
-    titleTemplate: 'OpenRune',
+    titleTemplate: 'osrsdb',
 
     description: 'Find Ruenscape Cache Data.',
-    canonical: " openrune.dev",
+    canonical: " osrsdb.dev",
 
     openGraph: {
       type: 'website',
       locale: 'en_GB',
-      url: ' openrune.dev',
+      url: ' osrsdb.dev',
       description: 'Find the best items to alch in OSRS. Old School RuneScape High Alchemy Calculator.',
-      site_name: 'openrune',
-      title: 'OpenRune',
+      site_name: 'osrsdb',
+      title: 'osrsdb',
       images: [
         {
           url: 'https://i.imgur.com/V9ScNJG.png',
           width: 800,
           height: 600,
-          alt: 'OpenRune',
+          alt: 'osrsdb',
         }
       ]
     },
@@ -28,7 +28,7 @@ export default {
       }, 
       {
         name: 'application-name',
-        content: 'openrune'
+        content: 'osrsdb'
       },
       {
         name: 'language',
@@ -40,7 +40,7 @@ export default {
       },
       {
         name: 'keywords',
-        content: ["osrs", "OpenRune", "OpenRuneemy", "osrs alchemy" , "osrs magic guide"]
+        content: ["osrs", "osrsdb", "osrsdbemy", "osrs alchemy" , "osrs magic guide"]
       },
       {
         name: 'viewport',
@@ -52,7 +52,7 @@ export default {
         url: 'https://i.imgur.com/V9ScNJG.png',
         width: 800,
         height: 600,
-        alt: 'OpenRune',
+        alt: 'osrsdb',
       },
     ],
     additionalLinkTags : [
