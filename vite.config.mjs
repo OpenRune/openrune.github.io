@@ -3,21 +3,30 @@ import react from '@vitejs/plugin-react'
 import path from 'node:path'
 import autoprefixer from 'autoprefixer'
 
-export default defineConfig(() => {
+export default defineConfig(({ mode }) => {
   return {
-    base: './',
+    // Since it's deploying to https://openrune.github.io/ (root path), base is '/'
+    base: mode === 'production' ? '/' : './',
+
+    build: {
+      outDir: 'dist', // Ensure build output goes to the dist directory
+      sourcemap: mode === 'production',
+    },
+
     css: {
       postcss: {
         plugins: [
-          autoprefixer({}), // add options if needed
+          autoprefixer(), // Add options if needed
         ],
       },
     },
+
     esbuild: {
       loader: 'jsx',
       include: /src\/.*\.jsx?$/,
       exclude: [],
     },
+
     optimizeDeps: {
       force: true,
       esbuildOptions: {
@@ -26,7 +35,9 @@ export default defineConfig(() => {
         },
       },
     },
+
     plugins: [react()],
+
     resolve: {
       alias: [
         {
@@ -36,10 +47,11 @@ export default defineConfig(() => {
       ],
       extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json', '.scss'],
     },
+
     server: {
       port: 3000,
       proxy: {
-        // https://vitejs.dev/config/server-options.html
+        // Add proxy configuration if needed
       },
     },
   }
