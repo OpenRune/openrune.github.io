@@ -3,7 +3,7 @@ name: Build Electron App
 on:
   push:
     branches:
-      - main
+      - main  # Adjust to your default branch
 
 jobs:
   build:
@@ -16,7 +16,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '16'
+          node-version: '16'  # Ensure the version matches your project
 
       - name: Install dependencies
         run: npm install
@@ -29,31 +29,11 @@ jobs:
 
       - name: Build Electron app
         env:
-          GH_TOKEN: ${{ secrets.TOKEN }}
-        run: npm run electron-build
+          GH_TOKEN: ${{ secrets.TOKEN }}  # Optional, if needed
+        run: npm run electron-build  # Define this in your package.json to build the Electron app
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v3
         with:
-          name: ElectronApp
-          path: dist/
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Create Git Tag
-        run: |
-          git tag v1.0.0
-          git push https://${{ secrets.TOKEN }}@github.com/OpenRune/openrune.github.io.git v1.0.0
-
-      - name: Upload Electron build to GitHub releases
-        uses: softprops/action-gh-release@v1
-        with:
-          files: dist/*.dmg, dist/*.exe, dist/*.AppImage
-        env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          name: ElectronApp  # Name of the artifact
+          path: dist/  # Path where the Electron app is built
