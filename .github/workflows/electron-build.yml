@@ -3,7 +3,7 @@ name: Build Electron App
 on:
   push:
     branches:
-      - main  # Adjust to your default branch
+      - main
 
 jobs:
   build:
@@ -16,7 +16,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '16'  # Ensure the version matches your project
+          node-version: '16'
 
       - name: Install dependencies
         run: npm install
@@ -29,14 +29,14 @@ jobs:
 
       - name: Build Electron app
         env:
-          GH_TOKEN: ${{ secrets.TOKEN }}  # Pass the GitHub Token here
-        run: npm run electron-build  # Define this in package.json
+          GH_TOKEN: ${{ secrets.TOKEN }}
+        run: npm run electron-build
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v3  # Updated to v3
+        uses: actions/upload-artifact@v3
         with:
           name: ElectronApp
-          path: dist/  # Path where the Electron app is built
+          path: dist/
 
   release:
     needs: build
@@ -46,14 +46,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Create Git Tag  # NEW: This creates a new tag for the release
+      - name: Create Git Tag
         run: |
-          git tag v1.0.0  # Replace with a versioning scheme of your choice
-          git push origin v1.0.0
+          git tag v1.0.0
+          git push https://${{ secrets.TOKEN }}@github.com/OpenRune/openrune.github.io.git v1.0.0
 
       - name: Upload Electron build to GitHub releases
         uses: softprops/action-gh-release@v1
         with:
-          files: dist/*.dmg, dist/*.exe, dist/*.AppImage  # Add formats you want to support
+          files: dist/*.dmg, dist/*.exe, dist/*.AppImage
         env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}  # Pass the GitHub Token here
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
