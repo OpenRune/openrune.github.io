@@ -48,6 +48,5 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: dist/*.dmg, dist/*.exe, dist/*.AppImage  # Add formats you want to support
-
-      - name: Notify auto-updater
-        run: echo "Triggering update check..."  # Adjust this to notify your updater server if needed
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}  # Use the GH_TOKEN secret here
