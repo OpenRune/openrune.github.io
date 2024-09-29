@@ -29,7 +29,7 @@ jobs:
 
       - name: Build Electron app
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}  # Pass the GitHub Token here
+          GH_TOKEN: ${{ secrets.TOKEN }}  # Pass the GitHub Token here
         run: npm run electron-build  # Define this in package.json
 
       - name: Upload build artifact
@@ -46,9 +46,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Create Git Tag  # NEW: This creates a new tag for the release
+        run: |
+          git tag v1.0.0  # Replace with a versioning scheme of your choice
+          git push origin v1.0.0
+
       - name: Upload Electron build to GitHub releases
         uses: softprops/action-gh-release@v1
         with:
           files: dist/*.dmg, dist/*.exe, dist/*.AppImage  # Add formats you want to support
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}  # Pass the GitHub Token here
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}  # Pass the GitHub Token here
