@@ -5,8 +5,7 @@ import autoprefixer from 'autoprefixer'
 
 export default defineConfig(({ mode }) => {
   return {
-    // Since it's deploying to https://openrune.github.io/ (root path), base is '/'
-    base: mode === 'production' ? '/' : './',
+    base: '/',
 
     build: {
       outDir: 'dist', // Ensure build output goes to the dist directory
