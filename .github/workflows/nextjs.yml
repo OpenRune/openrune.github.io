@@ -52,27 +52,3 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist  # Specify the directory where Vite built the project
 
-  electron-build:
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18' # Use a compatible Node.js version
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build Electron App
-        run: npm run electron-build
-
-      - name: Publish Electron Artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: electron-build
-          path: dist_electron # Assuming this is where electron-builder outputs artifacts
