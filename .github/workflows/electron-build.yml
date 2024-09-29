@@ -31,7 +31,7 @@ jobs:
         run: npm run electron-build  # Define this in package.json
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3  # Updated to v3
         with:
           name: ElectronApp
           path: dist/  # Path where the Electron app is built
