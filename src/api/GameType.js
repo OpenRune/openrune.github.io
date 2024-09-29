@@ -1,0 +1,7 @@
+export const GameType = {
+  OLDSCHOOL: 'OLDSCHOOL',
+  RUNESCAPE: 'RUNESCAPE',
+  DARKSCAPE: 'DARKSCAPE',
+  DOTD: 'DOTD',
+  ALL: 'ALL'
+};
