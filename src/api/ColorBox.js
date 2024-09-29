@@ -1,6 +1,6 @@
 import React from 'react';
 import { CTooltip } from '@coreui/react';
-import {convertHSLToHex, unpackJagexHSL} from './colorUtils'; // Assuming the utility functions are in colorUtils.js
+import {convertHSLToHex, unpackJagexHSL} from '../api/ColorUtils'; // Assuming the utility functions are in colorUtils.js
 
 const ColorBox = ({
                     width = 100,
