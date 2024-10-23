@@ -11,7 +11,7 @@ import {
 import JagexColorPicker from 'src/components/ColorPicker';
 import {
   convertHexToJagexHSL,
-  convertJagexHSLToHex, convertJagexHSLToHSL, convertJagexHSLToRGB,
+  convertJagexHSLToHex, convertJagexHSLToHSL, convertJagexHSLToRGB, getJagexHSLComponents,
 } from 'src/api/ColorUtils';
 
 const Colors = () => {
@@ -90,6 +90,13 @@ const Colors = () => {
                   </p>
                   <p className="mb-2">
                     <strong>Jagex HSL:</strong> {colorPickerRef.current.getPackedColor() || 0}
+                  </p>
+                  <p className="mb-2">
+                    <strong>Jagex HSL (h,s,l):</strong>
+                    {colorPickerRef.current && (() => {
+                      const {h, s, l} = getJagexHSLComponents(colorPickerRef.current.getPackedColor() || 0);
+                      return ` hsl(${h}, ${s}%, ${l}%)`;
+                    })()}
                   </p>
                 </>
               )}

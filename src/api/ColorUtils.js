@@ -79,6 +79,13 @@ export const convertJagexHSLToHSL = (packedHsl) => {
   return { h: normalizedHue, s: normalizedSaturation, l: normalizedLightness }; // Return HSL values
 };
 
+export const getJagexHSLComponents = (packedHsl) => {
+  const { hue, saturation, lightness } = unpackJagexHSL(packedHsl);
+
+  return { hue, saturation, lightness }; // Return the raw HSL values
+};
+
+
 export const convertJagexHSLToRGB = (packedHsl) => {
   const hexColor = convertJagexHSLToHex(packedHsl);
   return convertHexToRGB(hexColor); // Convert the hex color to RGB
