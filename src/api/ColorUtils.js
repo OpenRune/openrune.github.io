@@ -82,7 +82,7 @@ export const convertJagexHSLToHSL = (packedHsl) => {
 export const getJagexHSLComponents = (packedHsl) => {
   const { hue, saturation, lightness } = unpackJagexHSL(packedHsl);
 
-  return { hue, saturation, lightness }; // Return the raw HSL values
+  return { h: hue, s: saturation, l: lightness };
 };
 
 
