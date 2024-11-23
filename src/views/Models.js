@@ -18,7 +18,7 @@ const Models = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('http://134.195.88.53:8090/public/model/');
+        const response = await fetch('https://osrs.openrune.dev/public/model/');
         if (!response.ok) throw new Error('Network response was not ok');
 
         const data = await response.json();

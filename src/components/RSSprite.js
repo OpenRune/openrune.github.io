@@ -4,7 +4,7 @@ import { FiCopy } from 'react-icons/fi';
 
 // Function to dynamically build the image URL
 const buildImageUrl = (id, width, height, keepAspectRatio) => {
-  let url = `http://134.195.88.53:8090/public/sprite/${id}`; // Base URL
+  let url = `https://osrs.openrune.dev/public/sprite/${id}`; // Base URL
   const params = new URLSearchParams();
 
   // Append optional parameters if provided

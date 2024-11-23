@@ -29,7 +29,7 @@ const Sprites = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('http://134.195.88.53:8090/public/sprite/');
+        const response = await fetch('https://osrs.openrune.dev/public/sprite/');
         if (!response.ok) throw new Error('Network response was not ok');
 
         const data = await response.json();
@@ -52,7 +52,7 @@ const Sprites = () => {
 
   const downloadSprite = async (spriteId) => {
     try {
-      const response = await fetch(`http://134.195.88.53:8090/public/sprite/${spriteId}`);
+      const response = await fetch(`https://osrs.openrune.dev/public/sprite/${spriteId}`);
       if (!response.ok) throw new Error('Error fetching sprite');
 
       const blob = await response.blob();
@@ -77,7 +77,7 @@ const Sprites = () => {
 
     for (const item of filteredData) {
       try {
-        const response = await fetch(`http://134.195.88.53:8090/public/sprite/${item.id}`);
+        const response = await fetch(`https://osrs.openrune.dev/public/sprite/${item.id}`);
         if (response.ok) {
           const blob = await response.blob();
           zip.file(`sprite_${item.id}.png`, blob);

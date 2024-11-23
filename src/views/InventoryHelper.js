@@ -43,7 +43,7 @@ const InventoryHelper = () => {
 
   const fetchItemData = async (itemId) => {
     try {
-      const response = await fetch(`http://134.195.88.53:8090/public/item/${itemId}`);
+      const response = await fetch(`https://osrs.openrune.dev/public/item/${itemId}`);
       const item = await response.json();
 
       setSettings(prev => ({

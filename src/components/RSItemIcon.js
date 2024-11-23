@@ -3,7 +3,7 @@ import { CImage } from "@coreui/react";
 
 // Function to dynamically build the image URL
 export const buildImageUrl = (id, params = {}) => {
-  let url = `http://134.195.88.53:8090/public/item/${id}/icon`; // Base URL
+  let url = `https://osrs.openrune.dev/public/item/${id}/icon`; // Base URL
   const queryParams = new URLSearchParams();
 
   // Append optional parameters only if they are provided
