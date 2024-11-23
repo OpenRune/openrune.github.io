@@ -23,7 +23,7 @@ const Items = () => {
     setLoading(true);
     try {
       const nullsParam = filterNulls ? 'nulls=false' : 'nulls=true';
-      const response = await fetch(`http://127.0.0.1:8080/public/item/?${nullsParam}`);
+      const response = await fetch(`http://134.195.88.53:8090/public/item/?${nullsParam}`);
       const data = await response.json();
 
       setTableData(data.map((item) => ({
@@ -65,14 +65,14 @@ const Items = () => {
   };
 
   const handleDownloadItemIcon = async (item) => {
-    const response = await fetch(`http://127.0.0.1:8080/public/item/${item.id}/icon`);
+    const response = await fetch(`http://134.195.88.53:8090/public/item/${item.id}/icon`);
     const blob = await response.blob();
     saveAs(blob, `${item.name}_icon.png`);
   };
 
   const handleRowClick = async (item) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8080/public/item/${item.id}`);
+      const response = await fetch(`http://134.195.88.53:8090/public/item/${item.id}`);
       const fullItemData = await response.json();
       setSelectedItem(fullItemData);
       setModalVisible(true);

@@ -3,7 +3,7 @@ import { CImage } from "@coreui/react";
 
 // Function to dynamically build the image URL
 export const buildImageUrl = (id, params = {}) => {
-  let url = `http://127.0.0.1:8080/public/item/${id}/icon`; // Base URL
+  let url = `http://134.195.88.53:8090/public/item/${id}/icon`; // Base URL
   const queryParams = new URLSearchParams();
 
   // Append optional parameters only if they are provided

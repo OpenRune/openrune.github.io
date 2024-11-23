@@ -26,7 +26,7 @@ const RsModel = () => {
       if (modelId) {
         setLoading(true);
         try {
-          const response = await fetch(`http://127.0.0.1:8080/public/model/${modelId}`);
+          const response = await fetch(`http://134.195.88.53:8090/public/model/${modelId}`);
 
 
           const data = await response.json();

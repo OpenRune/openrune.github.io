@@ -8,7 +8,7 @@ const fetchRegionImage = async (regionID, scale) => {
     return cachedImages[cacheKey]; // Return cached image if available
   }
   try {
-    const response = await fetch(`http://127.0.0.1:8080/public/map/4/0/${regionID}`);
+    const response = await fetch(`http://134.195.88.53:8090/public/map/4/0/${regionID}`);
     if (!response.ok) throw new Error('Region not found');
     const blob = await response.blob();
     const imageUrl = URL.createObjectURL(blob);
@@ -143,7 +143,7 @@ const MapViewer = () => {
     let regionKeyMap = [];
 
     async function loadRegionKeyMap() {
-      const response = await fetch('http://127.0.0.1:8080/public/map/');
+      const response = await fetch('http://134.195.88.53:8090/public/map/');
       if (response.ok) {
         regionKeyMap = await response.json();
       } else {
