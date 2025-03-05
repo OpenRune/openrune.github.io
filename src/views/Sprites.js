@@ -138,7 +138,7 @@ const Sprites = () => {
               style={{ width: '150px', padding: '8px', marginRight: '8px' }}
             />
             <CButton color="primary" onClick={downloadAllSprites} style={{ marginLeft: 'auto' }}>
-              Download All Textures
+              Download All Sprites
             </CButton>
           </div>
         }
