@@ -26,7 +26,7 @@ const RsModel = () => {
       if (modelId) {
         setLoading(true);
         try {
-          const response = await fetch(`https://osrs.openrune.dev/public/model/${modelId}`);
+          const response = await fetch(`http://127.0.0.1:8090/public/model/${modelId}`);
 
 
           const data = await response.json();

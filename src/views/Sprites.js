@@ -6,39 +6,42 @@ import {
   CModalTitle,
   CModalBody,
   CModalFooter,
-  CProgress, CFormSelect
+  CProgress,
+  CFormInput
 } from "@coreui/react-pro";
 import RSSprite from "src/components/RSSprite";
-import { CFormInput } from "@coreui/react";
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import FilterTable from "src/components/FilterTable";
-import {FaFilter, FaHashtag} from "react-icons/fa";
+import { useServer } from '../api/apiService';
+import {getPublicFetch, getServerData } from "src/api/Api";
 
 const Sprites = () => {
+
   const [tableData, setTableData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [visible, setVisible] = useState(false);
-  const [selectedData, setSelectedData] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedSprite, setSelectedSprite] = useState(null);
   const [searchId, setSearchId] = useState('');
-  const [downloadModalVisible, setDownloadModalVisible] = useState(false); // Modal visibility for downloading
-  const [downloadProgress, setDownloadProgress] = useState(0); // Track download progress
+  const [downloadModalVisible, setDownloadModalVisible] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
 
-
+  // Fetch sprite data
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('https://osrs.openrune.dev/public/sprite/');
+        const response = await getPublicFetch(`sprite/`);
+
         if (!response.ok) throw new Error('Network response was not ok');
 
         const data = await response.json();
         const formattedData = data.map((item) => ({
           id: item.id,
           offsetX: item.offsetX,
-        }));
+        })).sort((a, b) => a.id - b.id);
 
-        setTableData(formattedData.sort((a, b) => a.id - b.id));
+        setTableData(formattedData);
         setFilteredData(formattedData);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -52,17 +55,11 @@ const Sprites = () => {
 
   const downloadSprite = async (spriteId) => {
     try {
-      const response = await fetch(`https://osrs.openrune.dev/public/sprite/${spriteId}`);
-      if (!response.ok) throw new Error('Error fetching sprite');
+      const response = await getPublicFetch(`sprite/${spriteId}`);
+      if (!response.ok) throw new Error(`Error fetching sprite ${spriteId}`);
 
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `sprite_${spriteId}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      saveAs(blob, `sprite_${spriteId}.png`);
     } catch (error) {
       console.error('Error downloading sprite:', error);
     }
@@ -70,14 +67,14 @@ const Sprites = () => {
 
   const downloadAllSprites = async () => {
     const zip = new JSZip();
-    setDownloadModalVisible(true); // Show modal when download starts
+    setDownloadModalVisible(true);
 
     const totalSprites = filteredData.length;
     let processedSprites = 0;
 
-    for (const item of filteredData) {
+    await Promise.all(filteredData.map(async (item) => {
       try {
-        const response = await fetch(`https://osrs.openrune.dev/public/sprite/${item.id}`);
+        const response = await getPublicFetch(`sprite/${item.id}`);
         if (response.ok) {
           const blob = await response.blob();
           zip.file(`sprite_${item.id}.png`, blob);
@@ -86,16 +83,13 @@ const Sprites = () => {
         console.error(`Error downloading sprite ${item.id}:`, error);
       }
 
-      // Update progress
       processedSprites += 1;
-      const progress = Math.round((processedSprites / totalSprites) * 100);
-      setDownloadProgress(progress);
-    }
+      setDownloadProgress(Math.round((processedSprites / totalSprites) * 100));
+    }));
 
-    zip.generateAsync({ type: 'blob' }).then((content) => {
-      saveAs(content, 'all_sprites.zip');
-      setDownloadModalVisible(false); // Hide modal when download finishes
-    });
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    saveAs(zipBlob, 'all_sprites.zip');
+    setDownloadModalVisible(false);
   };
 
   const handleSearchIdChange = (e) => {
@@ -103,96 +97,72 @@ const Sprites = () => {
     setSearchId(value);
 
     const filtered = tableData.filter((item) =>
-      item.id.toString().includes(value)
+      item.id.toString().includes(value) // Ensures ID 0 is included when filtering
     );
 
+    console.log("Filtered Data:", filtered); // Debugging line
     setFilteredData(filtered);
   };
 
   const handleRowClick = (item) => {
-    setSelectedData(item);
-    setVisible(true);
+    setSelectedSprite(item);
+    setModalVisible(true);
   };
 
-  const customFilters = (
-    <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '10px' }}>
-      {/* Search by ID */}
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <CFormInput
-          type="text"
-          placeholder="Search ID"
-          value={searchId}
-          onChange={handleSearchIdChange}
-          style={{ width: '150px', padding: '8px', marginRight: '8px' }}
-        />
-      </div>
-
-      {/* Download All Textures Button - Moved to Right */}
-      <CButton color="primary" onClick={downloadAllSprites} style={{ marginLeft: 'auto' }}>
-        Download All Textures
-      </CButton>
-    </div>
-  );
-
-
   const columns = [
-    {
-      key: 'id',
-      label: 'ID',
-      _style: { width: '30%' },
-      filter: false,
-      sorter: false,
-    },
-    {
-      key: 'sprite',
-      label: 'Sprite',
-      filter: false,
-      sorter: false,
-    },
+    { key: 'id', label: 'ID', _style: { width: '30%' }, filter: false, sorter: false },
+    { key: 'sprite', label: 'Sprite', filter: false, sorter: false },
   ];
 
   const scopedColumns = {
     sprite: (item) => (
       <td>
-        <RSSprite onClick={() => handleRowClick(item)} key={item.id} rounded thumbnail id={item.id} width={40} height={40} keepAspectRatio />
+        <RSSprite onClick={() => handleRowClick(item)} key={item.id} rounded thumbnail id={item.id} width={40} height={40} />
       </td>
     ),
   };
 
-  const CustomModalBody = ({ item }) => (
-    <>
-      <RSSprite id={item.id} />
-    </>
-  );
-
   return (
     <>
       <FilterTable
-        pageTitle={"Sprites"}
-        tableData={filteredData} // Pass the filtered data here
-        fetchData={() => {}} // No need to refetch, data already loaded
-        customFilters={customFilters}
+        pageTitle="Sprites"
+        tableData={filteredData}
+        fetchData={() => {}}
+        customFilters={
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '10px' }}>
+            <CFormInput
+              type="text"
+              placeholder="Search ID"
+              value={searchId}
+              onChange={handleSearchIdChange}
+              style={{ width: '150px', padding: '8px', marginRight: '8px' }}
+            />
+            <CButton color="primary" onClick={downloadAllSprites} style={{ marginLeft: 'auto' }}>
+              Download All Textures
+            </CButton>
+          </div>
+        }
         columns={columns}
         scopedColumns={scopedColumns}
         loading={loading}
-        CModalContent={CustomModalBody}
+        CModalContent={({ item }) => <RSSprite id={item.id} />}
         handleRowClick={handleRowClick}
         handleDownloadItemIcon={downloadSprite}
       />
 
-      {/* Modal Component for Sprite Details */}
-      <CModal alignment="center" visible={visible} onClose={() => setVisible(false)}>
+      {/* Modal for Sprite Details */}
+      <CModal alignment="center" visible={modalVisible} onClose={() => setModalVisible(false)}>
         <CModalHeader>
           <CModalTitle>Sprite Details</CModalTitle>
         </CModalHeader>
         <CModalBody>
-          {selectedData && <RSSprite id={selectedData.id} />}
+          {selectedSprite && <RSSprite id={selectedSprite.id} />}
         </CModalBody>
         <CModalFooter>
-          <CButton color="primary" onClick={() => downloadSprite(selectedData.id)}>
+          <CButton color="primary" onClick={() => downloadSprite(selectedSprite.id)}>
             Download Sprite
           </CButton>
-          <CButton color="secondary" onClick={() => setVisible(false)}>
+          <CButton color="secondary" onClick={() => setModalVisible(false)}>
             Close
           </CButton>
         </CModalFooter>

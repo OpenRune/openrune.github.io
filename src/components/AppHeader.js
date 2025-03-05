@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from 'react';
-import { NavLink } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   CContainer,
@@ -26,8 +25,8 @@ import {
 import { NavUserDropdown } from './header/index';
 import SecureContent from "src/components/SecureComponent";
 import LoginDropdown from "src/components/LoginDropdown";
-import ServerDropdown from "src/components/ServersDropdown";
 import { CIcon } from "@coreui/icons-react";
+import ServerDropdown from "src/components/ServerDropdown";
 
 const AppHeader = ({ removeMargins = false }) => { // Accept removeMargins prop with a default value of false
   const headerRef = useRef();
@@ -134,5 +133,7 @@ const AppHeader = ({ removeMargins = false }) => { // Accept removeMargins prop 
     </CHeader>
   );
 };
+
+
 
 export default AppHeader;

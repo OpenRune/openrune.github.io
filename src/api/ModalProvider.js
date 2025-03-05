@@ -1,9 +1,7 @@
 import React, { createContext, useContext, useState } from 'react';
 
-// Create the ModalContext
 const ModalContext = createContext();
 
-// ModalProvider component
 export const ModalProvider = ({ children }) => {
   const [modelId, setModelId] = useState(null);
   const [visible, setVisible] = useState(false);
