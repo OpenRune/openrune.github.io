@@ -19,6 +19,7 @@ import ColorBox from "src/api/ColorBox";
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import FilterTable from "src/components/FilterTable";
+import {getPublicFetch} from "src/api/Api";
 
 const Textures = () => {
   const perPage = 30;
@@ -35,7 +36,7 @@ const Textures = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('http://127.0.0.1:8090/public/texture/');
+        const response = await getPublicFetch('texture/');
         if (!response.ok) throw new Error('Network response was not ok');
 
         const data = await response.json();
@@ -93,14 +94,14 @@ const Textures = () => {
 
     if (item.spriteIds.length === 1) {
       // If only one sprite, download directly
-      const response = await fetch(`http://127.0.0.1:8090/public/sprite/${item.spriteIds[0]}.png`);
+      const response = await getPublicFetch(`sprite/${item.spriteIds[0]}.png`);
       const blob = await response.blob();
       saveAs(blob, `${item.spriteIds[0]}.png`);
     } else {
       // If multiple sprites, create a zip
       const zip = new JSZip();
       await Promise.all(item.spriteIds.map(async (spriteId) => {
-        const response = await fetch(`http://127.0.0.1:8090/public/sprite/${spriteId}.png`);
+        const response = await getPublicFetch(`sprite/${spriteId}.png`);
         const blob = await response.blob();
         zip.file(`${spriteId}.png`, blob);
       }));
@@ -116,13 +117,13 @@ const Textures = () => {
     await Promise.all(tableData.map(async (item) => {
       if (item.spriteIds.length === 1) {
         // If only one sprite, add to zip
-        const response = await fetch(`http://127.0.0.1:8090/public/sprite/${item.spriteIds[0]}.png`);
+        const response = await getPublicFetch(`sprite/${item.spriteIds[0]}.png`);
         const blob = await response.blob();
         zip.file(`${item.spriteIds[0]}.png`, blob);
       } else {
         // If multiple sprites, add all to zip
         await Promise.all(item.spriteIds.map(async (spriteId) => {
-          const response = await fetch(`http://127.0.0.1:8090/public/sprite/${spriteId}.png`);
+          const response = await getPublicFetch(`sprite/${spriteId}.png`);
           const blob = await response.blob();
           zip.file(`${spriteId}.png`, blob);
         }));

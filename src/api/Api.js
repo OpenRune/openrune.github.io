@@ -1,7 +1,21 @@
+import oldschoolIcon from '../assets/images/oldschool.png';
+import runescape742Icon from '../assets/images/runescape.png';
+
 export const serversData = [
-  { name: 'Oldschool', ip: 'http://192.168.1.1:8080', isPublic: true },
-  { name: 'Runescape 742', ip: 'http://192.168.1.2:8081', isPublic: true },
-  { name: 'Vorkath', ip: 'http://192.168.1.3:8082', isPublic: false },
+  {
+    icon: oldschoolIcon,
+    description: 'Latest Oldschool Data',
+    ip: 'https://osrs.openrune.dev/',
+    name: 'Oldschool',
+    isPublic: true,
+  },
+  {
+    icon: runescape742Icon,
+    description: 'Runescape data from 742',
+    ip: 'https://osrs.openrune.dev/',
+    name: 'Runescape 742',
+    isPublic: true,
+  }
 ];
 
 
@@ -23,24 +37,25 @@ export const getServerData = () => {
   return serversData[0];
 };
 
-const getIp = async (path) => {
+
+export const getIp = async (path) => {
   try {
+    const server = getServerData();
     const response = await fetch(`http://localhost:8090/${path}`);  // You can change the port based on your setup
     if (response.ok) {
-      return `http://localhost:8090/${path}`;
+        return `http://localhost:8090/${path}`;
     }
-    throw new Error('Localhost unavailable');
+    return `${server.ip}/${path}`;
   } catch (error) {
     const server = getServerData();
-    return server.ip;
+    return `${server.ip}/${path}`;
   }
 };
 
 export const getPublicFetch = async (path) => {
-  const server = getServerData();
-
   try {
-    const response = await fetch(await getIp(`/public/${path}`));
+    const response = await fetch(await getIp(`public/${path}`));
+
     if (!response.ok) {
       throw new Error('Failed to fetch data');
     }

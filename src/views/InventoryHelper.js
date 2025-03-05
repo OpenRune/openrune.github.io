@@ -15,7 +15,8 @@ import { FiCopy } from 'react-icons/fi';
 import RSItemIcon from 'src/components/RSItemIcon';
 import { buildImageUrl } from 'src/components/RSItemIcon';
 import AlertProviderWithDisplay, { useAlert } from 'src/components/AlertProviderWithDisplay';
-import inventoryIcon from '../assets/images/inv.png'; // Path to your local image
+import inventoryIcon from '../assets/images/inv.png';
+import {getPublicFetch} from "src/api/Api"; // Path to your local image
 
 const defaultValues = {
   itemId: 385, // Default to item 385
@@ -43,7 +44,7 @@ const InventoryHelper = () => {
 
   const fetchItemData = async (itemId) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8090/public/item/${itemId}`);
+      const response = await getPublicFetch(`item/${itemId}`);
       const item = await response.json();
 
       setSettings(prev => ({

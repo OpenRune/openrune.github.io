@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { CImage } from "@coreui/react";
 
 const buildImageUrl = (id, width, height, keepAspectRatio) => {
-  let url = `http://127.0.0.1:8090/public/sprite/${id}`;
+  let url = `https://osrs.openrune.dev/public/sprite/${id}`;
   const params = new URLSearchParams();
 
   if (width) params.append("width", width);
