@@ -1,19 +1,66 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AppContent, AppSidebar, AppHeader } from '../components/index';
-import MapViewer from "src/views/MapViewer";
-import { useLocation } from "react-router-dom";
+import MapViewer from 'src/views/MapViewer';
+import { useLocation } from 'react-router-dom';
+import routes from "src/routes";
 
 const DefaultLayout = () => {
-  const location = useLocation(); // Get the current location
-  const isMapView = location.pathname === '/MapViewer'; // Check if the current path is /MapViewer
+  const location = useLocation();
+  const { pathname, search } = location;
+
+  const isMapView = pathname === '/MapViewer';
+  const isEmbedView = pathname === '/widget';
+
+  const query = new URLSearchParams(search);
+  const type = query.get('type');
+  const styleOverride = query.get('style');
+
+  // 👇 Dynamically inject CSS based on `style` query param
+  useEffect(() => {
+    if (!styleOverride) return;
+
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `/styles/${styleOverride}.css`;
+    link.id = 'dynamic-style';
+
+    const oldLink = document.getElementById('dynamic-style');
+    if (oldLink) oldLink.remove();
+
+    document.head.appendChild(link);
+
+    return () => {
+      link.remove(); // Clean up on unmount or param change
+    };
+  }, [styleOverride]);
+
+  const renderWidgetView = () => {
+    const widgetRoute = routes.find(
+      (route) =>
+        route.isWidget &&
+        (route.path.includes(type) || route.name.toLowerCase() === type.toLowerCase())
+    );
+
+    if (widgetRoute && widgetRoute.element) {
+      const WidgetComponent = widgetRoute.element;
+      return <WidgetComponent />;
+    }
+
+    return (
+      <div>
+        <h1>Missing Widget</h1>
+        <p>Can't find widget: {type}</p>
+      </div>
+    );
+  };
 
   return (
     <div>
-      <AppSidebar forceUnfoldable={isMapView} />
-      <AppHeader removeMargins={isMapView} />
-      <div className={`wrapper d-flex flex-column min-vh-100`}>
+      {!isEmbedView && <AppSidebar forceUnfoldable={isMapView} />}
+      {!isEmbedView && <AppHeader removeMargins={isMapView} />}
+      <div className="wrapper d-flex flex-column min-vh-100">
         <div className="body flex-grow-1">
-          {isMapView ? <MapViewer /> : <AppContent />} {/* Render MapViewer or AppContent based on the path */}
+          {isEmbedView ? renderWidgetView() : isMapView ? <MapViewer /> : <AppContent />}
         </div>
       </div>
     </div>

@@ -15,13 +15,13 @@ const routes = [
   { path: '/', exact: true, name: 'Home' },
   { path: '/home', name: 'Home', element: Home },
   { path: '/caches', name: 'Caches', element: Caches },
-  { path: '/textures', name: 'Textures', element: Textures },
-  { path: '/items', name: 'Textures', element: Items },
-  { path: '/colors', name: 'Colors', element: Colors },
-  { path: '/inventoryHelper', name: 'Inventory Helper', element: InventoryHelper },
+  { path: '/textures', name: 'Textures', element: Textures, isWidget: true },
+  { path: '/items', name: 'Textures', element: Items, isWidget: true },
+  { path: '/colors', name: 'Colors', element: Colors, isWidget: true },
+  { path: '/inventoryHelper', name: 'Inventory Helper', element: InventoryHelper, isWidget: true },
   { path: '/MapViewer', name: 'Map View', element: MapView },
   { path: '/sprites', name: 'Sprites', element: Sprites },
   { path: '/models', name: 'Sprites', element: Models }
-]
+];
 
 export default routes
