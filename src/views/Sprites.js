@@ -38,6 +38,7 @@ const Sprites = () => {
         const data = await response.json();
         const formattedData = data.map((item) => ({
           id: item.id,
+          gameval: item.gameValName,
           offsetX: item.offsetX,
         })).sort((a, b) => a.id - b.id);
 
@@ -111,6 +112,7 @@ const Sprites = () => {
 
   const columns = [
     { key: 'id', label: 'ID', _style: { width: '30%' }, filter: false, sorter: false },
+    { key: 'gameval', label: 'Jagex Name', _style: { width: '20%' }, filter: false, sorter: false },
     { key: 'sprite', label: 'Sprite', filter: false, sorter: false },
   ];
 
