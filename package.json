@@ -1,83 +1,55 @@
 {
-  "name": "@coreui/coreui-free-react-admin-template",
-  "version": "5.1.0",
-  "main": "electron.js",
-  "description": "CoreUI Free React Admin Template",
-  "homepage": ".",
-  "bugs": {
-    "url": "https://github.com/coreui/coreui-free-react-admin-template/issues"
-  },
-  "build": {
-    "appId": "com.example.app",
-    "mac": {
-      "target": "dmg"
-    },
-    "win": {
-      "target": "nsis"
-    },
-    "linux": {
-      "target": "AppImage"
-    },
-    "files": [
-      "dist/**/*",
-      "electron.js"
-    ]
-  },
-  "repository": {
-    "type": "git",
-    "url": "git@github.com:coreui/coreui-free-react-admin-template.git"
-  },
-  "license": "MIT",
-  "author": "The CoreUI Team (https://github.com/orgs/coreui/people)",
+  "name": "OpenRune",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "build": "vite build",
-    "lint": "eslint \"src/**/*.js\"",
-    "serve": "vite preview",
-    "start": "vite",
-    "electron": "electron .",
-    "electron-build": "electron-builder"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
-    "@coreui/chartjs": "^4.0.0",
-    "@coreui/coreui-pro": "^5.3.1",
-    "@coreui/icons": "^3.0.1",
-    "@coreui/icons-pro": "^3.0.0",
-    "@coreui/icons-react": "^2.2.1",
-    "@coreui/react": "^5.1.0",
-    "@coreui/react-chartjs": "^3.0.0",
-    "@coreui/react-pro": "^5.4.0",
-    "@coreui/utils": "^2.0.2",
-    "@fortawesome/free-solid-svg-icons": "^6.6.0",
-    "@fortawesome/react-fontawesome": "^0.2.2",
-    "@popperjs/core": "^2.11.8",
-    "axios": "^1.7.4",
-    "chart.js": "^4.4.3",
-    "classnames": "^2.5.1",
-    "core-js": "^3.37.1",
-    "file-saver": "^2.0.5",
-    "jszip": "^3.10.1",
-    "next": "^14.2.5",
-    "primereact": "^10.8.2",
-    "prop-types": "^15.8.1",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-draggable": "^4.4.6",
-    "react-icons": "^5.3.0",
-    "react-redux": "^9.1.2",
-    "react-router-dom": "^6.23.1",
-    "redux": "5.0.1",
-    "simplebar-react": "^3.2.5"
+    "@hookform/resolvers": "^5.1.1",
+    "@radix-ui/react-avatar": "^1.1.10",
+    "@radix-ui/react-collapsible": "^1.1.11",
+    "@radix-ui/react-context-menu": "^2.2.15",
+    "@radix-ui/react-dialog": "^1.1.14",
+    "@radix-ui/react-dropdown-menu": "^2.1.15",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-scroll-area": "^1.2.9",
+    "@radix-ui/react-separator": "^1.1.7",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-tabs": "^1.1.12",
+    "@radix-ui/react-tooltip": "^1.2.7",
+    "@tabler/icons-react": "^3.34.0",
+    "axios": "^1.10.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "event-source-polyfill": "^1.0.31",
+    "lucide-react": "^0.525.0",
+    "next": "15.3.5",
+    "next-themes": "^0.4.6",
+    "nextjs-toploader": "^3.8.16",
+    "nuqs": "^2.4.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hook-form": "^7.60.0",
+    "sonner": "^2.0.6",
+    "tailwind-merge": "^3.3.1",
+    "zod": "^3.25.74"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.19",
-    "electron": "^25.0.0",
-    "electron-builder": "^23.0.0",
-    "eslint": "^8.57.0",
-    "eslint-plugin-react": "^7.34.2",
-    "eslint-plugin-react-hooks": "^4.6.2",
-    "postcss": "^8.4.38",
-    "sass": "^1.77.5",
-    "vite": "^5.2.13"
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/event-source-polyfill": "^1.0.5",
+    "@types/node": "^20",
+    "@types/react": "^18.0.28",
+    "@types/react-dom": "^18.0.11",
+    "eslint": "^9",
+    "eslint-config-next": "15.3.5",
+    "tailwindcss": "^4",
+    "tw-animate-css": "^1.3.5",
+    "typescript": "^5"
   }
 }
