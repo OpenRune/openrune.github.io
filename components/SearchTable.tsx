@@ -50,11 +50,13 @@ export default function SearchTable({
                                         name,
                                         baseUrl,
                                         queryPlaceholder,
-                                        filters,
+                                        filters = [],
+                                        disabledModes= [],
+                                        defaultSearchMode = "gameval",
                                         columns,
                                     }: SearchTableProps) {
     const [query, setQuery] = useState("");
-    const [searchMode, setSearchMode] = useState("gameval");
+    const [searchMode, setSearchMode] = useState(defaultSearchMode);
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(false);
     const [showSkeletons, setShowSkeletons] = useState(false);
@@ -72,27 +74,33 @@ export default function SearchTable({
     }
 
     const [filterState, setFilterState] = useState<Record<string, boolean>>(
-        Object.fromEntries(filters.map((f) => [f.key, false]))
+        filters.length > 0
+            ? Object.fromEntries(filters.map((f) => [f.key, false]))
+            : {}
     );
 
     const limit = 20;
     const totalPages = Math.ceil(total / limit);
 
-    const fetchData = async () => {
+    const fetchData = async (isInitial = false) => {
         setLoading(true);
 
-        // Compose filters keys that are true
         const activeFilters = Object.entries(filterState)
             .filter(([_, isOn]) => isOn)
             .map(([key]) => key);
 
-        const url = buildUrl(baseUrl, {
-            q: query,
-            mode: searchMode,
+        const params: Record<string, any> = {
             amt: limit,
             offset: (page - 1) * limit,
             filters: activeFilters.join(","),
-        });
+        };
+
+        if (!(searchMode === "id" && query === "")) {
+            params.q = query;
+            params.mode = searchMode;
+        }
+
+        const url = buildUrl(baseUrl, params);
 
         try {
             const res = await fetch(url);
@@ -161,17 +169,20 @@ export default function SearchTable({
                                     variant="outline"
                                     className="absolute right-1 top-1/2 -translate-y-1/2 h-8 px-3 min-w-[90px] rounded-l-none flex items-center justify-center"
                                 >
-                                    {SEARCH_MODES.find((m) => m.value === searchMode)?.label ??
-                                        searchMode}
+                                    {SEARCH_MODES.find((m) => m.value === searchMode)?.label ?? searchMode}
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent side="bottom" align="start" className="mt-1">
                                 {SEARCH_MODES.map((mode) => (
+
                                     <DropdownMenuItem
                                         key={mode.value}
+                                        disabled={disabledModes.includes(mode.value)}
                                         onClick={() => {
-                                            setSearchMode(mode.value);
-                                            setPage(1);
+                                            if (!disabledModes.includes(mode.value)) {
+                                                setSearchMode(mode.value);
+                                                setPage(1);
+                                            }
                                         }}
                                     >
                                         {mode.label}

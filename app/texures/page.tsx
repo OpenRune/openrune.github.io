@@ -10,9 +10,6 @@ export default function TextureSearch() {
         <SearchTable
             name = "Textures"
             baseUrl="/public/textures"
-            filters={[
-                { key: "noted", label: "Noted Items" }
-            ]}
             columns={[
                 {
                     key: "image",

@@ -9,9 +9,7 @@ export default function ItemSearch() {
         <SearchTable
             name = "Sprites"
             baseUrl="/public/sprites"
-            filters={[
-                { key: "noted", label: "Noted Items" }
-            ]}
+            disabledModes={["name"]}
             columns={[
                 {
                     key: "image",

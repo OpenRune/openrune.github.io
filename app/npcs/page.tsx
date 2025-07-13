@@ -8,9 +8,6 @@ export default function NpcsSearch() {
         <SearchTable
             name = "Npcs"
             baseUrl="/public/npcs"
-            filters={[
-                { key: "noted", label: "Noted Items" }
-            ]}
             columns={[
                 {
                     key: "image",

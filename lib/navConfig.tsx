@@ -46,6 +46,24 @@ export const NAV_PAGES: NavPage[] = [
         label: "Sprites",
         path: "/sprites",
         requiresAuth: false,
+      },
+      {
+        label: "Models",
+        path: "/models",
+        requiresAuth: false,
+      }
+    ],
+  },
+  {
+    label: "Tools",
+    path: "/",
+    icon: <IconFileSettings size={18} />,
+    requiresAuth: true,
+    children: [
+      {
+        label: "Color Helper",
+        path: "/colors",
+        requiresAuth: false,
       }
     ],
   }
