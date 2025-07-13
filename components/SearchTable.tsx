@@ -60,6 +60,7 @@ export default function SearchTable({
     const [showSkeletons, setShowSkeletons] = useState(false);
     const [results, setResults] = useState<any[]>([]);
     const [total, setTotal] = useState(0);
+    const [firstRender, setFirstRender] = useState(true);
 
     function getNestedValue(obj: any, path: string, fallback = "-") {
         if (!path.includes(".")) {
@@ -74,29 +75,27 @@ export default function SearchTable({
         Object.fromEntries(filters.map((f) => [f.key, false]))
     );
 
-    const limit = 13;
+    const limit = 20;
     const totalPages = Math.ceil(total / limit);
 
     const fetchData = async () => {
-        if (!query) {
-            setResults([]);
-            setTotal(0);
-            return;
-        }
-
         setLoading(true);
+
+        // Compose filters keys that are true
+        const activeFilters = Object.entries(filterState)
+            .filter(([_, isOn]) => isOn)
+            .map(([key]) => key);
 
         const url = buildUrl(baseUrl, {
             q: query,
             mode: searchMode,
             amt: limit,
             offset: (page - 1) * limit,
-            ...filterState,
+            filters: activeFilters.join(","),
         });
 
         try {
             const res = await fetch(url);
-            console.log(url);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             setResults(data.results);
@@ -108,10 +107,20 @@ export default function SearchTable({
         }
     };
 
+    // On first render, fetch initial data from baseUrl without params
     useEffect(() => {
+        fetchData(true);
+        setFirstRender(false);
+    }, []);
+
+    // On subsequent query/filter/page/searchMode changes, fetch filtered data
+    useEffect(() => {
+        if (firstRender) return; // skip fetch on first render here
+
         fetchData();
     }, [query, page, searchMode, filterState]);
 
+    // Show skeletons only after 500ms loading delay
     useEffect(() => {
         let timeout: ReturnType<typeof setTimeout>;
         if (loading) {
@@ -130,7 +139,7 @@ export default function SearchTable({
             : queryPlaceholder;
 
     return (
-        <Card className="max-w-7xl mx-auto p-4">
+        <Card className="max-w-7xl mx-auto p-4 h-screen flex flex-col">
             <CardHeader className="flex flex-col gap-2">
                 <CardTitle className="pl-1">{name} Search</CardTitle>
 
@@ -210,9 +219,10 @@ export default function SearchTable({
                 </div>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="flex flex-col flex-grow">
+                {/* Separate header table */}
                 <div className="overflow-x-auto">
-                    <Table>
+                    <Table className="table-fixed">
                         <TableHeader>
                             <TableRow>
                                 {columns.map((col) => (
@@ -220,6 +230,12 @@ export default function SearchTable({
                                 ))}
                             </TableRow>
                         </TableHeader>
+                    </Table>
+                </div>
+
+                {/* Scrollable body table */}
+                <div className="overflow-x-auto max-h-[750px] overflow-y-auto">
+                    <Table className="table-fixed">
                         <TableBody>
                             {loading && showSkeletons ? (
                                 <>

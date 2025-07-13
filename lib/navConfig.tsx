@@ -36,6 +36,16 @@ export const NAV_PAGES: NavPage[] = [
         label: "Npcs",
         path: "/npcs",
         requiresAuth: false,
+      },
+      {
+        label: "Textures",
+        path: "/texures",
+        requiresAuth: false,
+      },
+      {
+        label: "Sprites",
+        path: "/sprites",
+        requiresAuth: false,
       }
     ],
   }
