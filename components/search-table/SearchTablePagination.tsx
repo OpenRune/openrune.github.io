@@ -56,7 +56,7 @@ export const SearchTablePagination: React.FC<SearchTablePaginationProps> = ({
       {children}
       <Button
         size="sm"
-        onClick={() => setPage((p) => Math.max(p - 1, 1))}
+        onClick={() => setPage(page - 1 < 1 ? 1 : page - 1)}
         disabled={page === 1}
         className="flex items-center justify-center"
         variant="outline"
@@ -87,7 +87,7 @@ export const SearchTablePagination: React.FC<SearchTablePaginationProps> = ({
       />
       <Button
         size="sm"
-        onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+        onClick={() => setPage(page + 1 > totalPages ? totalPages : page + 1)}
         disabled={page === totalPages}
         className="flex items-center justify-center"
         variant="outline"
