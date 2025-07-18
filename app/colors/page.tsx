@@ -150,8 +150,8 @@ const Colors: React.FC = () => {
                             </p>
                             <p>
                                 <span className="font-medium">Jagex HSL Components:</span> hsl(
-                                {jagexHslComponents.h}, {jagexHslComponents.s}%,{" "}
-                                {jagexHslComponents.l}%)
+                                {jagexHslComponents.hue}, {jagexHslComponents.saturation}%,{" "}
+                                {jagexHslComponents.lightness}%)
                             </p>
                             <p>
                                 <span className="font-medium">Saturation Bits:</span> 3 bits
