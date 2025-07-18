@@ -36,22 +36,22 @@ const SEARCH_MODES = [
 
 interface SearchTableProps {
     baseUrl: string;
-    queryPlaceholder: string;
-    filters: { key: string; label: string }[];
+    filters?: { key: string; label: string }[];
     columns: {
         key: string;
         label: string;
         render?: (row: any) => React.ReactNode;
     }[];
     name?: string;
+    disabledModes?: string[];
+    defaultSearchMode?: string;
 }
 
 export default function SearchTable({
                                         name,
                                         baseUrl,
-                                        queryPlaceholder,
                                         filters = [],
-                                        disabledModes= [],
+                                        disabledModes = [],
                                         defaultSearchMode = "gameval",
                                         columns,
                                     }: SearchTableProps) {
@@ -144,7 +144,7 @@ export default function SearchTable({
     const placeholder =
         searchMode === "id"
             ? 'ID search (e.g. "10 + 100" supported)'
-            : queryPlaceholder;
+            : '';
 
     return (
         <Card className="max-w-7xl mx-auto p-4 h-screen flex flex-col">

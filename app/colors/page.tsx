@@ -206,7 +206,6 @@ const Colors: React.FC = () => {
                                 onChange={(packedHSLJagex: number) => {
                                     handleColorChange(packedHSLJagex, "hsl");
                                 }}
-                                style={{ width: "100%", height: "auto" }}
                             />
                         </div>
                     </CardContent>

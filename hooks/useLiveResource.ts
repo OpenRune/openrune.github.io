@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useSSE } from './useSSE';
-import {authorized} from "@/lib/api/apiClient";
 
 export interface RawSSEEvent {
   id?: string;
