@@ -5,18 +5,18 @@ if (!process.env.API_PROXY_DESTINATION) {
 }
 
 const nextConfig: {
-  devIndicators: { errorIndicator: boolean; buildActivityPosition: string };
+  devIndicators: { errorIndicator: boolean; position: string };
   rewrites(): Promise<[{ destination: string; source: string }]>
 } = {
   devIndicators: {
-    buildActivityPosition: 'top-right',
+    position: 'top-right',
     errorIndicator: true,
   },
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        destination: process.env.API_PROXY_DESTINATION,
+        destination: process.env.API_PROXY_DESTINATION!,
       },
     ];
   },
