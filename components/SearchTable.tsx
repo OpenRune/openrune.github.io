@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import {
     Card,
@@ -147,11 +148,11 @@ export default function SearchTable({
             : '';
 
     return (
-        <Card className="max-w-7xl mx-auto p-4 h-screen flex flex-col">
+        <Card className="max-w-7xl mx-auto p-4 flex flex-col h-[calc(100vh-20px)]">
             <CardHeader className="flex flex-col gap-2">
                 <CardTitle className="pl-1">{name} Search</CardTitle>
 
-                <div className="flex items-center w-full gap-2">
+                <div className="flex items-center w-full">
                     <div className="relative flex items-center w-[505px]">
                         <Input
                             placeholder={placeholder}
@@ -160,21 +161,19 @@ export default function SearchTable({
                                 setPage(1);
                                 setQuery(e.target.value);
                             }}
-                            className="pr-14"
+                            className="pr-20"
                         />
-
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button
                                     variant="outline"
-                                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 px-3 min-w-[90px] rounded-l-none flex items-center justify-center"
+                                    className="absolute right-0 top-1/2 -translate-y-1/2 h-8 px-3 min-w-[90px] rounded-l-none flex items-center justify-center border-l"
                                 >
                                     {SEARCH_MODES.find((m) => m.value === searchMode)?.label ?? searchMode}
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent side="bottom" align="start" className="mt-1">
+                            <DropdownMenuContent side="bottom" align="end" className="mt-1">
                                 {SEARCH_MODES.map((mode) => (
-
                                     <DropdownMenuItem
                                         key={mode.value}
                                         disabled={disabledModes.includes(mode.value)}
@@ -191,8 +190,6 @@ export default function SearchTable({
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
-
-                    <div className="flex-grow" />
 
                     {filters.length > 0 && (
                         <DropdownMenu>
@@ -230,22 +227,22 @@ export default function SearchTable({
                 </div>
             </CardHeader>
 
-            <CardContent className="flex flex-col flex-grow">
-                {/* Separate header table */}
-                <div className="overflow-x-auto">
+            <CardContent className="flex flex-col flex-grow min-h-0">
+                {/* Table header only */}
+                <div>
                     <Table className="table-fixed">
                         <TableHeader>
                             <TableRow>
                                 {columns.map((col) => (
-                                    <TableHead key={col.key}>{col.label}</TableHead>
+                                    <TableHead key={col.key} className={`align-middle ${col.key === 'view' ? 'text-right pr-8' : 'text-left'}`}>{col.label}</TableHead>
                                 ))}
                             </TableRow>
                         </TableHeader>
                     </Table>
                 </div>
 
-                {/* Scrollable body table */}
-                <div className="overflow-x-auto max-h-[750px] overflow-y-auto">
+                {/* Scrollable table body only */}
+                <div className="overflow-x-auto overflow-y-scroll flex-grow min-h-0 mt-0">
                     <Table className="table-fixed">
                         <TableBody>
                             {loading && showSkeletons ? (
@@ -253,7 +250,7 @@ export default function SearchTable({
                                     {[...Array(limit)].map((_, i) => (
                                         <TableRow key={`skeleton-${i}`}>
                                             {columns.map((col) => (
-                                                <TableCell key={col.key}>
+                                                <TableCell key={col.key} className="align-middle text-left">
                                                     <Skeleton className="h-6 w-20" />
                                                 </TableCell>
                                             ))}
@@ -270,7 +267,7 @@ export default function SearchTable({
                                 results.map((row, i) => (
                                     <TableRow key={row.id ?? i}>
                                         {columns.map((col) => (
-                                            <TableCell key={col.key}>
+                                            <TableCell key={col.key} className={`align-middle ${col.key === 'view' ? 'text-right' : 'text-left'}`}>
                                                 {col.render ? col.render(row) : getNestedValue(row, col.key)}
                                             </TableCell>
                                         ))}
@@ -292,16 +289,64 @@ export default function SearchTable({
                                 onClick={() => setPage((p) => Math.max(p - 1, 1))}
                                 disabled={page === 1}
                                 className="flex items-center justify-center"
+                                variant="outline"
                             >
-                                Previous
+                                <ChevronLeft className="w-4 h-4" />
                             </Button>
+                            {/* Page number buttons: always show min (1) and max (totalPages), always show ellipsis after 1 and before max, in-between buttons fixed */}
+                            {(() => {
+                                const pageButtons = [];
+                                const maxInBetween = 4;
+                                // Always show first page
+                                pageButtons.push(
+                                    <Button key={1} size="sm" variant={page === 1 ? "default" : "outline"} onClick={() => setPage(1)}>{1}</Button>
+                                );
+                                // Always show ellipsis after first page
+                                pageButtons.push(<span key="start-ellipsis" className="px-1">...</span>);
+                                // Calculate in-between range
+                                let inBetweenStart = Math.max(2, Math.min(page - Math.floor(maxInBetween / 2), totalPages - maxInBetween));
+                                let inBetweenEnd = Math.min(totalPages - 1, inBetweenStart + maxInBetween - 1);
+                                // Adjust if near the start
+                                if (inBetweenStart <= 2) {
+                                    inBetweenStart = 2;
+                                    inBetweenEnd = Math.min(totalPages - 1, inBetweenStart + maxInBetween - 1);
+                                }
+                                // Adjust if near the end
+                                if (inBetweenEnd >= totalPages - 1) {
+                                    inBetweenEnd = totalPages - 1;
+                                    inBetweenStart = Math.max(2, inBetweenEnd - maxInBetween + 1);
+                                }
+                                // In-between page buttons (never show 1 or totalPages here)
+                                for (let i = inBetweenStart; i <= inBetweenEnd; i++) {
+                                    pageButtons.push(
+                                        <Button
+                                            key={i}
+                                            size="sm"
+                                            variant={page === i ? "default" : "outline"}
+                                            onClick={() => setPage(i)}
+                                        >
+                                            {i}
+                                        </Button>
+                                    );
+                                }
+                                // Always show ellipsis before last page
+                                pageButtons.push(<span key="end-ellipsis" className="px-1">...</span>);
+                                // Always show last page if more than 1
+                                if (totalPages > 1) {
+                                    pageButtons.push(
+                                        <Button key={totalPages} size="sm" variant={page === totalPages ? "default" : "outline"} onClick={() => setPage(totalPages)}>{totalPages}</Button>
+                                    );
+                                }
+                                return pageButtons;
+                            })()}
                             <Button
                                 size="sm"
                                 onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
                                 disabled={page === totalPages}
                                 className="flex items-center justify-center"
+                                variant="outline"
                             >
-                                Next
+                                <ChevronRight className="w-4 h-4" />
                             </Button>
                             <Input
                                 type="number"

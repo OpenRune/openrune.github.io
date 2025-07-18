@@ -74,7 +74,7 @@ export default async function RootLayout({
             >
                 <Providers activeThemeValue={activeThemeValue as string}>
                     <ClientToaster />
-                    <SidebarProvider defaultOpen={defaultOpen}>
+                    <SidebarProvider defaultOpen={true}>
                         <AppSidebar/>
                         <FloatingSidebarTrigger />
                         <div className="w-full m-[10px]">

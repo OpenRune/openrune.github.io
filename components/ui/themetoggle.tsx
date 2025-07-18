@@ -90,7 +90,7 @@ export function ModeToggle() {
                     className='group/toggle size-8'
                     onClick={handleThemeToggle}
                 >
-                    {resolvedTheme === 'dark' ? <IconSun /> : <IconMoon />}
+                    {resolvedTheme === 'dark' ? <IconSun className="w-5 h-5" /> : <IconMoon className="w-5 h-5" />}
                     <span className='sr-only'>Toggle theme</span>
                 </Button>
             </ContextMenuTrigger>

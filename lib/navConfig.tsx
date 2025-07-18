@@ -1,4 +1,12 @@
-import { IconHome, IconUser, IconFileSettings, IconCreditCard } from "@tabler/icons-react";
+import {
+  IconHome,
+  IconUser,
+  IconFileSettings,
+  IconTools,
+  IconPhoto,
+  Icon3dCubeSphere,
+  IconTexture, IconPackage, IconCube, IconPalette
+} from "@tabler/icons-react";
 import type { ReactNode } from "react";
 
 export type NavPage = {
@@ -25,31 +33,37 @@ export const NAV_PAGES: NavPage[] = [
       {
         label: "Objects",
         path: "/objects",
+        icon: <IconCube size={18} />,
         requiresAuth: false,
       },
       {
         label: "Items",
         path: "/items",
+        icon: <IconPackage size={18} />,
         requiresAuth: false,
       },
       {
         label: "Npcs",
         path: "/npcs",
+        icon: <IconUser size={18} />,
         requiresAuth: false,
       },
       {
         label: "Textures",
         path: "/texures",
+        icon: <IconTexture size={18} />,
         requiresAuth: false,
       },
       {
         label: "Sprites",
         path: "/sprites",
+        icon: <IconPhoto size={18} />,
         requiresAuth: false,
       },
       {
         label: "Models",
         path: "/models",
+        icon: <Icon3dCubeSphere size={18} />,
         requiresAuth: false,
       }
     ],
@@ -57,12 +71,13 @@ export const NAV_PAGES: NavPage[] = [
   {
     label: "Tools",
     path: "/",
-    icon: <IconFileSettings size={18} />,
+    icon: <IconTools size={18} />,
     requiresAuth: true,
     children: [
       {
         label: "Color Helper",
         path: "/colors",
+        icon: <IconPalette size={18} />,
         requiresAuth: false,
       }
     ],

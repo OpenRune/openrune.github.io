@@ -6,6 +6,14 @@
   <component name="ChangeListManager">
     <list default="true" id="9e2dc116-edfb-462b-b863-05ca80e0ae51" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/SearchTable.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/SearchTable.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/sidebar/SideBarToggle.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/sidebar/SideBarToggle.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/sidebar/app-header-content.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/sidebar/app-header-content.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/sidebar/app-sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/sidebar/app-sidebar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ui/button.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/button.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ui/themetoggle.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/themetoggle.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/navConfig.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/lib/navConfig.tsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -32,7 +40,7 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "git-widget-placeholder": "main",
     "jsx.switch.disabled": "true",
-    "last_opened_file_path": "C:/Users/Home/Desktop/Engine2019-main/Engine2019-main",
+    "last_opened_file_path": "E:/RSPS/OpenRune/openrune.dev/components/sidebar",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.standard": "true",
     "node.js.detected.package.tslint": "true",
@@ -52,11 +60,11 @@
 }]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="E:\RSPS\OpenRune\openrune.dev\components\sidebar" />
+      <recent name="E:\RSPS\OpenRune\openrune.dev" />
       <recent name="E:\RSPS\OpenRune\openrune.dev\app" />
       <recent name="E:\Programming\synctunez\synctunez.com\components\sidebar" />
       <recent name="E:\Programming\synctunez\synctunez.com\src\api\data" />
-      <recent name="E:\Programming\synctunez\synctunez.com\src\views" />
-      <recent name="E:\Programming\synctunez" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="E:\RSPS\OpenRune\openrune.dev\components\ui" />
@@ -154,6 +162,7 @@
       <workItem from="1752358661976" duration="11764000" />
       <workItem from="1752399500508" duration="36000" />
       <workItem from="1752432872233" duration="70000" />
+      <workItem from="1752813629866" duration="4695000" />
     </task>
     <servers />
   </component>

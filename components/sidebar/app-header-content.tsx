@@ -2,50 +2,54 @@
 
 import * as React from 'react'
 import {
-    SidebarMenu, useSidebar,
-    // SidebarMenuButton, SidebarTrigger,
+  SidebarMenu,
+  useSidebar
 } from '@/components/ui/sidebar'
 import {ModeToggle} from "@/components/ui/themetoggle";
-import { Sygnet } from '@/components/ui/sygnet';
-import {PanelLeftIcon} from "lucide-react";
+import { SideBarToggle } from './SideBarToggle';
 import {Logo} from "@/components/ui/logo";
+import {Sygnet} from "@/components/ui/sygnet";
+import Image from "next/image";
 
 export function AppHeaderContent() {
   const [mounted, setMounted] = React.useState(false);
+  const { open } = useSidebar();
+
   React.useEffect(() => {
     setMounted(true);
   }, []);
 
-    const { open } = useSidebar();
-
   return (
     <SidebarMenu>
-      <div
-          className="peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-hidden ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-data-[sidebar=menu-action]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 h-8 text-sm min-w-8 duration-200 ease-linear"
-          tabIndex={0}
-          role="button"
+      <div className="flex flex-col gap-2 pt-3">
+        <div
+          className="flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm h-8 text-sm min-w-8"
           aria-label="Sidebar Header"
-      >
-        <div className="flex items-center justify-between w-full">
-          <div>
-              {open ? <Logo width={200} height={32}/> : <Sygnet width={200} height={32}/>}
-
-          </div>
-
-          <div className="flex-1 grid text-left text-sm leading-tight"/>
-
-          <div
-              style={{
-                width: 32,
-                height: 32,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-          >
-            {mounted ? <ModeToggle/> : null}
-          </div>
+        >
+          {!open && (
+            <div className="flex w-full h-8 items-center justify-center">
+              <Sygnet width={28} height={28} className="text-sidebar-primary-foreground" />
+            </div>
+          )}
+          {open && (
+            <>
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2 min-w-0 max-w-[60%]">
+                  <Logo width={200} height={32}/>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {mounted ? <ModeToggle /> : null}
+                  <SideBarToggle />
+                </div>
+              </div>
+            </>
+          )}
         </div>
+        {!open && (
+          <div className="w-full flex justify-center px-2 mt-1">
+            <SideBarToggle />
+          </div>
+        )}
       </div>
     </SidebarMenu>
   )
