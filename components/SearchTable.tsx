@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useMediaQuery } from "@uidotdev/usehooks";
+import Cookies from "js-cookie";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -14,6 +16,8 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    DropdownMenuSeparator,
+    DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +31,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buildUrl } from "@/lib/api/apiClient";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const SEARCH_MODES = [
     { value: "name", label: "Name" },
@@ -64,6 +69,14 @@ export default function SearchTable({
     const [results, setResults] = useState<any[]>([]);
     const [total, setTotal] = useState(0);
     const [firstRender, setFirstRender] = useState(true);
+    const perPageCookieKey = `per_page_${name || 'default'}`;
+    const defaultAmt = 19;
+    const [amt, setAmt] = useState(() => {
+        const cookieVal = Cookies.get(perPageCookieKey);
+        const parsed = cookieVal ? parseInt(cookieVal, 10) : defaultAmt;
+        return isNaN(parsed) ? defaultAmt : Math.max(1, Math.min(90, parsed));
+    });
+    const amtOptions = [5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90];
 
     function getNestedValue(obj: any, path: string, fallback = "-") {
         if (!path.includes(".")) {
@@ -80,8 +93,12 @@ export default function SearchTable({
             : {}
     );
 
-    const limit = 20;
+    const limit = amt;
     const totalPages = Math.ceil(total / limit);
+
+    // Responsive maxInBetween for pagination
+    const isLg = useMediaQuery("(min-width: 1024px)");
+    const isMd = useMediaQuery("(min-width: 768px)");
 
     const fetchData = async (isInitial = false) => {
         setLoading(true);
@@ -125,9 +142,13 @@ export default function SearchTable({
     // On subsequent query/filter/page/searchMode changes, fetch filtered data
     useEffect(() => {
         if (firstRender) return; // skip fetch on first render here
-
         fetchData();
-    }, [query, page, searchMode, filterState]);
+    }, [query, page, searchMode, filterState, amt]);
+
+    // Save amt to cookie when it changes
+    useEffect(() => {
+        Cookies.set(perPageCookieKey, String(amt), { expires: 365 });
+    }, [amt, perPageCookieKey]);
 
     // Show skeletons only after 500ms loading delay
     useEffect(() => {
@@ -152,7 +173,7 @@ export default function SearchTable({
             <CardHeader className="flex flex-col gap-2">
                 <CardTitle className="pl-1">{name} Search</CardTitle>
 
-                <div className="flex items-center w-full">
+                <div className="flex items-center w-full gap-2">
                     <div className="relative flex items-center w-[505px]">
                         <Input
                             placeholder={placeholder}
@@ -242,7 +263,7 @@ export default function SearchTable({
                 </div>
 
                 {/* Scrollable table body only */}
-                <div className="overflow-x-auto overflow-y-scroll flex-grow min-h-0 mt-0">
+                <div className="overflow-x-auto overflow-y-scroll flex-grow min-h-0 mt-0 w-full">
                     <Table className="table-fixed">
                         <TableBody>
                             {loading && showSkeletons ? (
@@ -279,90 +300,149 @@ export default function SearchTable({
                 </div>
 
                 {totalPages > 0 && (
-                    <div className="flex items-center justify-between mt-4">
-                        <div>
-                            Page {page} of {totalPages} ({total} results)
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                size="sm"
-                                onClick={() => setPage((p) => Math.max(p - 1, 1))}
-                                disabled={page === 1}
-                                className="flex items-center justify-center"
-                                variant="outline"
-                            >
-                                <ChevronLeft className="w-4 h-4" />
-                            </Button>
-                            {/* Page number buttons: always show min (1) and max (totalPages), always show ellipsis after 1 and before max, in-between buttons fixed */}
-                            {(() => {
-                                const pageButtons = [];
-                                const maxInBetween = 4;
-                                // Always show first page
-                                pageButtons.push(
+                    <>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-4 w-full">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <span>
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Button size="sm" variant="outline" className="min-w-[2.5rem] px-2 py-1">
+                                                            {amt}
+                                                        </Button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>per page</TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </span>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-32">
+                                        {amtOptions.map(opt => (
+                                            <DropdownMenuItem
+                                                key={opt}
+                                                onClick={() => {
+                                                    setAmt(opt);
+                                                    setPage(1);
+                                                }}
+                                                className={amt === opt ? 'font-bold' : ''}
+                                            >
+                                                {opt}
+                                            </DropdownMenuItem>
+                                        ))}
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuLabel>Custom</DropdownMenuLabel>
+                                        <div className="px-2 py-1">
+                                            <Input
+                                                type="number"
+                                                min={1}
+                                                max={90}
+                                                value={amt}
+                                                onChange={e => {
+                                                    let val = parseInt(e.target.value, 10);
+                                                    if (isNaN(val)) val = defaultAmt;
+                                                    setAmt(Math.max(1, Math.min(90, val)));
+                                                    setPage(1);
+                                                }}
+                                                className="w-full text-xs"
+                                                style={{ minWidth: 0 }}
+                                            />
+                                        </div>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                                <span className="whitespace-nowrap">Page {page} of {totalPages} ({total} results)</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-nowrap justify-end">
+                                <Button
+                                    size="sm"
+                                    onClick={() => setPage((p) => Math.max(p - 1, 1))}
+                                    disabled={page === 1}
+                                    className="flex items-center justify-center px-2 py-1"
+                                    variant="outline"
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                </Button>
+                                {/* Responsive page buttons: more on lg, fewer on md, only first/last on sm, none on xs */}
+                                <div className="hidden md:flex items-center gap-1">
+                                    {(() => {
+                                        const pageButtons = [];
+                                        let maxInBetween = 5;
+                                        // Always show first page
+                                        pageButtons.push(
+                                            <Button key={1} size="sm" variant={page === 1 ? "default" : "outline"} onClick={() => setPage(1)}>{1}</Button>
+                                        );
+                                        // Always show ellipsis after first page
+                                        pageButtons.push(<span key="start-ellipsis" className="px-1">...</span>);
+                                        // Calculate in-between range
+                                        let inBetweenStart = Math.max(2, Math.min(page - Math.floor(maxInBetween / 2), totalPages - maxInBetween));
+                                        let inBetweenEnd = Math.min(totalPages - 1, inBetweenStart + maxInBetween - 1);
+                                        // Adjust if near the start
+                                        if (inBetweenStart <= 2) {
+                                            inBetweenStart = 2;
+                                            inBetweenEnd = Math.min(totalPages - 1, inBetweenStart + maxInBetween - 1);
+                                        }
+                                        // Adjust if near the end
+                                        if (inBetweenEnd >= totalPages - 1) {
+                                            inBetweenEnd = totalPages - 1;
+                                            inBetweenStart = Math.max(2, inBetweenEnd - maxInBetween + 1);
+                                        }
+                                        // In-between page buttons (never show 1 or totalPages here)
+                                        for (let i = inBetweenStart; i <= inBetweenEnd; i++) {
+                                            pageButtons.push(
+                                                <Button
+                                                    key={i}
+                                                    size="sm"
+                                                    variant={page === i ? "default" : "outline"}
+                                                    onClick={() => setPage(i)}
+                                                >
+                                                    {i}
+                                                </Button>
+                                            );
+                                        }
+                                        // Always show ellipsis before last page
+                                        pageButtons.push(<span key="end-ellipsis" className="px-1">...</span>);
+                                        // Always show last page if more than 1
+                                        if (totalPages > 1) {
+                                            pageButtons.push(
+                                                <Button key={totalPages} size="sm" variant={page === totalPages ? "default" : "outline"} onClick={() => setPage(totalPages)}>{totalPages}</Button>
+                                            );
+                                        }
+                                        return pageButtons;
+                                    })()}
+                                </div>
+                                <div className="hidden sm:flex md:hidden items-center gap-1">
+                                    {/* Only show first/last page buttons, no ellipsis or in-between on sm screens */}
                                     <Button key={1} size="sm" variant={page === 1 ? "default" : "outline"} onClick={() => setPage(1)}>{1}</Button>
-                                );
-                                // Always show ellipsis after first page
-                                pageButtons.push(<span key="start-ellipsis" className="px-1">...</span>);
-                                // Calculate in-between range
-                                let inBetweenStart = Math.max(2, Math.min(page - Math.floor(maxInBetween / 2), totalPages - maxInBetween));
-                                let inBetweenEnd = Math.min(totalPages - 1, inBetweenStart + maxInBetween - 1);
-                                // Adjust if near the start
-                                if (inBetweenStart <= 2) {
-                                    inBetweenStart = 2;
-                                    inBetweenEnd = Math.min(totalPages - 1, inBetweenStart + maxInBetween - 1);
-                                }
-                                // Adjust if near the end
-                                if (inBetweenEnd >= totalPages - 1) {
-                                    inBetweenEnd = totalPages - 1;
-                                    inBetweenStart = Math.max(2, inBetweenEnd - maxInBetween + 1);
-                                }
-                                // In-between page buttons (never show 1 or totalPages here)
-                                for (let i = inBetweenStart; i <= inBetweenEnd; i++) {
-                                    pageButtons.push(
-                                        <Button
-                                            key={i}
-                                            size="sm"
-                                            variant={page === i ? "default" : "outline"}
-                                            onClick={() => setPage(i)}
-                                        >
-                                            {i}
-                                        </Button>
-                                    );
-                                }
-                                // Always show ellipsis before last page
-                                pageButtons.push(<span key="end-ellipsis" className="px-1">...</span>);
-                                // Always show last page if more than 1
-                                if (totalPages > 1) {
-                                    pageButtons.push(
+                                    {totalPages > 1 && (
                                         <Button key={totalPages} size="sm" variant={page === totalPages ? "default" : "outline"} onClick={() => setPage(totalPages)}>{totalPages}</Button>
-                                    );
-                                }
-                                return pageButtons;
-                            })()}
-                            <Button
-                                size="sm"
-                                onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-                                disabled={page === totalPages}
-                                className="flex items-center justify-center"
-                                variant="outline"
-                            >
-                                <ChevronRight className="w-4 h-4" />
-                            </Button>
-                            <Input
-                                type="number"
-                                min={1}
-                                max={totalPages}
-                                value={page}
-                                onChange={(e) => {
-                                    let val = Number(e.target.value);
-                                    if (val < 1) val = 1;
-                                    if (val > totalPages) val = totalPages;
-                                    setPage(val);
-                                }}
-                                className="w-16 text-center"
-                            />
+                                    )}
+                                </div>
+                                <Button
+                                    size="sm"
+                                    onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+                                    disabled={page === totalPages}
+                                    className="flex items-center justify-center px-2 py-1"
+                                    variant="outline"
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </Button>
+                                <Input
+                                    type="number"
+                                    min={1}
+                                    max={totalPages}
+                                    value={page}
+                                    onChange={(e) => {
+                                        let val = Number(e.target.value);
+                                        if (val < 1) val = 1;
+                                        if (val > totalPages) val = totalPages;
+                                        setPage(val);
+                                    }}
+                                    className="w-16 text-center px-2 py-1"
+                                />
+                            </div>
                         </div>
-                    </div>
+                    </>
                 )}
             </CardContent>
         </Card>
