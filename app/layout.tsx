@@ -13,6 +13,7 @@ import {SidebarProvider} from "@/components/ui/sidebar";
 import {AppSidebar} from "@/components/sidebar/app-sidebar";
 import FloatingSidebarTrigger from "@/components/FloatingSidebarTrigger";
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/next"
 
 const META_THEME_COLORS = {
     light: '#ffffff',
@@ -65,6 +66,7 @@ export default async function RootLayout({
             )}
         >
         <SpeedInsights/>
+        <Analytics/>
         <NextTopLoader showSpinner={false}/>
         <NuqsAdapter>
             <ThemeProvider
