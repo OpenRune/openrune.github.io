@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useMediaQuery } from "@uidotdev/usehooks";
 import Cookies from "js-cookie";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import {ChevronLeft, ChevronRight, Flag} from "lucide-react";
 import { toast } from "sonner";
 import {
     Card,
@@ -32,13 +32,106 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { buildUrl } from "@/lib/api/apiClient";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { IconTarget, IconCircleDashed } from "@tabler/icons-react";
+import { Info } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import GamevalTags from "./search-table/GamevalTags";
+import searchModes, { SEARCH_MODES } from "./search-table/searchModes";
 
-const SEARCH_MODES = [
-    { value: "name", label: "Name" },
-    { value: "id", label: "ID" },
-    { value: "gameval", label: "Gameval" },
-    { value: "regex", label: "Regex" },
-];
+// Helper to strip surrounding quotes
+function stripQuotes(str: string) {
+    return str.replace(/^"(.+)"$/, '$1');
+}
+
+// 2. useTags custom hook
+type Tag = { value: string; exact: boolean };
+function useTags(initial: Tag[] = []) {
+    const [tags, setTags] = React.useState<Tag[]>(initial);
+    // Add tags from input (splitting, deduplication)
+    const addTags = (input: string) => {
+        // Regex: match quoted values or unquoted words
+        const regex = /"([^"]+)"|([^\s,\n]+)/g;
+        let vals: string[] = [];
+        let match;
+        while ((match = regex.exec(input)) !== null) {
+            if (match[1]) {
+                vals.push('"' + match[1] + '"'); // preserve quotes for exact
+            } else if (match[2]) {
+                vals.push(match[2]);
+            }
+        }
+        vals = vals.map((v: string) => v.trim()).filter(Boolean);
+        setTags((prev: Tag[]) => {
+            const existing = new Set(prev.map((v) => v.value));
+            const newTags = vals.filter((v: string) => !existing.has(stripQuotes(v))).map((v: string) => {
+                if (v.startsWith('"') && v.endsWith('"')) {
+                    return { value: stripQuotes(v), exact: true };
+                } else {
+                    return { value: v, exact: false };
+                }
+            });
+            return [...prev, ...newTags];
+        });
+    };
+    // Remove tag by index
+    const removeTag = (idx: number) => setTags((prev: Tag[]) => prev.filter((_, i) => i !== idx));
+    // Remove all tags
+    const clearTags = () => setTags([]);
+    // Toggle exact for a tag
+    const toggleExact = (idx: number) => setTags((prev: Tag[]) => prev.map((v, i) => i === idx ? { ...v, exact: !v.exact } : v));
+    return { tags, setTags, addTags, removeTag, clearTags, toggleExact };
+}
+
+// 3. SearchTag component
+function SearchTag({ value, exact, onToggle, onRemove }: { value: string; exact: boolean; onToggle: () => void; onRemove: () => void }) {
+    return (
+        <Badge
+            variant={exact ? "default" : "secondary"}
+            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-mono select-none ${exact ? 'border border-primary bg-primary/10 text-primary' : ''}`}
+            style={{ minWidth: 0, maxWidth: 160, height: 22 }}
+        >
+            <span className="flex items-center" style={{ width: 18, justifyContent: 'center' }}>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button
+                                className={`p-0.5 focus:outline-none ${exact ? 'text-primary' : 'text-muted-foreground'} hover:text-primary flex items-center`}
+                                onClick={onToggle}
+                                aria-label={`Toggle exact for ${value}`}
+                                type="button"
+                                tabIndex={0}
+                            >
+                                {exact ? <IconTarget size={13} /> : <IconCircleDashed size={13} />}
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {exact ? 'Exact match' : 'Fuzzy match'}
+                          <br />
+                          Click to toggle mode
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            </span>
+            <span style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', fontSize: 12 }} className="select-none">
+                <span style={{ visibility: exact ? 'visible' : 'hidden' }}>
+                    "
+                </span>
+                {value}
+                <span style={{ visibility: exact ? 'visible' : 'hidden' }}>
+                    "
+                </span>
+            </span>
+            <button
+                className="ml-0.5 text-muted-foreground hover:text-destructive text-xs"
+                onClick={onRemove}
+                aria-label={`Remove ${value}`}
+                type="button"
+            >
+                ×
+            </button>
+        </Badge>
+    );
+}
 
 interface SearchTableProps {
     baseUrl: string;
@@ -78,6 +171,17 @@ export default function SearchTable({
     });
     const amtOptions = [5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90];
 
+    const {
+        tags: gamevalValues,
+        setTags: setGamevalValues,
+        addTags,
+        removeTag,
+        clearTags,
+        toggleExact,
+    } = useTags([]);
+    const [gamevalInput, setGamevalInput] = useState("");
+    const [gamevalExact, setGamevalExact] = useState(false);
+
     function getNestedValue(obj: any, path: string, fallback = "-") {
         if (!path.includes(".")) {
             return obj?.[path] ?? fallback;
@@ -95,10 +199,7 @@ export default function SearchTable({
 
     const limit = amt;
     const totalPages = Math.ceil(total / limit);
-
-    // Responsive maxInBetween for pagination
-    const isLg = useMediaQuery("(min-width: 1024px)");
-    const isMd = useMediaQuery("(min-width: 768px)");
+    // Remove client-side filteredResults logic, use results directly
 
     const fetchData = async (isInitial = false) => {
         setLoading(true);
@@ -113,7 +214,19 @@ export default function SearchTable({
             filters: activeFilters.join(","),
         };
 
-        if (!(searchMode === "id" && query === "")) {
+        if (searchMode === "gameval") {
+            params.mode = searchMode;
+            if (gamevalValues.length > 0) {
+                params.q = gamevalValues.map(v => v.exact ? `"${v.value}"` : v.value).join(",");
+            } else if (gamevalInput.trim()) {
+                const val = gamevalInput.trim();
+                const isQuoted = /^"(.+)"$/.test(val);
+                const cleanVal = stripQuotes(val);
+                params.q = isQuoted ? `"${cleanVal}"` : cleanVal;
+            } else {
+                params.q = "";
+            }
+        } else if (!(searchMode === "id" && query === "")) {
             params.q = query;
             params.mode = searchMode;
         }
@@ -139,11 +252,16 @@ export default function SearchTable({
         setFirstRender(false);
     }, []);
 
-    // On subsequent query/filter/page/searchMode changes, fetch filtered data
+    // Remove client-side filtering and tag-count-based fetch logic
+    // Restore previous useEffect for fetching on all relevant changes
     useEffect(() => {
-        if (firstRender) return; // skip fetch on first render here
+        if (firstRender) return;
+        // If in gameval mode and input contains quotes, do not fetch on input change
+        if (searchMode === "gameval" && gamevalInput.includes('"')) {
+            return;
+        }
         fetchData();
-    }, [query, page, searchMode, filterState, amt]);
+    }, [query, page, searchMode, filterState, amt, gamevalInput, gamevalValues]);
 
     // Save amt to cookie when it changes
     useEffect(() => {
@@ -163,27 +281,76 @@ export default function SearchTable({
         return () => clearTimeout(timeout);
     }, [loading]);
 
+    // Reset gameval state when mode changes
+    useEffect(() => {
+        if (searchMode !== "gameval") {
+            clearTags();
+            setGamevalInput("");
+            setGamevalExact(false);
+        }
+    }, [searchMode]);
+
     const placeholder =
         searchMode === "id"
             ? 'ID search (e.g. "10 + 100" supported)'
             : '';
 
+    // Remove local filteredResults logic, use results directly
+
+    // --- Add filteredResults logic for gameval mode ---
+    // let filteredResults = results; // This line is now redundant as filtering is done globally
+
     return (
         <Card className="max-w-7xl mx-auto p-4 flex flex-col h-[calc(100vh-20px)]">
             <CardHeader className="flex flex-col gap-2">
-                <CardTitle className="pl-1">{name} Search</CardTitle>
+                <CardTitle className="pl-1 flex items-center gap-2">
+                    {name} Search
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <button type="button" className="p-0.5 text-muted-foreground hover:text-primary focus:outline-none align-middle">
+                                    <Info className="w-4 h-4" />
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs whitespace-pre-line bg-zinc-900 text-white border border-zinc-800 shadow-lg">
+                                {searchModes[searchMode].help}
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </CardTitle>
 
                 <div className="flex items-center w-full gap-2">
+                    {/* Input and dropdown always in a row */}
                     <div className="relative flex items-center w-[505px]">
-                        <Input
-                            placeholder={placeholder}
-                            value={query}
-                            onChange={(e) => {
-                                setPage(1);
-                                setQuery(e.target.value);
-                            }}
-                            className="pr-20"
-                        />
+                        {searchMode === "gameval" ? (
+                            <Input
+                                id="gameval-input"
+                                placeholder="Paste or type values (comma, space, or newline separated)"
+                                value={gamevalInput}
+                                onChange={e => setGamevalInput(e.target.value)}
+                                onKeyDown={e => {
+                                    if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        let input = gamevalInput.trim();
+                                        if (input) {
+                                            addTags(input);
+                                            setGamevalInput("");
+                                        }
+                                    }
+                                }}
+                                className="pr-20"
+                            />
+                        ) : (
+                            <Input
+                                placeholder={placeholder}
+                                value={query}
+                                onChange={(e) => {
+                                    setPage(1);
+                                    setQuery(e.target.value);
+                                }}
+                                className="pr-20"
+                            />
+                        )}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button
@@ -211,7 +378,7 @@ export default function SearchTable({
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
-
+                    {/* Filters dropdown remains unchanged */}
                     {filters.length > 0 && (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -246,6 +413,15 @@ export default function SearchTable({
                         </DropdownMenu>
                     )}
                 </div>
+                {/* Chips and exact match toggle below input row, only for gameval mode */}
+                {searchMode === "gameval" && (
+                    <GamevalTags
+                        tags={gamevalValues}
+                        onToggle={toggleExact}
+                        onRemove={removeTag}
+                        onClear={clearTags}
+                    />
+                )}
             </CardHeader>
 
             <CardContent className="flex flex-col flex-grow min-h-0">
