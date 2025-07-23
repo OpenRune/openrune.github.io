@@ -5,8 +5,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9e2dc116-edfb-462b-b863-05ca80e0ae51" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/app/modelview/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.env.production" beforeDir="false" afterPath="$PROJECT_DIR$/.env.production" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/models/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/texures/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/texures/page.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/SearchTable.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/SearchTable.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/RSSprite.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/lib/RSSprite.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/api/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/api/types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/navConfig.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/lib/navConfig.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
     </list>
@@ -33,9 +41,9 @@
   &quot;keyToString&quot;: {
     &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;live&quot;,
     &quot;jsx.switch.disabled&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;E:/RSPS/OpenRune/openrune.dev/components/sidebar&quot;,
+    &quot;last_opened_file_path&quot;: &quot;E:/RSPS/OpenRune/openrune.dev/app&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.standard&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
@@ -55,18 +63,18 @@
 }</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="E:\RSPS\OpenRune\openrune.dev\app" />
       <recent name="E:\RSPS\OpenRune\openrune.dev\components\sidebar" />
       <recent name="E:\RSPS\OpenRune\openrune.dev" />
-      <recent name="E:\RSPS\OpenRune\openrune.dev\app" />
       <recent name="E:\Programming\synctunez\synctunez.com\components\sidebar" />
       <recent name="E:\Programming\synctunez\synctunez.com\src\api\data" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="E:\RSPS\OpenRune\openrune.dev\lib" />
+      <recent name="E:\RSPS\OpenRune\openrune.dev\public" />
       <recent name="E:\RSPS\OpenRune\openrune.dev\components\ui" />
       <recent name="E:\Programming\synctunez\synctunez.com\components\ui\playlist" />
       <recent name="E:\Programming\synctunez\synctunez.com\components\layout" />
-      <recent name="E:\Programming\synctunez\synctunez.com\components\sidebar" />
-      <recent name="E:\Programming\synctunez\synctunez.com\src\api" />
     </key>
   </component>
   <component name="RunManager" selected="npm.dev">
@@ -158,10 +166,26 @@
       <workItem from="1752399500508" duration="36000" />
       <workItem from="1752432872233" duration="70000" />
       <workItem from="1752813629866" duration="8312000" />
+      <workItem from="1752926672649" duration="207000" />
+      <workItem from="1752928342174" duration="698000" />
+      <workItem from="1752991085072" duration="25070000" />
+      <workItem from="1753296774955" duration="3888000" />
+      <workItem from="1753303058464" duration="819000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
   </component>
 </project>

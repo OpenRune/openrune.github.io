@@ -79,6 +79,12 @@ export const NAV_PAGES: NavPage[] = [
         path: "/colors",
         icon: <IconPalette size={18} />,
         requiresAuth: false,
+      },
+      {
+        label: "Model Viewer",
+        path: "/modelview",
+        icon: <Icon3dCubeSphere size={18} />,
+        requiresAuth: false,
       }
     ],
   }

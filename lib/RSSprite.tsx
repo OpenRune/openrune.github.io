@@ -1,4 +1,4 @@
-import React, { useState, useEffect, MouseEventHandler } from "react";
+import React, { useState, useEffect, MouseEventHandler, useMemo } from "react";
 import { buildUrl } from "@/lib/api/apiClient";
 import { toast } from "sonner";
 import {
@@ -16,6 +16,7 @@ interface RSSpriteProps {
     rounded?: boolean;
     thumbnail?: boolean;
     onClick?: MouseEventHandler<HTMLImageElement>;
+    saveSprite?: boolean;
 }
 
 const RSSprite: React.FC<RSSpriteProps> = ({
@@ -26,6 +27,7 @@ const RSSprite: React.FC<RSSpriteProps> = ({
                                                rounded = false,
                                                thumbnail = false,
                                                onClick,
+                                               saveSprite = false,
                                            }) => {
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -35,39 +37,55 @@ const RSSprite: React.FC<RSSpriteProps> = ({
     const maxRetries = 3;
     const retryDelay = 2000;
 
-    const spriteUrl = buildUrl(`/public/sprite/${id}`, {
+    const spriteUrl = useMemo(() => buildUrl(`/public/sprite/${id}`, {
         width,
         height,
         keepAspectRatio,
-    });
+    }), [id, width, height, keepAspectRatio]);
 
     useEffect(() => {
-        const fetchImage = () => {
-            setLoading(true);
-            fetch(spriteUrl)
-                .then((response) => {
-                    if (!response.ok) throw new Error(`Failed to load image from ${spriteUrl}`);
-                    return response.blob();
-                })
-                .then((blob) => {
-                    setImageSrc(URL.createObjectURL(blob));
-                    setError(null);
-                })
-                .catch((err) => {
-                    setError(err.message);
-                    if (retryCount < maxRetries) {
-                        setTimeout(() => setRetryCount((prev) => prev + 1), retryDelay);
+        const cacheKey = `sprite_${id}_${width}_${height}_${keepAspectRatio}`;
+        if (saveSprite) {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                console.log(`Loaded sprite ${id} from cache`, cached.slice(0, 30));
+                setImageSrc(cached);
+                setLoading(false);
+                setError(null);
+                return;
+            } else {
+                console.log(`No cache for sprite ${id}, fetching...`);
+            }
+        } else {
+            console.log(`Fetching sprite ${id} (not cached)`);
+        }
+
+        setLoading(true);
+        fetch(spriteUrl)
+            .then((response) => {
+                if (!response.ok) throw new Error(`Failed to load image from ${spriteUrl}`);
+                return response.blob();
+            })
+            .then((blob) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const dataUrl = reader.result as string;
+                    if (saveSprite) {
+                        localStorage.setItem(cacheKey, dataUrl);
                     }
-                })
-                .finally(() => setLoading(false));
-        };
-
-        fetchImage();
-
-        return () => {
-            if (imageSrc) URL.revokeObjectURL(imageSrc);
-        };
-    }, [id, width, height, keepAspectRatio, retryCount]);
+                    setImageSrc(dataUrl);
+                };
+                reader.readAsDataURL(blob);
+            })
+            .catch((err) => {
+                setError(err.message);
+                if (retryCount < maxRetries) {
+                    setTimeout(() => setRetryCount((prev) => prev + 1), retryDelay);
+                }
+            })
+            .finally(() => setLoading(false));
+        // No need for URL.revokeObjectURL cleanup for data URLs
+    }, [id, width, height, keepAspectRatio, retryCount, saveSprite]);
 
     const copyImageUrl = async () => {
         try {
@@ -81,7 +99,7 @@ const RSSprite: React.FC<RSSpriteProps> = ({
     const downloadImage = () => {
         if (!imageSrc) return;
         const link = document.createElement("a");
-        link.href = imageSrc;
+        link.href = buildUrl(`/public/sprite/${id}`);
         link.download = `sprite-${id}.png`;
         link.click();
     };
