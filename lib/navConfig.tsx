@@ -5,7 +5,7 @@ import {
   IconTools,
   IconPhoto,
   Icon3dCubeSphere,
-  IconTexture, IconPackage, IconCube, IconPalette
+  IconTexture, IconPackage, IconCube, IconPalette, IconKeyframe, IconKeyframes
 } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 
@@ -64,6 +64,18 @@ export const NAV_PAGES: NavPage[] = [
         label: "Models",
         path: "/models",
         icon: <Icon3dCubeSphere size={18} />,
+        requiresAuth: false,
+      },
+      {
+        label: "Animations",
+        path: "/animations",
+        icon: <IconKeyframes size={18} />,
+        requiresAuth: false,
+      },
+      {
+        label: "Spot Animations",
+        path: "/spotanims",
+        icon: <IconKeyframe size={18} />,
         requiresAuth: false,
       }
     ],
