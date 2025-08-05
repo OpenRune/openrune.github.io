@@ -5,7 +5,8 @@ import {
   IconTools,
   IconPhoto,
   Icon3dCubeSphere,
-  IconTexture, IconPackage, IconCube, IconPalette
+  IconTexture, IconPackage, IconCube, IconPalette,
+  IconChartBar
 } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 
@@ -78,6 +79,12 @@ export const NAV_PAGES: NavPage[] = [
         label: "Color Helper",
         path: "/colors",
         icon: <IconPalette size={18} />,
+        requiresAuth: false,
+      },
+      {
+        label: "117 Performance",
+        path: "/117performance",
+        icon: <IconChartBar size={18} />,
         requiresAuth: false,
       }
     ],
