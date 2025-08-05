@@ -14,6 +14,7 @@ import {AppSidebar} from "@/components/sidebar/app-sidebar";
 import FloatingSidebarTrigger from "@/components/FloatingSidebarTrigger";
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Analytics } from "@vercel/analytics/next"
+import { SettingsProvider } from "@/components/layout/settings-provider";
 
 const META_THEME_COLORS = {
     light: '#ffffff',
@@ -77,14 +78,16 @@ export default async function RootLayout({
                 enableColorScheme
             >
                 <Providers activeThemeValue={activeThemeValue as string}>
-                    <ClientToaster />
-                    <SidebarProvider defaultOpen={true}>
-                        <AppSidebar/>
-                        <FloatingSidebarTrigger />
-                        <div className="w-full m-[10px]">
-                            {children}
-                        </div>
-                    </SidebarProvider>
+                    <SettingsProvider>
+                        <ClientToaster />
+                        <SidebarProvider defaultOpen={true}>
+                            <AppSidebar/>
+                            <FloatingSidebarTrigger />
+                            <div className="w-full m-[10px]">
+                                {children}
+                            </div>
+                        </SidebarProvider>
+                    </SettingsProvider>
                 </Providers>
             </ThemeProvider>
         </NuqsAdapter>

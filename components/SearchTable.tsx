@@ -37,6 +37,7 @@ import { Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import GamevalTags from "./search-table/GamevalTags";
 import searchModes, { SEARCH_MODES } from "./search-table/searchModes";
+import { useSettings } from "@/components/layout/settings-provider";
 
 // Helper to strip surrounding quotes
 function stripQuotes(str: string) {
@@ -170,6 +171,7 @@ export default function SearchTable({
         return isNaN(parsed) ? defaultAmt : Math.max(1, Math.min(90, parsed));
     });
     const amtOptions = [5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90];
+    const { settings } = useSettings();
 
     const {
         tags: gamevalValues,
@@ -190,6 +192,46 @@ export default function SearchTable({
         const secondKey = path.split(".")[1];
         return String(obj.extraData?.[secondKey] ?? fallback);
     }
+
+    // Handle copy event to convert gamevals to uppercase when setting is enabled
+    useEffect(() => {
+        const handleCopy = (event: ClipboardEvent) => {
+            if (!settings.copyGamevalsToUppercase) return;
+            
+            const selection = window.getSelection();
+            if (!selection || selection.toString().trim() === '') return;
+            
+            // Check if the selection is within a gameval column
+            const range = selection.getRangeAt(0);
+            const startContainer = range.startContainer;
+            
+            // Walk up the DOM tree to find the table cell
+            let element = startContainer.nodeType === Node.TEXT_NODE 
+                ? startContainer.parentElement 
+                : startContainer as Element;
+            
+            while (element && element.tagName !== 'TD' && element.tagName !== 'TH') {
+                element = element.parentElement;
+            }
+            
+            // If we found a table cell, check if it's in a gameval column
+            if (element && element.tagName === 'TD') {
+                const cellIndex = Array.from(element.parentElement?.children || []).indexOf(element);
+                const isGamevalColumn = columns[cellIndex]?.key === 'gameval';
+                
+                if (isGamevalColumn) {
+                    const selectedText = selection.toString();
+                    event.preventDefault();
+                    const uppercaseText = selectedText.toUpperCase();
+                    event.clipboardData?.setData('text/plain', uppercaseText);
+                    toast.success("Copied gameval (uppercase)");
+                }
+            }
+        };
+
+        document.addEventListener('copy', handleCopy);
+        return () => document.removeEventListener('copy', handleCopy);
+    }, [settings.copyGamevalsToUppercase, columns]);
 
     const [filterState, setFilterState] = useState<Record<string, boolean>>(
         filters.length > 0
@@ -463,11 +505,15 @@ export default function SearchTable({
                             ) : (
                                 results.map((row, i) => (
                                     <TableRow key={row.id ?? i}>
-                                        {columns.map((col) => (
-                                            <TableCell key={col.key} className={`align-middle ${col.key === 'view' ? 'text-right' : 'text-left'}`}>
-                                                {col.render ? col.render(row) : getNestedValue(row, col.key)}
-                                            </TableCell>
-                                        ))}
+                                        {columns.map((col) => {
+                                            const cellValue = col.render ? col.render(row) : getNestedValue(row, col.key);
+                                            
+                                            return (
+                                                <TableCell key={col.key} className={`align-middle ${col.key === 'view' ? 'text-right' : 'text-left'}`}>
+                                                    {cellValue}
+                                                </TableCell>
+                                            );
+                                        })}
                                     </TableRow>
                                 ))
                             )}
