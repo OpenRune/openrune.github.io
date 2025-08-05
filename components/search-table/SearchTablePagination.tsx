@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface SearchTablePaginationProps {
   page: number;
-  setPage: (page: number) => void;
+  setPage: (page: number | ((currentPage: number) => number)) => void;
   totalPages: number;
   children?: React.ReactNode;
 }
