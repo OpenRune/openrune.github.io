@@ -97,8 +97,14 @@ export default function TextureSearch() {
 
                                 {hasOverlays && (
                                     <div>
-                                        <strong>Overlays:</strong>{" "}
-                                        {overlays.join(", ")}
+                                        <strong>Overlays:</strong>
+                                        <div className="max-h-40 overflow-y-auto border rounded p-2">
+                                            <ul className="list-disc ml-4">
+                                                {overlays.map((overlay, idx) => (
+                                                    <li key={idx}>{overlay}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
                                     </div>
                                 )}
 
