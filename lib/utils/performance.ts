@@ -6,7 +6,9 @@ export const formatFileSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-export const formatMemory = (bytes: number) => {
+export const formatMemory = (mib: number) => {
+  // Convert MiB to bytes first, then format
+  const bytes = mib * 1024 * 1024;
   return formatFileSize(bytes);
 };
 

@@ -8,22 +8,24 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 import { IconList } from '@tabler/icons-react';
 
 interface FrameData {
-  elapsed: number;
-  currentTime: number;
+  timestamp: number;
   drawnTiles: number;
   drawnStatic: number;
   drawnDynamic: number;
-  npcCacheSize: number;
-  timings: number[];
-  bottleneck: string;
-  estimatedFps: number;
-  cpuTime: number;
-  gpuTime: number;
-  timingMap: Record<string, number>;
+  npcDisplacementCacheSize: number;
   memoryUsed: number;
   memoryTotal: number;
   memoryFree: number;
   memoryMax: number;
+  cpu: Record<string, number>;
+  gpu: Record<string, number>;
+  // Computed fields
+  elapsed?: number;
+  bottleneck?: string;
+  estimatedFps?: number;
+  cpuTime?: number;
+  gpuTime?: number;
+  timingMap?: Record<string, number>;
 }
 
 interface TimingMapTabProps {
@@ -79,7 +81,7 @@ export default function TimingMapTab({ frames, getTimingMapKeys, formatTime }: T
                       <TableRow key={timingKey}>
                         <TableCell className="font-medium">{timingKey}</TableCell>
                         {frames.map((frame, frameIndex) => {
-                          const value = frame.timingMap[timingKey];
+                          const value = frame.timingMap?.[timingKey];
                           return (
                             <TableCell key={frameIndex} className="text-center">
                               {value !== undefined ? formatTime(value) : '-'}
@@ -104,7 +106,7 @@ export default function TimingMapTab({ frames, getTimingMapKeys, formatTime }: T
             </CardHeader>
             <CardContent>
               {(() => {
-                const values = frames.map(frame => frame.timingMap[selectedTiming]).filter((v): v is number => v !== undefined);
+                const values = frames.map(frame => frame.timingMap?.[selectedTiming]).filter((v): v is number => v !== undefined);
                 const avgValue = values.length > 0 ? values.reduce((sum, val) => sum + val, 0) / values.length : 0;
                 const maxValue = values.length > 0 ? Math.max(...values) : 0;
                 const minValue = values.length > 0 ? Math.min(...values) : 0;
@@ -156,14 +158,14 @@ export default function TimingMapTab({ frames, getTimingMapKeys, formatTime }: T
                     </TableHeader>
                     <TableBody>
                       {frames.map((frame, index) => {
-                        const value = frame.timingMap[selectedTiming];
-                        const totalTime = frame.cpuTime + frame.gpuTime;
-                        const percentage = totalTime > 0 ? ((value / totalTime) * 100).toFixed(2) : '0.00';
+                        const value = frame.timingMap?.[selectedTiming];
+                        const totalTime = (frame.cpuTime || 0) + (frame.gpuTime || 0);
+                        const percentage = totalTime > 0 && value !== undefined ? ((value / totalTime) * 100).toFixed(2) : '0.00';
 
                         return (
                           <TableRow key={index}>
                             <TableCell className="font-medium">Frame {index + 1}</TableCell>
-                            <TableCell>{formatTime(value)}</TableCell>
+                            <TableCell>{value !== undefined ? formatTime(value) : '-'}</TableCell>
                             <TableCell>{percentage}%</TableCell>
                           </TableRow>
                         );
@@ -183,10 +185,12 @@ export default function TimingMapTab({ frames, getTimingMapKeys, formatTime }: T
                   {(() => {
                     const timingData = frames.map((frame, index) => ({
                       frame: index + 1,
-                      value: frame.timingMap[selectedTiming],
-                      percentage: ((frame.timingMap[selectedTiming] / (frame.cpuTime + frame.gpuTime)) * 100).toFixed(2),
-                      fps: frame.estimatedFps,
-                      bottleneck: frame.bottleneck
+                      value: frame.timingMap?.[selectedTiming] || 0,
+                      percentage: frame.timingMap?.[selectedTiming] && frame.cpuTime && frame.gpuTime 
+                        ? ((frame.timingMap[selectedTiming] / (frame.cpuTime + frame.gpuTime)) * 100).toFixed(2)
+                        : '0.00',
+                      fps: frame.estimatedFps || 0,
+                      bottleneck: frame.bottleneck || 'Unknown'
                     }));
 
                     return (

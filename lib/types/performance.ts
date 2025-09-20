@@ -1,25 +1,40 @@
 export interface FrameData {
-  elapsed: number;
-  currentTime: number;
+  timestamp: number;
   drawnTiles: number;
   drawnStatic: number;
   drawnDynamic: number;
-  npcCacheSize: number;
-  timings: number[];
-  bottleneck: string;
-  estimatedFps: number;
-  cpuTime: number;
-  gpuTime: number;
-  timingMap: Record<string, number>;
+  npcDisplacementCacheSize: number;
   memoryUsed: number;
   memoryTotal: number;
   memoryFree: number;
   memoryMax: number;
+  cpu: Record<string, number>;
+  gpu: Record<string, number>;
+  // Computed fields
+  elapsed?: number;
+  bottleneck?: string;
+  estimatedFps?: number;
+  cpuTime?: number;
+  gpuTime?: number;
+  timingMap?: Record<string, number>;
+}
+
+export interface SnapshotData {
+  timestamp: number;
+  osName: string;
+  osArch: string;
+  osVersion: string;
+  javaVersion: string;
+  cpuCores: number;
+  memoryMaxMiB: number;
+  gpuName: string;
+  settings: Record<string, string>;
+  frames: FrameData[];
 }
 
 export interface UploadedFile {
   name: string;
-  data: any;
+  data: SnapshotData;
   size: number;
 }
 
@@ -30,5 +45,8 @@ export interface SummaryStats {
   avgGpuTime: string;
   avgMemoryUsed: string;
   avgDrawnTiles: number;
+  avgDrawnStatic: number;
+  avgDrawnDynamic: number;
+  avgNpcCacheSize: number;
   bottlenecks: Record<string, number>;
 } 

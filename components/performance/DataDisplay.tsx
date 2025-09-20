@@ -80,6 +80,7 @@ export default function DataDisplay({
                   formatTime={formatTime}
                   formatMemory={formatMemory}
                   compareMode={true}
+                  snapshotData={uploadedFiles[0]?.data}
                 />
               </div>
               <div>
@@ -90,6 +91,7 @@ export default function DataDisplay({
                   formatTime={formatTime}
                   formatMemory={formatMemory}
                   compareMode={true}
+                  snapshotData={uploadedFiles[1]?.data}
                 />
               </div>
             </div>
@@ -185,6 +187,7 @@ export default function DataDisplay({
           getTimingMapKeys={getTimingMapKeys}
           formatTime={formatTime}
           formatMemory={formatMemory}
+          snapshotData={uploadedFiles[0]?.data}
         />
       </TabsContent>
 

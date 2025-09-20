@@ -29,6 +29,8 @@ export default function Performance117Page() {
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState<string>('');
+  const [frameLimit, setFrameLimit] = useState<number | 'all'>(20);
+  const [isFrameDropdownOpen, setIsFrameDropdownOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef1 = useRef<HTMLInputElement>(null);
   const fileInputRef2 = useRef<HTMLInputElement>(null);
@@ -238,7 +240,38 @@ export default function Performance117Page() {
     const frames: FrameData[] = [];
     uploadedFiles.forEach(file => {
       if (file.data.frames && Array.isArray(file.data.frames)) {
-        frames.push(...file.data.frames);
+        // Apply frame limit
+        const framesToProcess = frameLimit === 'all' 
+          ? file.data.frames 
+          : file.data.frames.slice(0, frameLimit as number);
+          
+        // Process each frame to add computed fields
+        const processedFrames = framesToProcess.map((frame: any, index: number) => {
+          const processedFrame: FrameData = {
+            ...frame,
+            // Compute elapsed time (relative to first frame)
+            elapsed: index === 0 ? 0 : frame.timestamp - framesToProcess[0].timestamp,
+            // Compute total CPU time
+            cpuTime: frame.cpu ? Object.values(frame.cpu).reduce((sum: number, val: any) => sum + (val || 0), 0) : 0,
+            // Compute total GPU time  
+            gpuTime: frame.gpu ? Object.values(frame.gpu).reduce((sum: number, val: any) => sum + (val || 0), 0) : 0,
+            // Create combined timing map
+            timingMap: {
+              ...frame.cpu,
+              ...frame.gpu
+            }
+          };
+          
+          // Determine bottleneck
+          processedFrame.bottleneck = processedFrame.cpuTime > processedFrame.gpuTime ? 'CPU' : 'GPU';
+          
+          // Estimate FPS based on total frame time
+          const totalFrameTime = processedFrame.cpuTime + processedFrame.gpuTime;
+          processedFrame.estimatedFps = totalFrameTime > 0 ? 1000000000 / totalFrameTime : 0; // nanoseconds to FPS
+          
+          return processedFrame;
+        });
+        frames.push(...processedFrames);
       }
     });
     return frames;
@@ -248,7 +281,37 @@ export default function Performance117Page() {
     if (fileIndex >= uploadedFiles.length) return [];
     const file = uploadedFiles[fileIndex];
     if (file.data.frames && Array.isArray(file.data.frames)) {
-      return file.data.frames;
+      // Apply frame limit
+      const framesToProcess = frameLimit === 'all' 
+        ? file.data.frames 
+        : file.data.frames.slice(0, frameLimit as number);
+        
+      // Process frames for this specific file
+      return framesToProcess.map((frame: any, index: number) => {
+        const processedFrame: FrameData = {
+          ...frame,
+          // Compute elapsed time (relative to first frame)
+          elapsed: index === 0 ? 0 : frame.timestamp - framesToProcess[0].timestamp,
+          // Compute total CPU time
+          cpuTime: frame.cpu ? Object.values(frame.cpu).reduce((sum: number, val: any) => sum + (val || 0), 0) : 0,
+          // Compute total GPU time  
+          gpuTime: frame.gpu ? Object.values(frame.gpu).reduce((sum: number, val: any) => sum + (val || 0), 0) : 0,
+          // Create combined timing map
+          timingMap: {
+            ...frame.cpu,
+            ...frame.gpu
+          }
+        };
+        
+        // Determine bottleneck
+        processedFrame.bottleneck = processedFrame.cpuTime > processedFrame.gpuTime ? 'CPU' : 'GPU';
+        
+        // Estimate FPS based on total frame time
+        const totalFrameTime = processedFrame.cpuTime + processedFrame.gpuTime;
+        processedFrame.estimatedFps = totalFrameTime > 0 ? 1000000000 / totalFrameTime : 0; // nanoseconds to FPS
+        
+        return processedFrame;
+      });
     }
     return [];
   };
@@ -265,7 +328,7 @@ export default function Performance117Page() {
     if (uploadedFiles.length === 0) return null;
     // Get settings from the first file (assuming all files have same settings)
     const firstFile = uploadedFiles[0];
-    return firstFile.data.pluginSettings || null;
+    return firstFile.data.settings || null;
   };
 
   const renderJsonData = (data: any, depth = 0) => {
@@ -313,17 +376,20 @@ export default function Performance117Page() {
   const timingMapKeys = getTimingMapKeys();
   const isCompareMode = uploadedFiles.length > 1;
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (isFileDropdownOpen && !(event.target as Element).closest('.file-dropdown')) {
         setIsFileDropdownOpen(false);
       }
+      if (isFrameDropdownOpen && !(event.target as Element).closest('.frame-dropdown')) {
+        setIsFrameDropdownOpen(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isFileDropdownOpen]);
+  }, [isFileDropdownOpen, isFrameDropdownOpen]);
 
   // Load data from share link on page load
   React.useEffect(() => {
@@ -338,6 +404,39 @@ export default function Performance117Page() {
         <div className="flex items-center gap-2">
           {uploadedFiles.length > 0 && (
             <>
+              <div className="relative frame-dropdown">
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2"
+                  onClick={() => setIsFrameDropdownOpen(!isFrameDropdownOpen)}
+                >
+                  <IconChartBar size={16} />
+                  {frameLimit === 'all' ? 'All Frames' : `${frameLimit} Frames`}
+                  <IconChevronDown size={16} />
+                </Button>
+                {isFrameDropdownOpen && (
+                  <div className="absolute top-full right-0 mt-1 w-40 bg-popover border rounded-lg shadow-lg z-50">
+                    <div className="p-2 space-y-1">
+                      <div className="text-xs font-semibold text-muted-foreground px-2 py-1">Frame Limit</div>
+                      {['all', 20, 40, 60, 80, 100, 120, 140, 160, 180, 200].map((limit) => (
+                        <button
+                          key={limit}
+                          className={`w-full text-left px-2 py-1 text-sm rounded hover:bg-muted ${
+                            frameLimit === limit ? 'bg-muted font-medium' : ''
+                          }`}
+                          onClick={() => {
+                            setFrameLimit(limit);
+                            setIsFrameDropdownOpen(false);
+                          }}
+                        >
+                          {limit === 'all' ? 'All Frames' : `${limit} Frames`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -766,13 +865,14 @@ export default function Performance117Page() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div>
                     <h3 className="text-lg font-semibold mb-4">{uploadedFiles[0]?.name}</h3>
-                    <SummaryTab
-                      frames={getFramesDataByFile(0)}
-                      getTimingMapKeys={getTimingMapKeys}
-                      formatTime={formatTime}
-                      formatMemory={formatMemory}
-                      compareMode={true}
-                    />
+                <SummaryTab 
+                  frames={getFramesDataByFile(0)}
+                  getTimingMapKeys={getTimingMapKeys}
+                  formatTime={formatTime}
+                  formatMemory={formatMemory}
+                  compareMode={true}
+                  snapshotData={uploadedFiles[0]?.data}
+                />
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold mb-4">{uploadedFiles[1]?.name}</h3>
@@ -782,6 +882,7 @@ export default function Performance117Page() {
                       formatTime={formatTime}
                       formatMemory={formatMemory}
                       compareMode={true}
+                      snapshotData={uploadedFiles[1]?.data}
                     />
                   </div>
                 </div>
@@ -875,6 +976,7 @@ export default function Performance117Page() {
                   getTimingMapKeys={getTimingMapKeys}
                   formatTime={formatTime}
                   formatMemory={formatMemory}
+                  snapshotData={uploadedFiles[0]?.data}
                 />
             </TabsContent>
 

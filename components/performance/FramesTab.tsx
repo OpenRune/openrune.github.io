@@ -8,22 +8,24 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 
 interface FrameData {
-  elapsed: number;
-  currentTime: number;
+  timestamp: number;
   drawnTiles: number;
   drawnStatic: number;
   drawnDynamic: number;
-  npcCacheSize: number;
-  timings: number[];
-  bottleneck: string;
-  estimatedFps: number;
-  cpuTime: number;
-  gpuTime: number;
-  timingMap: Record<string, number>;
+  npcDisplacementCacheSize: number;
   memoryUsed: number;
   memoryTotal: number;
   memoryFree: number;
   memoryMax: number;
+  cpu: Record<string, number>;
+  gpu: Record<string, number>;
+  // Computed fields
+  elapsed?: number;
+  bottleneck?: string;
+  estimatedFps?: number;
+  cpuTime?: number;
+  gpuTime?: number;
+  timingMap?: Record<string, number>;
 }
 
 interface FramesTabProps {
@@ -83,7 +85,7 @@ export default function FramesTab({ frames, formatTime, formatMemory }: FramesTa
                   <Badge variant={frame.bottleneck === 'CPU' ? 'destructive' : 'default'}>
                     {frame.bottleneck}
                   </Badge>
-                  <Badge variant="outline">{frame.estimatedFps.toFixed(1)} FPS</Badge>
+                  <Badge variant="outline">{(frame.estimatedFps || 0).toFixed(1)} FPS</Badge>
                 </CardTitle>
               </CardHeader>
             </CollapsibleTrigger>
@@ -96,11 +98,11 @@ export default function FramesTab({ frames, formatTime, formatMemory }: FramesTa
                   </div>
                   <div>
                     <span className="text-muted-foreground">CPU Time:</span>
-                    <div className="font-semibold">{formatTime(frame.cpuTime)}</div>
+                    <div className="font-semibold">{formatTime(frame.cpuTime || 0)}</div>
                   </div>
                   <div>
                     <span className="text-muted-foreground">GPU Time:</span>
-                    <div className="font-semibold">{formatTime(frame.gpuTime)}</div>
+                    <div className="font-semibold">{formatTime(frame.gpuTime || 0)}</div>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Memory:</span>
@@ -120,7 +122,7 @@ export default function FramesTab({ frames, formatTime, formatMemory }: FramesTa
                   </div>
                   <div>
                     <span className="text-muted-foreground">NPC Cache:</span>
-                    <div className="font-semibold">{frame.npcCacheSize}</div>
+                    <div className="font-semibold">{frame.npcDisplacementCacheSize}</div>
                   </div>
                 </div>
               </CardContent>
