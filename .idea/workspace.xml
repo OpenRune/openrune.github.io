@@ -4,17 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9e2dc116-edfb-462b-b863-05ca80e0ae51" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/117performance/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/117performance/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/SearchTable.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/SearchTable.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/performance/DataDisplay.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/performance/DataDisplay.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/performance/FramesTab.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/performance/FramesTab.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/performance/SummaryTab.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/performance/SummaryTab.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/performance/TimingMapTab.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/performance/TimingMapTab.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/types/performance.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/types/performance.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/utils/performance.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/utils/performance.ts" afterDir="false" />
-    </list>
+    <list default="true" id="9e2dc116-edfb-462b-b863-05ca80e0ae51" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -74,7 +64,7 @@
       <recent name="E:\Programming\synctunez\synctunez.com\components\layout" />
     </key>
   </component>
-  <component name="RunManager" selected="npm.dev">
+  <component name="RunManager" selected="npm.build">
     <configuration name="Debug Application" type="JavascriptDebugType" uri="http://localhost:3000">
       <method v="2" />
     </configuration>
@@ -130,10 +120,10 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="npm.build" />
         <item itemvalue="npm.dev" />
         <item itemvalue="npm.serve" />
         <item itemvalue="npm.lint" />
-        <item itemvalue="npm.build" />
       </list>
     </recent_temporary>
   </component>
@@ -169,7 +159,7 @@
       <workItem from="1753296774955" duration="3888000" />
       <workItem from="1753303058464" duration="1302000" />
       <workItem from="1753480737722" duration="2543000" />
-      <workItem from="1758332675047" duration="1734000" />
+      <workItem from="1758332675047" duration="2333000" />
     </task>
     <servers />
   </component>

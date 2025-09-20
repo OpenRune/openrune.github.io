@@ -263,10 +263,10 @@ export default function Performance117Page() {
           };
           
           // Determine bottleneck
-          processedFrame.bottleneck = processedFrame.cpuTime > processedFrame.gpuTime ? 'CPU' : 'GPU';
+          processedFrame.bottleneck = (processedFrame.cpuTime || 0) > (processedFrame.gpuTime || 0) ? 'CPU' : 'GPU';
           
           // Estimate FPS based on total frame time
-          const totalFrameTime = processedFrame.cpuTime + processedFrame.gpuTime;
+          const totalFrameTime = (processedFrame.cpuTime || 0) + (processedFrame.gpuTime || 0);
           processedFrame.estimatedFps = totalFrameTime > 0 ? 1000000000 / totalFrameTime : 0; // nanoseconds to FPS
           
           return processedFrame;
@@ -304,10 +304,10 @@ export default function Performance117Page() {
         };
         
         // Determine bottleneck
-        processedFrame.bottleneck = processedFrame.cpuTime > processedFrame.gpuTime ? 'CPU' : 'GPU';
+        processedFrame.bottleneck = (processedFrame.cpuTime || 0) > (processedFrame.gpuTime || 0) ? 'CPU' : 'GPU';
         
         // Estimate FPS based on total frame time
-        const totalFrameTime = processedFrame.cpuTime + processedFrame.gpuTime;
+        const totalFrameTime = (processedFrame.cpuTime || 0) + (processedFrame.gpuTime || 0);
         processedFrame.estimatedFps = totalFrameTime > 0 ? 1000000000 / totalFrameTime : 0; // nanoseconds to FPS
         
         return processedFrame;
@@ -418,7 +418,7 @@ export default function Performance117Page() {
                   <div className="absolute top-full right-0 mt-1 w-40 bg-popover border rounded-lg shadow-lg z-50">
                     <div className="p-2 space-y-1">
                       <div className="text-xs font-semibold text-muted-foreground px-2 py-1">Frame Limit</div>
-                      {['all', 20, 40, 60, 80, 100, 120, 140, 160, 180, 200].map((limit) => (
+                      {(['all', 20, 40, 60, 80, 100, 120, 140, 160, 180, 200] as const).map((limit) => (
                         <button
                           key={limit}
                           className={`w-full text-left px-2 py-1 text-sm rounded hover:bg-muted ${
