@@ -21,7 +21,9 @@ export default function ItemSearch() {
                             height={32}
                             rounded
                             thumbnail
-                            onClick={() => console.log("Clicked", row.id)}
+                            enableClickModel={true}
+                            showInfoTab={false}
+                            gameval={row.gameval}
                         />
                     ),
                 },

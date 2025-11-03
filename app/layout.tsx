@@ -15,6 +15,8 @@ import FloatingSidebarTrigger from "@/components/FloatingSidebarTrigger";
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Analytics } from "@vercel/analytics/next"
 import { SettingsProvider } from "@/components/layout/settings-provider";
+import { CacheTypeProvider } from "@/components/layout/cache-type-provider";
+import { CacheStatusWrapper } from "@/components/layout/cache-status-wrapper";
 
 const META_THEME_COLORS = {
     light: '#ffffff',
@@ -79,14 +81,18 @@ export default async function RootLayout({
             >
                 <Providers activeThemeValue={activeThemeValue as string}>
                     <SettingsProvider>
-                        <ClientToaster />
-                        <SidebarProvider defaultOpen={true}>
-                            <AppSidebar/>
-                            <FloatingSidebarTrigger />
-                            <div className="w-full m-[10px]">
-                                {children}
-                            </div>
-                        </SidebarProvider>
+                        <CacheTypeProvider>
+                            <ClientToaster />
+                            <SidebarProvider defaultOpen={true}>
+                                <AppSidebar/>
+                                <FloatingSidebarTrigger />
+                                <div className="w-full m-[10px]">
+                                    <CacheStatusWrapper>
+                                        {children}
+                                    </CacheStatusWrapper>
+                                </div>
+                            </SidebarProvider>
+                        </CacheTypeProvider>
                     </SettingsProvider>
                 </Providers>
             </ThemeProvider>

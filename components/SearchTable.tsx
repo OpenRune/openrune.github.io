@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useMediaQuery } from "@uidotdev/usehooks";
 import Cookies from "js-cookie";
 import {ChevronLeft, ChevronRight, Flag} from "lucide-react";
@@ -30,7 +30,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { buildUrl } from "@/lib/api/apiClient";
+import { fetchFromBuildUrl } from "@/lib/api/apiClient";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { IconTarget, IconCircleDashed } from "@tabler/icons-react";
 import { Info } from "lucide-react";
@@ -38,6 +38,7 @@ import { Badge } from "@/components/ui/badge";
 import GamevalTags from "./search-table/GamevalTags";
 import searchModes, { SEARCH_MODES } from "./search-table/searchModes";
 import { useSettings } from "@/components/layout/settings-provider";
+import { useCacheType } from "@/components/layout/cache-type-provider";
 
 // Helper to strip surrounding quotes
 function stripQuotes(str: string) {
@@ -145,6 +146,7 @@ interface SearchTableProps {
     name?: string;
     disabledModes?: string[];
     defaultSearchMode?: string;
+    onResultsChange?: (results: any[]) => void; // Callback when results are loaded
 }
 
 export default function SearchTable({
@@ -154,6 +156,7 @@ export default function SearchTable({
                                         disabledModes = [],
                                         defaultSearchMode = "gameval",
                                         columns,
+                                        onResultsChange,
                                     }: SearchTableProps) {
     const [query, setQuery] = useState("");
     const [searchMode, setSearchMode] = useState(defaultSearchMode);
@@ -172,6 +175,7 @@ export default function SearchTable({
     });
     const amtOptions = [5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90];
     const { settings } = useSettings();
+    const { selectedCacheType } = useCacheType();
 
     const {
         tags: gamevalValues,
@@ -243,7 +247,7 @@ export default function SearchTable({
     const totalPages = Math.ceil(total / limit);
     // Remove client-side filteredResults logic, use results directly
 
-    const fetchData = async (isInitial = false) => {
+    const fetchData = useCallback(async (isInitial = false) => {
         setLoading(true);
 
         const activeFilters = Object.entries(filterState)
@@ -273,26 +277,28 @@ export default function SearchTable({
             params.mode = searchMode;
         }
 
-        const url = buildUrl(baseUrl, params);
-
         try {
-            const res = await fetch(url);
+            const res = await fetchFromBuildUrl(baseUrl, params);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             setResults(data.results);
             setTotal(data.total);
+            // Notify parent component of results change
+            if (onResultsChange) {
+                onResultsChange(data.results);
+            }
         } catch {
             toast.error("Failed to fetch objects.");
         } finally {
             setLoading(false);
         }
-    };
+    }, [baseUrl, limit, page, filterState, searchMode, gamevalValues, gamevalInput, query, onResultsChange, selectedCacheType]);
 
     // On first render, fetch initial data from baseUrl without params
     useEffect(() => {
         fetchData(true);
         setFirstRender(false);
-    }, []);
+    }, [fetchData]);
 
     // Remove client-side filtering and tag-count-based fetch logic
     // Restore previous useEffect for fetching on all relevant changes
@@ -303,7 +309,7 @@ export default function SearchTable({
             return;
         }
         fetchData();
-    }, [query, page, searchMode, filterState, amt, gamevalInput, gamevalValues]);
+    }, [firstRender, searchMode, gamevalInput, fetchData]);
 
     // Save amt to cookie when it changes
     useEffect(() => {

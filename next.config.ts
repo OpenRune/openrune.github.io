@@ -1,9 +1,5 @@
 import type { NextConfig } from "next";
 
-if (!process.env.API_PROXY_DESTINATION) {
-  throw new Error("API_PROXY_DESTINATION environment variable is not set. Please define it in your .env.local file.");
-}
-
 const nextConfig: {
   devIndicators: { errorIndicator: boolean; position: string };
   rewrites(): Promise<[{ destination: string; source: string }]>
@@ -13,10 +9,12 @@ const nextConfig: {
     errorIndicator: true,
   },
   async rewrites() {
+    // Use cache-proxy route for dynamic cache type routing
+    // Route handlers (like /api/share) take precedence over rewrites
     return [
       {
         source: '/api/:path*',
-        destination: process.env.API_PROXY_DESTINATION!,
+        destination: '/api/cache-proxy/:path*',
       },
     ];
   },

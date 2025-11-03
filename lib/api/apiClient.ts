@@ -1,4 +1,51 @@
 import axios, { AxiosRequestConfig, AxiosResponse, AxiosInstance } from 'axios'
+import { CacheType } from '@/lib/cacheTypes'
+
+// Cache type storage
+let currentCacheType: CacheType | null = null;
+
+export function setCacheType(cacheType: CacheType) {
+    currentCacheType = cacheType;
+}
+
+export function getCacheType(): CacheType | null {
+    return currentCacheType;
+}
+
+// Wrapper around fetch that automatically includes cache type header and cookie
+export async function fetchWithCacheType(
+    input: RequestInfo | URL,
+    init?: RequestInit
+): Promise<Response> {
+    const headers = new Headers(init?.headers);
+    
+    // Add cache type header and cookie if available
+    if (currentCacheType && typeof window !== 'undefined') {
+        const cacheTypeStr = JSON.stringify({
+            ip: currentCacheType.ip,
+            port: currentCacheType.port
+        });
+        headers.set('x-cache-type', cacheTypeStr);
+        // Also set cookie for server-side access (e.g., when Three.js loads images)
+        document.cookie = `cache-type=${cacheTypeStr}; path=/; max-age=31536000`;
+    }
+    
+    // Merge with any existing headers
+    return fetch(input, {
+        ...init,
+        headers
+    });
+}
+
+// Build URL and fetch in one call with automatic cache type header
+export async function fetchFromBuildUrl(
+    path: string,
+    queryParams: Record<string, string | number | boolean | null | undefined> = {},
+    init?: RequestInit
+): Promise<Response> {
+    const url = buildUrl(path, queryParams);
+    return fetchWithCacheType(url, init);
+}
 
 // Axios instance with credentials
 export const apiClient: AxiosInstance = axios.create({
@@ -8,6 +55,21 @@ export const apiClient: AxiosInstance = axios.create({
         'Content-Type': 'application/json',
     },
 })
+
+// Interceptor to add cache type to requests
+apiClient.interceptors.request.use((config) => {
+    if (currentCacheType && typeof window !== 'undefined') {
+        const cacheTypeStr = JSON.stringify({
+            ip: currentCacheType.ip,
+            port: currentCacheType.port
+        });
+        // Store cache type in header and cookie for server-side access
+        config.headers['x-cache-type'] = cacheTypeStr;
+        // Also set cookie for consistency
+        document.cookie = `cache-type=${cacheTypeStr}; path=/; max-age=31536000`;
+    }
+    return config;
+});
 
 // Build a full URL with optional query parameters
 export function buildUrl(

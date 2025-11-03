@@ -2,11 +2,12 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import { buildUrl } from '@/lib/api/apiClient';
+import { buildUrl, fetchFromBuildUrl } from '@/lib/api/apiClient';
 import { useFrame } from '@react-three/fiber';
 import { Color } from 'three';
 import { VANILLA_TO_HD_TEXTURE } from '@/lib/hdTextureMap';
 import { useRef } from 'react';
+import { useCacheType } from "@/components/layout/cache-type-provider";
 
 // Store available HD textures in a Set
 const availableHdTextures = new Set<string>();
@@ -112,11 +113,11 @@ function extractModelStats(scene: THREE.Object3D | null, gltfJson?: any) {
 
 export function getSpriteIdFromTextureId(textureId: number, textureResults: any[]): number | undefined {
   const texObj = textureResults[textureId];
-  return texObj?.fileIds?.[0];
+  return texObj?.fileId;
 }
 
 // Helper to fetch texture results with CRC-based caching
-async function fetchTextureResultsWithCache(buildUrl: (url: string) => string) {
+async function fetchTextureResultsWithCache(fetchFromBuildUrl: (path: string, params?: any, init?: RequestInit) => Promise<Response>) {
   const cached = localStorage.getItem('textureResultsCache');
   let cachedCrc = null;
   let cachedResults = null;
@@ -127,8 +128,7 @@ async function fetchTextureResultsWithCache(buildUrl: (url: string) => string) {
       cachedResults = parsed.results;
     } catch {}
   }
-  const url = buildUrl(`public/web/textures${cachedCrc ? `?crc=${cachedCrc}` : ''}`);
-  const res = await fetch(url);
+  const res = await fetchFromBuildUrl(`public/web/textures`, cachedCrc ? { crc: cachedCrc } : {});
   const data = await res.json();
   if (data.updated === false && cachedResults) {
     return cachedResults;
@@ -140,12 +140,15 @@ async function fetchTextureResultsWithCache(buildUrl: (url: string) => string) {
   }
 }
 
-// Helper to cache a sprite in localStorage if not already present
-async function ensureSpriteCached(spriteId: number, buildUrl: (url: string, params?: any) => string) {
-  const cacheKey = `sprite_${spriteId}_128_128_true`;
-  if (localStorage.getItem(cacheKey)) return;
-  const spriteUrl = buildUrl(`/public/sprite/${spriteId}`, { width: 128, height: 128, keepAspectRatio: true });
-  const res = await fetch(spriteUrl);
+// Helper to cache a sprite in localStorage with cache type support
+async function ensureSpriteCached(spriteId: number, cacheTypeId: string, fetchFromBuildUrl: (path: string, params?: any, init?: RequestInit) => Promise<Response>) {
+  const cacheKey = `sprite_${cacheTypeId}_${spriteId}_128_128_true`;
+  const cached = localStorage.getItem(cacheKey);
+  // Validate cached image is a valid data URL for an image
+  if (cached && cached.startsWith('data:image/')) return;
+  // If cached but invalid, remove it
+  if (cached) localStorage.removeItem(cacheKey);
+  const res = await fetchFromBuildUrl(`/public/sprite/${spriteId}`, { width: 128, height: 128, keepAspectRatio: true });
   const blob = await res.blob();
   const reader = new FileReader();
   await new Promise(resolve => {
@@ -267,7 +270,6 @@ function ModelViewer({
           const animData = trailingNum !== -1 ? textureResults[trailingNum] : undefined;
           if (typeof texIndex === 'number') {
             const imageIndex = gltfJson.textures[texIndex]?.source;
-            console.log("Tex Index:" + imageIndex)
             if (typeof imageIndex === 'number') {
               if (animData?.animationSpeed && animData?.animationDirection) {
                 animatedMaterials.current.push(child.material);
@@ -451,6 +453,7 @@ const RSModel: React.FC<RSModelProps> = ({
   animateTextures = true,
   highlightColor
 }) => {
+  const { selectedCacheType } = useCacheType();
   const [gltfUrl, setGltfUrl] = useState<string | null>(null);
   const [scene, setScene] = useState<THREE.Object3D | null>(null);
   const [gltfJson, setGltfJson] = useState<any>(null);
@@ -459,8 +462,9 @@ const RSModel: React.FC<RSModelProps> = ({
   const [loading, setLoading] = useState(true);
   const [usedImages, setUsedImages] = useState<string[]>([]);
 
-  // Sprite caching logic for model viewer
+  // Sprite caching logic for model viewer with cache type support
   useEffect(() => {
+    const cacheTypeId = selectedCacheType?.id || 'default';
     THREE.DefaultLoadingManager.setURLModifier((url) => {
       // Try to extract the vanilla texture index from the URL (e.g., .../62.png)
       const spriteMatch = url.match(/(\d+)\.png$/);
@@ -468,9 +472,37 @@ const RSModel: React.FC<RSModelProps> = ({
         const texId = parseInt(spriteMatch[1], 10);
         const spriteId = getSpriteIdFromTextureId(texId, textureResults);
         if (spriteId !== undefined) {
-          const cacheKey = `sprite_${spriteId}_128_128_true`;
+          const cacheKey = `sprite_${cacheTypeId}_${spriteId}_128_128_true`;
           const cached = localStorage.getItem(cacheKey);
-          const imageUrl = cached || buildUrl(`/public/sprite/${spriteId}`, { width: 128, height: 128, keepAspectRatio: true });
+          // Validate cached image is valid (starts with data:image/)
+          const isValidCached = cached && cached.startsWith('data:image/');
+          
+          // If cached, return data URL directly (Three.js can load this without headers)
+          if (isValidCached) {
+            setTimeout(() => {
+              setUsedImages((prev) => {
+                if (!prev.includes(cached)) {
+                  const next = [...prev, cached];
+                  if (onImages) onImages(next);
+                  return next;
+                }
+                return prev;
+              });
+            }, 0);
+            return cached;
+          }
+          
+          // If not cached, ensure cookie is set for Three.js to use, then return URL
+          // The cookie will allow the proxy to route correctly even without header
+          if (selectedCacheType && typeof window !== 'undefined') {
+            const cacheTypeStr = JSON.stringify({
+              ip: selectedCacheType.ip,
+              port: selectedCacheType.port
+            });
+            document.cookie = `cache-type=${cacheTypeStr}; path=/; max-age=31536000`;
+          }
+          
+          const imageUrl = buildUrl(`/public/sprite/${spriteId}`, { width: 128, height: 128, keepAspectRatio: true });
           setTimeout(() => {
             setUsedImages((prev) => {
               if (!prev.includes(imageUrl)) {
@@ -481,7 +513,8 @@ const RSModel: React.FC<RSModelProps> = ({
               return prev;
             });
           }, 0);
-          if (!cached) ensureSpriteCached(spriteId, buildUrl);
+          // Cache in background for next time
+          ensureSpriteCached(spriteId, cacheTypeId, fetchFromBuildUrl);
           return imageUrl;
         }
       }
@@ -490,7 +523,7 @@ const RSModel: React.FC<RSModelProps> = ({
     });
     setUsedImages([]);
     if (onImages) onImages([]);
-  }, [textureResults]);
+  }, [textureResults, selectedCacheType?.id]);
 
   useEffect(() => {
     if (!id) {
@@ -515,7 +548,7 @@ const RSModel: React.FC<RSModelProps> = ({
         setLoading(false);
         return;
       }
-      const results = await fetchTextureResultsWithCache(buildUrl);
+      const results = await fetchTextureResultsWithCache(fetchFromBuildUrl);
       if (!cancelled) {
         setTextureResults(results);
         if (onTextureResults) onTextureResults(results);

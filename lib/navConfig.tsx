@@ -5,7 +5,8 @@ import {
   IconTools,
   IconPhoto,
   Icon3dCubeSphere,
-  IconTexture, IconPackage, IconCube, IconPalette, IconKeyframe, IconKeyframes, IconChartBar
+  IconStairs,
+  IconTexture, IconPackage, IconCube, IconPalette, IconKeyframe, IconKeyframes, IconChartBar, IconMap
 } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 
@@ -14,6 +15,7 @@ export type NavPage = {
   path: string;
   icon?: ReactNode;
   requiresAuth?: boolean;
+  usableOffline?: boolean; // Can be used when cache is offline
   children?: NavPage[];
 };
 
@@ -77,6 +79,12 @@ export const NAV_PAGES: NavPage[] = [
         path: "/spotanims",
         icon: <IconKeyframe size={18} />,
         requiresAuth: false,
+      },
+      {
+        label: "Overlay/Underlay",
+        path: "/underlays-overlays",
+        icon: <IconStairs size={18} />,
+        requiresAuth: false,
       }
     ],
   },
@@ -91,12 +99,14 @@ export const NAV_PAGES: NavPage[] = [
         path: "/colors",
         icon: <IconPalette size={18} />,
         requiresAuth: false,
+        usableOffline: true,
       },
       {
         label: "117 Performance",
         path: "/117performance",
         icon: <IconChartBar size={18} />,
         requiresAuth: false,
+        usableOffline: true,
       },
       {
         label: "Model Viewer",
@@ -105,5 +115,12 @@ export const NAV_PAGES: NavPage[] = [
         requiresAuth: false,
       }
     ],
+  },
+  {
+    label: "Map",
+    path: "/map",
+    icon: <IconMap size={18} />,
+    requiresAuth: false,
+    usableOffline: true,
   }
 ]; 

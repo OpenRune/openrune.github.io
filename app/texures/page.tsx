@@ -5,31 +5,52 @@ import SearchTable from "@/components/SearchTable";
 import RSSprite from "@/lib/RSSprite";
 import RSColorBox from "@/components/ui/RSColorBox";
 import {useState} from "react";
-import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {GameValElement} from "@/lib/api/types";
+import RSTexture, { setTexturesCache } from "@/lib/RSTexture";
 
 export default function TextureSearch() {
     const [selectedRow, setSelectedRow] = useState<any | null>(null);
-    const [dialogOpen, setDialogOpen] = useState(false);
+    const [modalOpen, setModalOpen] = useState(false);
+
+    // Populate texture cache when table results are loaded
+    const handleResultsChange = (results: any[]) => {
+        // Update the texture cache with the loaded results
+        setTexturesCache(results);
+    };
 
     return (
         <>
             <SearchTable
                 name="Textures"
                 baseUrl="/public/textures"
+                onResultsChange={handleResultsChange}
                 columns={[
                     {
                         key: "image",
                         label: "Image",
                         render: (row) => (
-                            <RSSprite
-                                id={row.extraData.fileIds[0]}
+                            <RSTexture
+                                key={row.id}
+                                id={row.id}
                                 width={64}
                                 height={64}
                                 rounded
                                 thumbnail
                                 saveSprite={true}
-                                onClick={() => console.log("Clicked", row.id)}
+                                enableClickModel={true}
+                                gameval={row.gameval}
+                                extraData={row.extraData}
+                                textureData={row} // Pass full row data to avoid cache lookup
+                                modalOpen={selectedRow?.id === row.id ? modalOpen : false}
+                                onModalOpenChange={(open) => {
+                                    if (open) {
+                                        setSelectedRow({ ...row });
+                                        setModalOpen(true);
+                                    } else {
+                                        setModalOpen(false);
+                                        setSelectedRow(null);
+                                    }
+                                }}
                             />
                         ),
                     },
@@ -60,7 +81,7 @@ export default function TextureSearch() {
                                 variant="outline"
                                 onClick={() => {
                                     setSelectedRow(row);
-                                    setDialogOpen(true);
+                                    setModalOpen(true);
                                 }}
                             >
                                 View
@@ -69,94 +90,6 @@ export default function TextureSearch() {
                     },
                 ]}
             />
-
-            <Dialog open={dialogOpen} onOpenChange={(open) => {
-                setDialogOpen(open);
-                if (!open) setSelectedRow(null);
-            }}>
-                <DialogContent className="max-h-[60vh] overflow-y-auto flex flex-col">
-                    <DialogHeader>
-                        <DialogTitle>
-                            Attachments for Texture ID {selectedRow?.id}
-                        </DialogTitle>
-                    </DialogHeader>
-
-                    {selectedRow && (() => {
-                        const attachments = selectedRow.extraData.attachments;
-                        if (!attachments) return null;
-
-                        const { overlays, total, models } = attachments;
-                        const hasItems = models?.items?.length > 0;
-                        const hasObjects = models?.objects?.length > 0;
-                        const hasNpcs = models?.npcs?.length > 0;
-                        const hasOverlays = overlays?.length > 0;
-
-                        return (
-                            <div className="space-y-4 text-sm max-h-[75vh] overflow-y-auto pr-2">
-                                <div><strong>Total:</strong> {total}</div>
-
-                                {hasOverlays && (
-                                    <div>
-                                        <strong>Overlays:</strong>
-                                        <div className="max-h-40 overflow-y-auto border rounded p-2">
-                                            <ul className="list-disc ml-4">
-                                                {overlays.map((overlay: any, idx: number) => (
-                                                    <li key={idx}>{overlay}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {hasItems && (
-                                    <div>
-                                        <strong>Items:</strong>
-                                        <div className="max-h-40 overflow-y-auto border rounded p-2">
-                                            <ul className="list-disc ml-4">
-                                                {models.items.map((item: GameValElement, i: number) => (
-                                                    <li key={`item-${i}`}>
-                                                        {item.name} (ID: {item.id})
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {hasObjects && (
-                                    <div>
-                                    <strong>Objects:</strong>
-                                        <div className="max-h-40 overflow-y-auto border rounded p-2">
-                                            <ul className="list-disc ml-4">
-                                                {models.objects.map((obj: GameValElement, i: number) => (
-                                                    <li key={`obj-${i}`}>
-                                                        {obj.name} (ID: {obj.id})
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {hasNpcs && (
-                                    <div>
-                                    <strong>NPCs:</strong>
-                                        <div className="max-h-40 overflow-y-auto border rounded p-2">
-                                            <ul className="list-disc ml-4">
-                                                {models.npcs.map((npc: GameValElement, i: number) => (
-                                                    <li key={`npc-${i}`}>
-                                                        {npc.name} (ID: {npc.id})
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })()}
-                </DialogContent>
-            </Dialog>
         </>
     );
 }
