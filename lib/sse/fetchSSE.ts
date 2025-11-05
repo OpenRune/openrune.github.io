@@ -19,7 +19,7 @@ export interface SseConnection {
  * @param onEvent - Callback that receives the deserialized data class
  * @param onError - Optional error callback
  * @param onConnect - Optional connect callback
- * @param backendUrl - Optional backend URL (defaults to localhost:8090)
+ * @param backendUrl - Optional backend URL (if provided, will extract ip/port and use proxy route)
  * 
  * @example
  * ```typescript
@@ -37,14 +37,33 @@ export function fetchSSE<T extends SseEventType>(
   onEvent: SseEventCallback<T>,
   onError?: SseErrorCallback,
   onConnect?: SseConnectCallback,
-  backendUrl: string = 'http://localhost:8090'
+  backendUrl?: string
 ): SseConnection | null {
   if (typeof window === 'undefined') {
     return null;
   }
 
   try {
-    const sseUrl = `${backendUrl}/sse?type=${type}`;
+    // Use the proxy route - it will handle HTTPS to HTTP conversion
+    let sseUrl: string;
+    
+    if (backendUrl) {
+      // Extract ip and port from backendUrl (e.g., "http://localhost:8090" or "http://150.107.201.110:8090")
+      try {
+        const url = new URL(backendUrl);
+        const ip = url.hostname;
+        const port = url.port || (url.protocol === 'https:' ? '443' : '80');
+        // Use proxy route with ip and port as query parameters
+        sseUrl = `/api/server/sse?type=${type}&ip=${encodeURIComponent(ip)}&port=${encodeURIComponent(port)}`;
+      } catch (e) {
+        // If URL parsing fails, fall back to proxy route without ip/port (will use cookie/header)
+        sseUrl = `/api/server/sse?type=${type}`;
+      }
+    } else {
+      // No backendUrl provided, use proxy route which will use cookie/header
+      sseUrl = `/api/server/sse?type=${type}`;
+    }
+    
     const eventSource = new EventSource(sseUrl);
     
     // Suppress 404 errors in console by intercepting fetch

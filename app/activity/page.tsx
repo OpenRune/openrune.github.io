@@ -202,8 +202,18 @@ export default function ActivityPage() {
     // If "ALL" is selected, connect without type query parameter to get all events
     if (sseEventType === 'ALL') {
       try {
-        // No type parameter = all event types
-        const sseUrl = `${backendUrl}/sse`;
+        // Use proxy route - extract ip and port from backendUrl
+        let sseUrl: string;
+        try {
+          const url = new URL(backendUrl);
+          const ip = url.hostname;
+          const port = url.port || (url.protocol === 'https:' ? '443' : '80');
+          // Use proxy route without type parameter to get all events
+          sseUrl = `/api/server/sse?ip=${encodeURIComponent(ip)}&port=${encodeURIComponent(port)}`;
+        } catch (e) {
+          // Fallback to proxy route without ip/port (will use cookie/header)
+          sseUrl = `/api/server/sse`;
+        }
         const eventSource = new EventSource(sseUrl);
 
         eventSource.onopen = () => {

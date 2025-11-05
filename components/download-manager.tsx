@@ -147,8 +147,18 @@ export function DownloadManagerProvider({ children }: { children: React.ReactNod
         )
       );
 
-      // Connect to SSE for progress updates
-      const sseUrl = `${backendUrl}/sse?type=ZIP_PROGRESS&jobId=${jobId}`;
+      // Connect to SSE for progress updates via proxy route
+      let sseUrl: string;
+      try {
+        const url = new URL(backendUrl);
+        const ip = url.hostname;
+        const port = url.port || (url.protocol === 'https:' ? '443' : '80');
+        // Use proxy route with ip, port, type, and jobId
+        sseUrl = `/api/server/sse?type=ZIP_PROGRESS&jobId=${encodeURIComponent(jobId)}&ip=${encodeURIComponent(ip)}&port=${encodeURIComponent(port)}`;
+      } catch (e) {
+        // Fallback to proxy route without ip/port (will use cookie/header)
+        sseUrl = `/api/server/sse?type=ZIP_PROGRESS&jobId=${encodeURIComponent(jobId)}`;
+      }
       const eventSource = new EventSource(sseUrl);
 
       eventSource.onopen = () => {

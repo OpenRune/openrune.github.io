@@ -58,9 +58,18 @@ export function DownloadDialog({ open, onOpenChange, type, backendUrl }: Downloa
         setJobId(newJobId);
         setMessage('Job created, waiting for progress...');
 
-        // Connect to SSE for progress updates with jobId
-        // Note: fetchSSE doesn't support query params, so we'll use EventSource directly
-        const sseUrl = `${backendUrl}/sse?type=ZIP_PROGRESS&jobId=${newJobId}`;
+        // Connect to SSE for progress updates with jobId via proxy route
+        let sseUrl: string;
+        try {
+          const url = new URL(backendUrl);
+          const ip = url.hostname;
+          const port = url.port || (url.protocol === 'https:' ? '443' : '80');
+          // Use proxy route with ip, port, type, and jobId
+          sseUrl = `/api/server/sse?type=ZIP_PROGRESS&jobId=${encodeURIComponent(newJobId)}&ip=${encodeURIComponent(ip)}&port=${encodeURIComponent(port)}`;
+        } catch (e) {
+          // Fallback to proxy route without ip/port (will use cookie/header)
+          sseUrl = `/api/server/sse?type=ZIP_PROGRESS&jobId=${encodeURIComponent(newJobId)}`;
+        }
         const eventSource = new EventSource(sseUrl);
         
         eventSource.onopen = () => {
