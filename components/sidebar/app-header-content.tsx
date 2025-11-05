@@ -5,7 +5,6 @@ import {
   SidebarMenu,
   useSidebar
 } from '@/components/ui/sidebar'
-import {ModeToggle} from "@/components/ui/themetoggle";
 import { SideBarToggle } from './SideBarToggle';
 import {Logo} from "@/components/ui/logo";
 import {Sygnet} from "@/components/ui/sygnet";
@@ -38,7 +37,6 @@ export function AppHeaderContent() {
                   <Logo width={200} height={32}/>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {mounted ? <ModeToggle /> : null}
                   <SideBarToggle />
                 </div>
               </div>

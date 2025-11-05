@@ -1,6 +1,6 @@
 'use client';
 
-import { IconBrightness, IconSun, IconMoon } from '@tabler/icons-react';
+import { IconSun, IconMoon } from '@tabler/icons-react';
 import { useTheme } from 'next-themes';
 import * as React from 'react';
 
@@ -14,7 +14,7 @@ import {
     ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { useThemeConfig } from '@/components/active-theme';
-import { Check } from 'lucide-react'; // Or any other check icon
+import { Check } from 'lucide-react';
 
 const DEFAULT_THEMES = [
     { name: 'Default', value: 'default' },

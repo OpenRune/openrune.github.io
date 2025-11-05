@@ -1,40 +1,37 @@
-"use client";
+'use client';
 
-import { Button } from "@/components/ui/button";
-import SearchTable from "@/components/SearchTable";
+import { PaginatedTable } from '@/components/ui/paginated-table';
+import {
+  createIdColumn,
+  createGameValColumn,
+  createTickDurationColumn,
+} from '@/components/ui/table-columns/common-columns';
+import { useInfoContent } from '@/hooks/useInfoContent';
 
-export default function SpotAnimationsSearch() {
-    return (
-        <SearchTable
-            name = "Spotanims"
-            baseUrl="/public/spotanim"
-            disabledModes={["name"]}
-            columns={[
-                { key: "id", label: "ID" },
-                { key: "gameval", label: "Gameval" },
-                {
-                    key: "extra.length",
-                    label: "Tick Duration",
-                    render: (row) => {
-                        const ticks = row.extraData?.length ?? 0;
-                        const seconds = (ticks * 0.6).toFixed(1);
-                        return `${ticks} ticks (${seconds}s)`;
-                    },
-                },
-                {
-                    key: "view",
-                    label: "View",
-                    render: (row) => (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => alert(`View data for object ID ${row.id}`)}
-                        >
-                            View
-                        </Button>
-                    ),
-                },
-            ]}
-        />
-    );
+export default function SpotAnimsPage() {
+  const { info, infoContent } = useInfoContent({
+    endpoint: 'spotanims',
+    title: 'Spot Animations Information',
+    description: 'Use the search modes to find spot animations by ID or gameval.',
+  });
+
+  const columns = [
+    createIdColumn(),
+    createGameValColumn(),
+    createTickDurationColumn(),
+  ];
+
+  return (
+    <PaginatedTable
+      endpoint="spotanims"
+      columns={columns}
+      title="Spot Animations"
+      itemsPerPage={50}
+      disabledModes={['name']}
+      defaultSearchMode="gameval"
+      infoContent={infoContent}
+      externalInfo={info}
+    />
+  );
 }
+

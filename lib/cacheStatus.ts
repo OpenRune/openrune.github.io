@@ -1,13 +1,36 @@
 import { CacheType } from './cacheTypes';
 import { unauthorizedRequest } from './api/apiClient';
 
-export interface CacheStatus {
-  cacheTypeId: string;
-  isOnline: boolean;
+export enum ServerStatus {
+  BOOTING = 'BOOTING',
+  UPDATING = 'UPDATING',
+  LIVE = 'LIVE',
+  ERROR = 'ERROR',
+}
+
+export interface StatusResponse {
+  status: ServerStatus;
+  game: string;
+  revision: number;
+  environment: string;
+  port: number;
+  statusMessage?: string | null;
+  progress?: number | null;
+}
+
+export interface CacheStatusInfo {
+  status: ServerStatus;
+  isOnline: boolean; // LIVE = true, others = false
+  statusResponse: StatusResponse | null;
   lastChecked: number;
 }
 
-export async function checkCacheStatus(cacheType: CacheType): Promise<boolean> {
+// Helper to determine if server is online based on status
+export function isStatusOnline(status: ServerStatus): boolean {
+  return status === ServerStatus.LIVE;
+}
+
+export async function checkCacheStatus(cacheType: CacheType): Promise<StatusResponse | null> {
   try {
     // Create a temporary cache type header to check this specific cache
     const cacheTypeHeader = JSON.stringify({ ip: cacheType.ip, port: cacheType.port });
@@ -17,10 +40,10 @@ export async function checkCacheStatus(cacheType: CacheType): Promise<boolean> {
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
     
     try {
-      const response = await unauthorizedRequest<string>({
+      const response = await unauthorizedRequest<StatusResponse>({
         method: 'get',
-        url: 'public/status',
-        responseType: 'text',
+        url: 'status',
+        responseType: 'json',
         headers: {
           'x-cache-type': cacheTypeHeader,
         },
@@ -33,49 +56,42 @@ export async function checkCacheStatus(cacheType: CacheType): Promise<boolean> {
 
       // Handle connection errors (503, 502) - cache is unavailable
       if (response.status === 503 || response.status === 502) {
-        return false;
+        return null;
       }
 
-      // If we get a successful status code (200-299), service is online
+      // If we get a successful status code (200-299), return the status response
       if (response.status >= 200 && response.status < 300) {
-        // Status code 200 OK is sufficient - service is online
-        // Also check response body if available (may contain "OK" or "ok")
-        const data = response.data || '';
-        // If status is 200, return true regardless of body
-        // For other 2xx codes, also check if body contains "ok" if needed
-        return true;
+        return response.data;
       }
 
-      // Any other status code means offline
-      return false;
+      // Any other status code means we couldn't get status
+      return null;
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
-      // Silently handle timeout/connection errors - services can be down
       
       // Check if it's an abort error or timeout
       if (controller.signal.aborted || fetchError?.code === 'ECONNABORTED' || fetchError?.message?.includes('timeout')) {
-        return false;
+        return null;
       }
       
       // For axios errors with response, check status codes
-      // Axios throws errors for non-2xx status codes, but we can check the response
       if (fetchError?.response) {
         const status = fetchError.response.status;
         // If we got a 200 response but axios still threw, something else is wrong
-        if (status === 200) {
-          return true; // Got 200, consider it online
+        if (status === 200 && fetchError.response.data) {
+          return fetchError.response.data as StatusResponse;
         }
         if (status === 503 || status === 502) {
-          return false;
+          return null;
         }
       }
       
-      // For any other error, consider it offline
-      return false;
+      // For any other error, return null
+      return null;
     }
   } catch (error) {
     // Silently handle errors - services can be down
-    return false;
+    return null;
   }
 }
 
@@ -101,13 +117,13 @@ async function limitConcurrency<T>(
   await Promise.all(executing);
 }
 
-export async function checkAllCacheStatuses(cacheTypes: CacheType[]): Promise<Map<string, boolean>> {
-  const statusMap = new Map<string, boolean>();
+export async function checkAllCacheStatuses(cacheTypes: CacheType[]): Promise<Map<string, StatusResponse | null>> {
+  const statusMap = new Map<string, StatusResponse | null>();
   
   // Check cache types with concurrency limit (2 at a time)
   await limitConcurrency(cacheTypes, 2, async (cacheType) => {
-    const isOnline = await checkCacheStatus(cacheType);
-    statusMap.set(cacheType.id, isOnline);
+    const statusResponse = await checkCacheStatus(cacheType);
+    statusMap.set(cacheType.id, statusResponse);
   });
 
   return statusMap;
@@ -116,8 +132,8 @@ export async function checkAllCacheStatuses(cacheTypes: CacheType[]): Promise<Ma
 export async function checkCacheStatusPriority(
   priorityCacheType: CacheType,
   otherCacheTypes: CacheType[]
-): Promise<Map<string, boolean>> {
-  const statusMap = new Map<string, boolean>();
+): Promise<Map<string, StatusResponse | null>> {
+  const statusMap = new Map<string, StatusResponse | null>();
   
   // Check priority cache type first
   const priorityStatus = await checkCacheStatus(priorityCacheType);
@@ -126,12 +142,11 @@ export async function checkCacheStatusPriority(
   // Then check others in background (don't await)
   Promise.allSettled(
     otherCacheTypes.map(async (cacheType) => {
-      const isOnline = await checkCacheStatus(cacheType);
-      statusMap.set(cacheType.id, isOnline);
-      return { id: cacheType.id, isOnline };
+      const statusResponse = await checkCacheStatus(cacheType);
+      statusMap.set(cacheType.id, statusResponse);
+      return { id: cacheType.id, statusResponse };
     })
   );
   
   return statusMap;
 }
-

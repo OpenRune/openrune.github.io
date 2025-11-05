@@ -4,8 +4,61 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9e2dc116-edfb-462b-b863-05ca80e0ae51" name="Changes" comment="">
+    <list default="true" id="51982a52-4621-4b78-827a-2c8ff91c7405" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.github/workflows/nextjs.yml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/openrune.github.io.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/openrune.github.io.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/animations/page.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/api/cache-proxy/[...path]/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/cache-proxy/[...path]/route.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/globals.css" beforeDir="false" afterPath="$PROJECT_DIR$/app/globals.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/items/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/items/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/models/page.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/modelview/page.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/not-found.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/not-found.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/npcs/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/npcs/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/objects/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/objects/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/spotanims/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/spotanims/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/sprites/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/sprites/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/texures/page.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/underlays-overlays/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/underlays-overlays/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ModelInfoSidebar.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/SearchTable.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/active-theme.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/active-theme.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/layout/cache-status-wrapper.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/layout/cache-status-wrapper.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/layout/cache-type-provider.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/layout/cache-type-provider.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/layout/settings-provider.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/layout/settings-provider.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/search-table/GamevalTags.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/search-table/SearchTablePagination.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/search-table/searchModes/gameval.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/search-table/searchModes/gameval.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/search-table/searchModes/id.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/search-table/searchModes/id.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/search-table/searchModes/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/search-table/searchModes/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/search-table/searchModes/name.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/search-table/searchModes/name.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/search-table/searchModes/regex.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/search-table/searchModes/regex.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/sidebar/app-header-content.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/sidebar/app-header-content.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/sidebar/app-sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/sidebar/app-sidebar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ui/cache-status-banner.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/cache-status-banner.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ui/cache-type-modal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/cache-type-modal.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ui/cache-type-selector-page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/cache-type-selector-page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ui/settings-modal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/settings-modal.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ui/sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/sidebar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ui/themetoggle.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/themetoggle.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ui/user-avatar-profile.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/hooks/useLiveResource.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/hooks/useSSE.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/hooks/useShareLink.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/RSModel.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/RSTexture.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/api/apiClient.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/api/apiClient.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/api/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/api/types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/cacheStatus.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/cacheStatus.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/hdTextureMap.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/navConfig.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/lib/navConfig.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/next.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/next.config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -15,59 +68,52 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="MarkdownSettingsMigration">
-    <option name="stateVersion" value="1" />
-  </component>
   <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
   &quot;associatedIndex&quot;: 5
 }</component>
-  <component name="ProjectId" id="2ytL2cXw9RcBIki6GGm4NT4GT6Q" />
+  <component name="ProjectId" id="34yjgdrsRQpK8F5Sw3iiqXXhclQ" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;live&quot;,
-    &quot;jsx.switch.disabled&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;E:/RSPS/OpenRune/openrune.dev/app&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.standard&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.standard&quot;: &quot;&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_interpreter_path&quot;: &quot;node&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;npm.build.executor&quot;: &quot;Run&quot;,
-    &quot;npm.dev.executor&quot;: &quot;Run&quot;,
-    &quot;npm.lint.executor&quot;: &quot;Run&quot;,
-    &quot;npm.npm start.executor&quot;: &quot;Run&quot;,
-    &quot;npm.serve.executor&quot;: &quot;Run&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;D:\\openrune.github.io\\node_modules\\typescript\\lib&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "git-widget-placeholder": "re-build",
+    "js.debugger.nextJs.config.created.client": "true",
+    "js.debugger.nextJs.config.created.server": "true",
+    "junie.onboarding.icon.badge.shown": "true",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "npm.Next.js: server-side.executor": "Run",
+    "npm.build.executor": "Run",
+    "npm.start.executor": "Run",
+    "to.speed.mode.migration.done": "true",
+    "ts.external.directory.path": "D:\\openrune.github.io\\node_modules\\typescript\\lib",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
-  <component name="RecentsManager">
-    <key name="CopyFile.RECENT_KEYS">
-      <recent name="E:\RSPS\OpenRune\openrune.dev\app" />
-      <recent name="E:\RSPS\OpenRune\openrune.dev\components\sidebar" />
-      <recent name="E:\RSPS\OpenRune\openrune.dev" />
-      <recent name="E:\Programming\synctunez\synctunez.com\components\sidebar" />
-      <recent name="E:\Programming\synctunez\synctunez.com\src\api\data" />
-    </key>
-    <key name="MoveFile.RECENT_KEYS">
-      <recent name="E:\RSPS\OpenRune\openrune.dev\lib" />
-      <recent name="E:\RSPS\OpenRune\openrune.dev\public" />
-      <recent name="E:\RSPS\OpenRune\openrune.dev\components\ui" />
-      <recent name="E:\Programming\synctunez\synctunez.com\components\ui\playlist" />
-      <recent name="E:\Programming\synctunez\synctunez.com\components\layout" />
-    </key>
-  </component>
-  <component name="RunManager" selected="npm.dev">
-    <configuration name="Debug Application" type="JavascriptDebugType" uri="http://localhost:3000">
+}]]></component>
+  <component name="RunManager" selected="npm.build">
+    <configuration name="Next.js: debug client-side" type="JavascriptDebugType" uri="http://localhost:3000/">
+      <method v="2" />
+    </configuration>
+    <configuration name="Next.js: server-side" type="js.build_tools.npm">
+      <package-json value="$PROJECT_DIR$/package.json" />
+      <command value="run" />
+      <scripts>
+        <script value="dev" />
+      </scripts>
+      <node-interpreter value="project" />
+      <envs />
       <method v="2" />
     </configuration>
     <configuration name="build" type="js.build_tools.npm" temporary="true" nameIsGenerated="true">
@@ -80,27 +126,7 @@
       <envs />
       <method v="2" />
     </configuration>
-    <configuration name="dev" type="js.build_tools.npm" temporary="true" nameIsGenerated="true">
-      <package-json value="$PROJECT_DIR$/package.json" />
-      <command value="run" />
-      <scripts>
-        <script value="dev" />
-      </scripts>
-      <node-interpreter value="project" />
-      <envs />
-      <method v="2" />
-    </configuration>
-    <configuration name="lint" type="js.build_tools.npm" temporary="true" nameIsGenerated="true">
-      <package-json value="$PROJECT_DIR$/package.json" />
-      <command value="run" />
-      <scripts>
-        <script value="lint" />
-      </scripts>
-      <node-interpreter value="project" />
-      <envs />
-      <method v="2" />
-    </configuration>
-    <configuration name="npm start" type="js.build_tools.npm">
+    <configuration name="start" type="js.build_tools.npm" temporary="true" nameIsGenerated="true">
       <package-json value="$PROJECT_DIR$/package.json" />
       <command value="run" />
       <scripts>
@@ -110,74 +136,33 @@
       <envs />
       <method v="2" />
     </configuration>
-    <configuration name="serve" type="js.build_tools.npm" temporary="true" nameIsGenerated="true">
-      <package-json value="$PROJECT_DIR$/package.json" />
-      <command value="run" />
-      <scripts>
-        <script value="serve" />
-      </scripts>
-      <node-interpreter value="project" />
-      <envs />
-      <method v="2" />
-    </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="npm.dev" />
         <item itemvalue="npm.build" />
-        <item itemvalue="npm.serve" />
-        <item itemvalue="npm.lint" />
+        <item itemvalue="npm.start" />
       </list>
     </recent_temporary>
   </component>
-  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-WS-252.27397.92" />
+      </set>
+    </attachedChunks>
+  </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
-      <changelist id="9e2dc116-edfb-462b-b863-05ca80e0ae51" name="Changes" comment="" />
-      <created>1750648717492</created>
+      <changelist id="51982a52-4621-4b78-827a-2c8ff91c7405" name="Changes" comment="" />
+      <created>1762192818919</created>
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
-      <updated>1750648717492</updated>
-      <workItem from="1750648718515" duration="1160000" />
-      <workItem from="1750649992971" duration="4828000" />
-      <workItem from="1750724227090" duration="5728000" />
-      <workItem from="1750765351896" duration="50000" />
-      <workItem from="1750952391324" duration="31970000" />
-      <workItem from="1751654138490" duration="953000" />
-      <workItem from="1751657931242" duration="2277000" />
-      <workItem from="1751662887557" duration="3769000" />
-      <workItem from="1751763532153" duration="56000" />
-      <workItem from="1751766918941" duration="21376000" />
-      <workItem from="1751992488277" duration="18299000" />
-      <workItem from="1752120274951" duration="18803000" />
-      <workItem from="1752239542354" duration="97000" />
-      <workItem from="1752342846474" duration="11418000" />
-      <workItem from="1752358661976" duration="11764000" />
-      <workItem from="1752399500508" duration="36000" />
-      <workItem from="1752432872233" duration="70000" />
-      <workItem from="1752813629866" duration="8312000" />
-      <workItem from="1752926672649" duration="207000" />
-      <workItem from="1752928342174" duration="698000" />
-      <workItem from="1752991085072" duration="25070000" />
-      <workItem from="1753296774955" duration="3888000" />
-      <workItem from="1753303058464" duration="1302000" />
-      <workItem from="1753480737722" duration="2543000" />
-      <workItem from="1758332675047" duration="2333000" />
-      <workItem from="1762127906315" duration="1463000" />
+      <updated>1762192818919</updated>
+      <workItem from="1762192820368" duration="23217000" />
+      <workItem from="1762301296736" duration="14373000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
-  </component>
-  <component name="Vcs.Log.Tabs.Properties">
-    <option name="TAB_STATES">
-      <map>
-        <entry key="MAIN">
-          <value>
-            <State />
-          </value>
-        </entry>
-      </map>
-    </option>
   </component>
 </project>

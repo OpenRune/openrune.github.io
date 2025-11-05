@@ -30,10 +30,21 @@ export async function fetchWithCacheType(
         document.cookie = `cache-type=${cacheTypeStr}; path=/; max-age=31536000`;
     }
     
+    // Disable caching in development/local
+    const isDev = process.env.NODE_ENV === 'development' || 
+                  (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'));
+    
+    if (isDev) {
+        headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+        headers.set('Pragma', 'no-cache');
+        headers.set('Expires', '0');
+    }
+    
     // Merge with any existing headers
     return fetch(input, {
         ...init,
-        headers
+        headers,
+        cache: isDev ? 'no-store' : init?.cache
     });
 }
 
@@ -56,7 +67,7 @@ export const apiClient: AxiosInstance = axios.create({
     },
 })
 
-// Interceptor to add cache type to requests
+// Interceptor to add cache type to requests and disable caching in dev
 apiClient.interceptors.request.use((config) => {
     if (currentCacheType && typeof window !== 'undefined') {
         const cacheTypeStr = JSON.stringify({
@@ -68,6 +79,17 @@ apiClient.interceptors.request.use((config) => {
         // Also set cookie for consistency
         document.cookie = `cache-type=${cacheTypeStr}; path=/; max-age=31536000`;
     }
+    
+    // Disable caching in development/local
+    const isDev = process.env.NODE_ENV === 'development' || 
+                  (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'));
+    
+    if (isDev) {
+        config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+        config.headers['Pragma'] = 'no-cache';
+        config.headers['Expires'] = '0';
+    }
+    
     return config;
 });
 

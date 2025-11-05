@@ -4,6 +4,9 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface Settings {
   copyGamevalsToUppercase: boolean;
+  fullWidthContent: boolean;
+  allowMultipleCollapsiblesOpen: boolean;
+  navItemSize: 'small' | 'medium' | 'large';
 }
 
 interface SettingsContextType {
@@ -16,6 +19,9 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<Settings>({
     copyGamevalsToUppercase: false,
+    fullWidthContent: true,
+    allowMultipleCollapsiblesOpen: true,
+    navItemSize: 'medium',
   });
 
   // Load settings from localStorage on mount

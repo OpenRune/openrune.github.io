@@ -116,7 +116,50 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.6 0 0 / 0.3) oklch(0.95 0 0 / 0.1);
   }
+  
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  *::-webkit-scrollbar-track {
+    background: oklch(0.95 0 0 / 0.1);
+    border-radius: 4px;
+  }
+  
+  *::-webkit-scrollbar-thumb {
+    background: oklch(0.6 0 0 / 0.3);
+    border-radius: 4px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+  }
+  
+  *::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.5 0 0 / 0.5);
+    background-clip: padding-box;
+  }
+  
+  .dark * {
+    scrollbar-color: oklch(0.7 0 0 / 0.5) oklch(0.3 0 0 / 0.3);
+  }
+  
+  .dark *::-webkit-scrollbar-track {
+    background: oklch(0.3 0 0 / 0.3);
+  }
+  
+  .dark *::-webkit-scrollbar-thumb {
+    background: oklch(0.7 0 0 / 0.5);
+    background-clip: padding-box;
+  }
+  
+  .dark *::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.75 0 0 / 0.7);
+    background-clip: padding-box;
+  }
+  
   body {
     @apply bg-background text-foreground;
   }
@@ -152,7 +195,54 @@
   }
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 ::view-transition-new(root) {
   /* Apply the reveal animation */
   animation: reveal 0.4s ease-in-out forwards;
+}
+
+/* Collapsible animations */
+[data-slot="collapsible-content"] {
+  overflow: hidden;
+  transition: height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+}
+
+[data-slot="collapsible-content"][data-state="open"] {
+  animation: collapsible-down 0.3s ease-in-out;
+}
+
+[data-slot="collapsible-content"][data-state="closed"] {
+  animation: collapsible-up 0.3s ease-in-out;
+}
+
+@keyframes collapsible-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
 }

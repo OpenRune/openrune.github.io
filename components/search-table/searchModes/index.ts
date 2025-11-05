@@ -11,4 +11,10 @@ const searchModes: Record<string, SearchModeConfig> = {
 };
 
 export const SEARCH_MODES: SearchModeConfig[] = Object.values(searchModes);
-export default searchModes; 
+
+export default searchModes;
+
+
+
+
+

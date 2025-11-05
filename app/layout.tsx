@@ -9,7 +9,7 @@ import NextTopLoader from 'nextjs-toploader';
 import {NuqsAdapter} from 'nuqs/adapters/next/app';
 import './globals.css';
 import './theme.css';
-import {SidebarProvider} from "@/components/ui/sidebar";
+import {SidebarProvider, SidebarInset} from "@/components/ui/sidebar";
 import {AppSidebar} from "@/components/sidebar/app-sidebar";
 import FloatingSidebarTrigger from "@/components/FloatingSidebarTrigger";
 import { SpeedInsights } from "@vercel/speed-insights/next"
@@ -17,6 +17,9 @@ import { Analytics } from "@vercel/analytics/next"
 import { SettingsProvider } from "@/components/layout/settings-provider";
 import { CacheTypeProvider } from "@/components/layout/cache-type-provider";
 import { CacheStatusWrapper } from "@/components/layout/cache-status-wrapper";
+import { ContentWrapper } from "@/components/layout/content-wrapper";
+import { DownloadManagerProvider } from "@/components/download-manager";
+import UpdateModalWrapper from "@/components/ui/update-modal";
 
 const META_THEME_COLORS = {
     light: '#ffffff',
@@ -42,8 +45,6 @@ export default async function RootLayout({
     const isScaled = activeThemeValue?.endsWith('-scaled');
 
     const defaultOpen = cookieStore.get("sidebar_state")?.value === "true"
-    const userSession = cookieStore.get("UserSession")?.value ?? null;
-    const userAccountRaw = cookieStore.get("UserAccount")?.value ?? null;
 
     return (
         <html lang='en' suppressHydrationWarning>
@@ -70,7 +71,7 @@ export default async function RootLayout({
         >
         <SpeedInsights/>
         <Analytics/>
-        <NextTopLoader showSpinner={false}/>
+        <NextTopLoader showSpinner={false} color="#3b82f6" height={3} easing="ease" speed={200}/>
         <NuqsAdapter>
             <ThemeProvider
                 attribute='class'
@@ -82,16 +83,21 @@ export default async function RootLayout({
                 <Providers activeThemeValue={activeThemeValue as string}>
                     <SettingsProvider>
                         <CacheTypeProvider>
-                            <ClientToaster />
-                            <SidebarProvider defaultOpen={true}>
-                                <AppSidebar/>
-                                <FloatingSidebarTrigger />
-                                <div className="w-full m-[10px]">
-                                    <CacheStatusWrapper>
-                                        {children}
-                                    </CacheStatusWrapper>
-                                </div>
-                            </SidebarProvider>
+                            <DownloadManagerProvider>
+                                <ClientToaster />
+                                <UpdateModalWrapper />
+                                <SidebarProvider defaultOpen={true}>
+                                    <AppSidebar/>
+                                    <FloatingSidebarTrigger />
+                                    <SidebarInset>
+                                        <ContentWrapper>
+                                            <CacheStatusWrapper>
+                                                {children}
+                                            </CacheStatusWrapper>
+                                        </ContentWrapper>
+                                    </SidebarInset>
+                                </SidebarProvider>
+                            </DownloadManagerProvider>
                         </CacheTypeProvider>
                     </SettingsProvider>
                 </Providers>

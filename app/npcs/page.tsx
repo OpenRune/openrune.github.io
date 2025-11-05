@@ -1,47 +1,39 @@
-"use client";
+'use client';
 
-import { Button } from "@/components/ui/button";
-import SearchTable from "@/components/SearchTable";
+import { PaginatedTable } from '@/components/ui/paginated-table';
+import {
+  createIdColumn,
+  createGameValColumn,
+  createNameColumn,
+  createNpcImageColumn,
+} from '@/components/ui/table-columns/common-columns';
+import { useInfoContent } from '@/hooks/useInfoContent';
 
-export default function NpcsSearch() {
-    return (
-        <SearchTable
-            name = "Npcs"
-            baseUrl="/public/npcs"
-            columns={[
-                {
-                    key: "image",
-                    label: "Image",
-                    render: (row) => (
-                        <img
-                            width={32}
-                            height={32}
-                            src={`https://chisel.weirdgloop.org/static/img/osrs-npc/${row.id}_128.png`}
-                            onError={(e) => {
-                                e.currentTarget.src =
-                                    "https://oldschool.runescape.wiki/images/Bank_filler_detail.png?7d983";
-                            }}
-                            alt={row.name || "Object image"}
-                        />
-                    ),
-                },
-                { key: "id", label: "ID" },
-                { key: "name", label: "Name" },
-                { key: "gameval", label: "Gameval" },
-                {
-                    key: "view",
-                    label: "View",
-                    render: (row) => (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => alert(`View data for object ID ${row.id}`)}
-                        >
-                            View
-                        </Button>
-                    ),
-                },
-            ]}
-        />
-    );
+export default function NpcsPage() {
+  const { info, infoContent } = useInfoContent({
+    endpoint: 'npcs',
+    title: 'NPCs Information',
+    description: 'Use the search modes to find NPCs by ID, name, or gameval.',
+  });
+
+  const columns = [
+    createNpcImageColumn(),
+    createIdColumn(),
+    createNameColumn(),
+    createGameValColumn(),
+  ];
+
+  return (
+    <PaginatedTable
+      endpoint="npcs"
+      columns={columns}
+      title="NPCs"
+      itemsPerPage={50}
+      disabledModes={[]}
+      defaultSearchMode="gameval"
+      infoContent={infoContent}
+      externalInfo={info}
+    />
+  );
 }
+

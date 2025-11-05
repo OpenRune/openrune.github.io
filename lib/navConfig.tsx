@@ -6,7 +6,7 @@ import {
   IconPhoto,
   Icon3dCubeSphere,
   IconStairs,
-  IconTexture, IconPackage, IconCube, IconPalette, IconKeyframe, IconKeyframes, IconChartBar, IconMap
+  IconTexture, IconPackage, IconCube, IconPalette, IconKeyframe, IconKeyframes, IconChartBar, IconMap, IconActivity
 } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 
@@ -25,6 +25,7 @@ export const NAV_PAGES: NavPage[] = [
     path: "/",
     icon: <IconHome size={18} />,
     requiresAuth: false,
+    usableOffline: true,
   },
   {
     label: "Configs",
@@ -52,7 +53,7 @@ export const NAV_PAGES: NavPage[] = [
       },
       {
         label: "Textures",
-        path: "/texures",
+        path: "/textures",
         icon: <IconTexture size={18} />,
         requiresAuth: false,
       },
@@ -63,14 +64,8 @@ export const NAV_PAGES: NavPage[] = [
         requiresAuth: false,
       },
       {
-        label: "Models",
-        path: "/models",
-        icon: <Icon3dCubeSphere size={18} />,
-        requiresAuth: false,
-      },
-      {
-        label: "Animations",
-        path: "/animations",
+        label: "Sequences",
+        path: "/sequences",
         icon: <IconKeyframes size={18} />,
         requiresAuth: false,
       },
@@ -107,12 +102,6 @@ export const NAV_PAGES: NavPage[] = [
         icon: <IconChartBar size={18} />,
         requiresAuth: false,
         usableOffline: true,
-      },
-      {
-        label: "Model Viewer",
-        path: "/modelview",
-        icon: <Icon3dCubeSphere size={18} />,
-        requiresAuth: false,
       }
     ],
   },
@@ -123,4 +112,25 @@ export const NAV_PAGES: NavPage[] = [
     requiresAuth: false,
     usableOffline: true,
   }
-]; 
+];
+
+/**
+ * Check if a given pathname is marked as usable offline
+ * @param pathname - The pathname to check
+ * @returns true if the page can be used when the server is offline
+ */
+export function isPageUsableOffline(pathname: string): boolean {
+  function checkPage(pages: NavPage[]): boolean {
+    for (const page of pages) {
+      if (page.path === pathname && page.usableOffline === true) {
+        return true;
+      }
+      if (page.children && checkPage(page.children)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  
+  return checkPage(NAV_PAGES);
+} 

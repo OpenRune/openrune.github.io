@@ -113,9 +113,15 @@ async function handleProxy(
         statusText: response.statusText,
       });
 
-      // Copy relevant headers
+      // Set no-cache headers to prevent caching
+      nextResponse.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      nextResponse.headers.set('Pragma', 'no-cache');
+      nextResponse.headers.set('Expires', '0');
+
+      // Copy relevant headers (but override cache headers)
       response.headers.forEach((value, key) => {
-        if (!['content-encoding', 'transfer-encoding'].includes(key.toLowerCase())) {
+        const lowerKey = key.toLowerCase();
+        if (!['content-encoding', 'transfer-encoding', 'cache-control', 'pragma', 'expires'].includes(lowerKey)) {
           nextResponse.headers.set(key, value);
         }
       });
