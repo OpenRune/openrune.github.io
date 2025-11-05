@@ -2,7 +2,7 @@ import React from 'react';
 
 export const Sygnet: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <svg
-        xmlns="https://www.w3.org/2000/svg"
+        xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 800 1200"
         preserveAspectRatio="xMinYMin meet" // align top-left, maintain aspect
         {...props} // This allows width, height, className, style, etc. to be passed in
