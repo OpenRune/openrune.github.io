@@ -5,13 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="51982a52-4621-4b78-827a-2c8ff91c7405" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/activity/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/activity/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/cache-proxy/[...path]/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/cache-proxy/[...path]/route.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/sprites/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/sprites/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/textures/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/textures/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/layout/cache-type-provider.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/layout/cache-type-provider.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/sse/fetchSSE.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/sse/fetchSSE.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/vercel.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
