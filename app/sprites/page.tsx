@@ -13,9 +13,9 @@ export default function SpritesPage() {
   
   const getBackendUrl = () => {
     if (selectedCacheType) {
-      return `https://${selectedCacheType.ip}:${selectedCacheType.port}`;
+      return `http://${selectedCacheType.ip}:${selectedCacheType.port}`;
     }
-    return 'https://localhost:8090';
+    return 'http://localhost:8090';
   };
 
   const handleDownload = () => {
