@@ -71,7 +71,7 @@ async function handleProxy(
     // Build the destination URL
     const path = params.path.join('/');
     const searchParams = request.nextUrl.searchParams.toString();
-    const destination = `http://${ip}:${port}/${path}${searchParams ? `?${searchParams}` : ''}`;
+    const destination = `https://${ip}:${port}/${path}${searchParams ? `?${searchParams}` : ''}`;
 
     // Get request body if present
     let body: BodyInit | undefined;

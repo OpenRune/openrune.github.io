@@ -14,9 +14,9 @@ export default function TexturesPage() {
   
   const getBackendUrl = () => {
     if (selectedCacheType) {
-      return `http://${selectedCacheType.ip}:${selectedCacheType.port}`;
+      return `https://${selectedCacheType.ip}:${selectedCacheType.port}`;
     }
-    return 'http://localhost:8090';
+    return 'https://localhost:8090';
   };
 
   const handleDownload = () => {

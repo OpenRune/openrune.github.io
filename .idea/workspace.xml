@@ -5,60 +5,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="51982a52-4621-4b78-827a-2c8ff91c7405" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.github/workflows/nextjs.yml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/openrune.github.io.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/openrune.github.io.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/animations/page.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/activity/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/activity/page.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/api/cache-proxy/[...path]/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/cache-proxy/[...path]/route.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/globals.css" beforeDir="false" afterPath="$PROJECT_DIR$/app/globals.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/items/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/items/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/layout.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/models/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/modelview/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/not-found.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/not-found.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/npcs/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/npcs/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/objects/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/objects/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/spotanims/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/spotanims/page.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/sprites/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/sprites/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/texures/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/underlays-overlays/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/underlays-overlays/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ModelInfoSidebar.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/SearchTable.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/active-theme.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/active-theme.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/layout/cache-status-wrapper.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/layout/cache-status-wrapper.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/textures/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/textures/page.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/layout/cache-type-provider.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/layout/cache-type-provider.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/layout/settings-provider.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/layout/settings-provider.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/search-table/GamevalTags.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/search-table/SearchTablePagination.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/search-table/searchModes/gameval.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/search-table/searchModes/gameval.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/search-table/searchModes/id.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/search-table/searchModes/id.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/search-table/searchModes/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/search-table/searchModes/index.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/search-table/searchModes/name.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/search-table/searchModes/name.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/search-table/searchModes/regex.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/search-table/searchModes/regex.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/sidebar/app-header-content.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/sidebar/app-header-content.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/sidebar/app-sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/sidebar/app-sidebar.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/cache-status-banner.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/cache-status-banner.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/cache-type-modal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/cache-type-modal.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/cache-type-selector-page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/cache-type-selector-page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/settings-modal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/settings-modal.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/sidebar.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/themetoggle.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/themetoggle.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/user-avatar-profile.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hooks/useLiveResource.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hooks/useSSE.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hooks/useShareLink.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/RSModel.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/RSTexture.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/api/apiClient.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/api/apiClient.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/api/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/api/types.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/cacheStatus.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/cacheStatus.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/hdTextureMap.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/navConfig.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/lib/navConfig.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/next.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/next.config.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ui/sygnet.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/sygnet.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/sse/fetchSSE.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/sse/fetchSSE.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -85,7 +39,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "re-build",
+    "git-widget-placeholder": "live",
     "js.debugger.nextJs.config.created.client": "true",
     "js.debugger.nextJs.config.created.server": "true",
     "junie.onboarding.icon.badge.shown": "true",

@@ -37,7 +37,7 @@ export function fetchSSE<T extends SseEventType>(
   onEvent: SseEventCallback<T>,
   onError?: SseErrorCallback,
   onConnect?: SseConnectCallback,
-  backendUrl: string = 'http://localhost:8090'
+  backendUrl: string = 'https://localhost:8090'
 ): SseConnection | null {
   if (typeof window === 'undefined') {
     return null;
