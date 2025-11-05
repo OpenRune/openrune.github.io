@@ -1,8 +1,0 @@
-{
-  "rewrites": [
-    {
-      "source": "/sse/:path*",
-      "destination": "http://150.107.201.110:8090/sse/:path*"
-    }
-  ]
-} 
