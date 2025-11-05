@@ -108,7 +108,7 @@ export default function ActivityPage() {
 
   // Helper to get backend URL from cache type
   const getBackendUrl = useCallback((cacheType: CacheType) => {
-    return `http://${cacheType.ip}:${cacheType.port}`;
+    return `https://${cacheType.ip}:${cacheType.port}`;
   }, []);
 
   // Helper to create event from parsed data

@@ -185,7 +185,7 @@ export function CacheTypeProvider({ children }: { children: React.ReactNode }) {
 
   // Setup SSE connection for a specific cache type
   const setupSSEForCacheType = React.useCallback((cacheType: CacheType, isSelected: boolean = false) => {
-    const backendUrl = `http://${cacheType.ip}:${cacheType.port}`;
+    const backendUrl = `https://${cacheType.ip}:${cacheType.port}`;
     const connectionKey = isSelected ? `selected-${cacheType.id}` : cacheType.id;
     
     // Clear any existing reconnection timer for this connection
