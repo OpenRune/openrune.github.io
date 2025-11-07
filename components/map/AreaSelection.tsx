@@ -34,6 +34,7 @@ export function AreaSelection({
     const [showImportView, setShowImportView] = useState(false);
     const [localImportFormat, setLocalImportFormat] = useState<'normal' | '117hd'>('normal');
     const importFormat = propImportFormat ?? localImportFormat;
+    const [itemNames, setItemNames] = useState<Map<string, string>>(new Map());
 
     const {
         items,
@@ -44,6 +45,38 @@ export function AreaSelection({
         setHiddenItems,
         setSelectedTool
     } = useCollectionControl(collectionControl);
+
+    // Merge custom names with items
+    const itemsWithNames = items.map(item => ({
+        ...item,
+        name: itemNames.get(item.id)
+    }));
+
+    const handleRename = (itemId: string, name: string) => {
+        setItemNames(prev => {
+            const newMap = new Map(prev);
+            if (name) {
+                newMap.set(itemId, name);
+            } else {
+                newMap.delete(itemId);
+            }
+            return newMap;
+        });
+    };
+
+    // Clean up names for items that no longer exist
+    useEffect(() => {
+        const itemIds = new Set(items.map(item => item.id));
+        setItemNames(prev => {
+            const newMap = new Map();
+            prev.forEach((name, id) => {
+                if (itemIds.has(id)) {
+                    newMap.set(id, name);
+                }
+            });
+            return newMap;
+        });
+    }, [items]);
 
     useEffect(() => {
         setShowImportView(importMode);
@@ -285,13 +318,15 @@ export function AreaSelection({
 
                     <ScrollArea className="flex-1 min-h-0">
                         <AreaItemList
-                            items={items}
+                            items={itemsWithNames}
                             selectedItemId={selectedItemId}
                             hiddenItems={hiddenItems}
                             onItemClick={handleItemClick}
                             onRemove={handleRemove}
                             onToggleHide={handleToggleHide}
                             onExport={handleExport}
+                            onRename={handleRename}
+                            itemNames={itemNames}
                         />
                     </ScrollArea>
 

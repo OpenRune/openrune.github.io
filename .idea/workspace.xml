@@ -6,8 +6,13 @@
   <component name="ChangeListManager">
     <list default="true" id="51982a52-4621-4b78-827a-2c8ff91c7405" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/globals.css" beforeDir="false" afterPath="$PROJECT_DIR$/app/globals.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/map/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/map/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/AreaItemList.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection/AreaItemList.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection/types.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/map/OSRSMap.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/OSRSMap.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/cacheTypes.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/cacheTypes.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/map/controls/CollectionControl.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/map/controls/CollectionControl.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

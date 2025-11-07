@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from 'react';
 import {
     ContextMenu,
     ContextMenuContent,
@@ -10,7 +11,17 @@ import {
     ContextMenuSubTrigger,
     ContextMenuTrigger
 } from '@/components/ui/context-menu';
-import { Square, Trash2, Eye, EyeOff, Download } from 'lucide-react';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Square, Trash2, Eye, EyeOff, Download, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SelectionItem, ExportFormat } from './types';
 import { formatArea, formatPoly } from './utils';
@@ -23,6 +34,8 @@ interface AreaItemListProps {
     onRemove: (item: SelectionItem, e?: React.MouseEvent) => void;
     onToggleHide: (item: SelectionItem, e?: React.MouseEvent) => void;
     onExport: (item: SelectionItem, format: ExportFormat, e?: React.MouseEvent) => void;
+    onRename: (itemId: string, name: string) => void;
+    itemNames: Map<string, string>;
 }
 
 export function AreaItemList({
@@ -32,8 +45,46 @@ export function AreaItemList({
     onItemClick,
     onRemove,
     onToggleHide,
-    onExport
+    onExport,
+    onRename,
+    itemNames
 }: AreaItemListProps) {
+    const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+    const [renameItem, setRenameItem] = useState<SelectionItem | null>(null);
+    const [renameValue, setRenameValue] = useState('');
+
+    const handleRenameClick = (item: SelectionItem, e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        setRenameItem(item);
+        setRenameValue(itemNames.get(item.id) || '');
+        setRenameDialogOpen(true);
+    };
+
+    const handleRenameSubmit = () => {
+        if (renameItem) {
+            const trimmedName = renameValue.trim();
+            onRename(renameItem.id, trimmedName || '');
+            setRenameDialogOpen(false);
+            setRenameItem(null);
+            setRenameValue('');
+        }
+    };
+
+    const handleRenameCancel = () => {
+        setRenameDialogOpen(false);
+        setRenameItem(null);
+        setRenameValue('');
+    };
+
+    const getDisplayText = (item: SelectionItem): string => {
+        const defaultText = item.type === 'area' ? formatArea(item) : formatPoly(item);
+        const customName = itemNames.get(item.id);
+        if (customName) {
+            return `${customName} - ${defaultText}`;
+        }
+        return defaultText;
+    };
+
     if (items.length === 0) {
         return (
             <div className="text-center text-sm text-muted-foreground py-8">
@@ -67,15 +118,23 @@ export function AreaItemList({
                                         selectedItemId === item.id ? "text-primary" : "text-muted-foreground"
                                     )} />
                                     <div className="flex-1 min-w-0">
-                                        {item.type === 'area' ? (
-                                            <div className="font-mono text-xs break-words">
-                                                {formatArea(item)}
-                                            </div>
-                                        ) : (
-                                            <div className="text-xs break-words">
-                                                {formatPoly(item)}
-                                            </div>
-                                        )}
+                                        <div className="text-xs break-words">
+                                            {item.type === 'area' ? (
+                                                <>
+                                                    {itemNames.get(item.id) && (
+                                                        <span className="font-sans">{itemNames.get(item.id)} - </span>
+                                                    )}
+                                                    <span className="font-mono">{formatArea(item)}</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    {itemNames.get(item.id) && (
+                                                        <span>{itemNames.get(item.id)} - </span>
+                                                    )}
+                                                    <span>{formatPoly(item)}</span>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                     {isHidden && (
                                         <EyeOff className="h-3 w-3 text-muted-foreground flex-shrink-0 mt-0.5" />
@@ -106,6 +165,12 @@ export function AreaItemList({
                                     </>
                                 )}
                             </ContextMenuItem>
+                            <ContextMenuItem 
+                                onClick={(e) => handleRenameClick(item, e)}
+                            >
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Rename
+                            </ContextMenuItem>
                             <ContextMenuSeparator />
                             <ContextMenuSub>
                                 <ContextMenuSubTrigger>
@@ -131,6 +196,46 @@ export function AreaItemList({
                     </ContextMenu>
                 );
             })}
+            
+            <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Rename {renameItem?.type === 'area' ? 'Area' : 'Polygon'}</DialogTitle>
+                        <DialogDescription>
+                            Enter a custom name for this {renameItem?.type === 'area' ? 'area' : 'polygon'}. This name is only saved for this session.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Input
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            placeholder={
+                                renameItem 
+                                    ? (renameItem.type === 'area' 
+                                        ? formatArea(renameItem) 
+                                        : formatPoly(renameItem))
+                                    : 'Enter name...'
+                            }
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleRenameSubmit();
+                                } else if (e.key === 'Escape') {
+                                    handleRenameCancel();
+                                }
+                            }}
+                            autoFocus
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={handleRenameCancel}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleRenameSubmit}>
+                            Save
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

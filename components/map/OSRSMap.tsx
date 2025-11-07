@@ -16,6 +16,7 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { ObjectPosition } from './ObjectFinder';
 import { AreaSelection } from './AreaSelection';
 import { CollectionControl } from '@/lib/map/controls/CollectionControl';
+import { SelectionControls } from './SelectionControls';
 
 
 const OSRSMap: React.FC = () => {
@@ -29,6 +30,7 @@ const OSRSMap: React.FC = () => {
     const [zoom, setZoom] = useState<number>(7);
     const [showRegionGrid, setShowRegionGrid] = useState<boolean>(false);
     const [showLabels, setShowLabels] = useState<boolean>(false);
+    const [selectedItemType, setSelectedItemType] = useState<'area' | 'poly' | null>(null);
     const { state } = useSidebar();
 
     const gridControlRef = useRef<GridControl | null>(null);
@@ -49,8 +51,21 @@ const OSRSMap: React.FC = () => {
         // Update map tiles
         map.updateMapPath = function () {
             if (map.tile_layer) map.removeLayer(map.tile_layer);
+            
+            // Check if we're on localhost - if so, use direct backend URL
+            // Otherwise use API proxy route
+            const isLocalhost = typeof window !== 'undefined' && (
+                window.location.hostname === 'localhost' ||
+                window.location.hostname === '127.0.0.1' ||
+                process.env.NODE_ENV === 'development'
+            );
+            
+            const tileUrl = isLocalhost
+                ? `http://150.107.201.110:8090/map/{z}/${map.plane}_{x}_{y}.png`
+                : `api/map/{z}/${map.plane}_{x}_{y}.png`;
+            
             map.tile_layer = L.tileLayer(
-                `api/map/{z}/${map.plane}_{x}_{y}.png`,
+                tileUrl,
                 {
                     minZoom: 7,
                     maxZoom: 11,
@@ -257,6 +272,59 @@ const OSRSMap: React.FC = () => {
         };
     }, []);
 
+    // Keyboard controls for moving selected areas
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Only handle arrow keys when map is focused or no input is focused
+            if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            if (!collectionControlRef.current) return;
+            
+            const selected = collectionControlRef.current.getSelectedItem();
+            if (!selected.type) return;
+
+            let moved = false;
+            let dx = 0;
+            let dy = 0;
+
+            switch (e.key) {
+                case 'ArrowUp':
+                    e.preventDefault();
+                    dy = 1; // Move up (increase Y - north in game coordinates)
+                    moved = true;
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    dy = -1; // Move down (decrease Y - south in game coordinates)
+                    moved = true;
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    dx = -1; // Move left (decrease X)
+                    moved = true;
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    dx = 1; // Move right (increase X)
+                    moved = true;
+                    break;
+            }
+
+            if (moved && collectionControlRef.current) {
+                if (selected.type === 'area' && selected.index !== null) {
+                    collectionControlRef.current.moveSelectedArea(dx, dy);
+                } else if (selected.type === 'poly') {
+                    collectionControlRef.current.moveSelectedPolyArea(dx, dy);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
     return (
         <div style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: '#000' }}>
             <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
@@ -422,8 +490,12 @@ const OSRSMap: React.FC = () => {
                     onItemClick={(item) => {
                         console.log('Area/Poly clicked:', item);
                     }}
+                    onItemSelected={(item) => {
+                        setSelectedItemType(item?.type || null);
+                    }}
                 />
             </MapControls>
+            <SelectionControls visible={selectedItemType !== null} type={selectedItemType} />
         </div>
     );
 };

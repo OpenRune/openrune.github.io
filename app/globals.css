@@ -120,6 +120,33 @@
     scrollbar-color: oklch(0.6 0 0 / 0.3) oklch(0.95 0 0 / 0.1);
   }
   
+  /* Hide sidebar completely when in fullscreen */
+  body.fullscreen-active [data-slot="sidebar"],
+  body.fullscreen-active [data-sidebar="sidebar"],
+  body.fullscreen-active [data-slot="sidebar-wrapper"] > [data-slot="sidebar"],
+  body.fullscreen-active [data-slot="sidebar-gap"],
+  body.fullscreen-active [data-slot="sidebar-container"],
+  body.fullscreen-active [data-slot="sidebar-inner"] {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  
+  /* Hide floating sidebar trigger button in fullscreen */
+  body.fullscreen-active button[aria-label*="sidebar" i],
+  body.fullscreen-active button[aria-label*="menu" i][data-state] {
+    display: none !important;
+  }
+  
+  /* Ensure sidebar wrapper doesn't take up space in fullscreen */
+  body.fullscreen-active [data-slot="sidebar-wrapper"] {
+    width: 0 !important;
+    min-width: 0 !important;
+  }
+  
   *::-webkit-scrollbar {
     width: 8px;
     height: 8px;

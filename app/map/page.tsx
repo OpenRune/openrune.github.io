@@ -23,12 +23,14 @@ export default function MapPage() {
             const fullscreen = !!document.fullscreenElement;
             setIsFullscreen(fullscreen);
             
+            // Add/remove class to body to hide sidebar completely
             if (fullscreen) {
                 // Entering fullscreen - save current state (from ref) and hide sidebar
-                // The ref is always up to date with the latest sidebar state
+                document.body.classList.add('fullscreen-active');
                 setOpen(false);
             } else {
-                // Exiting fullscreen - restore previous sidebar state
+                // Exiting fullscreen - remove class and restore previous sidebar state
+                document.body.classList.remove('fullscreen-active');
                 setOpen(wasExpandedRef.current);
             }
         };
@@ -37,11 +39,16 @@ export default function MapPage() {
         const initialFullscreen = !!document.fullscreenElement;
         setIsFullscreen(initialFullscreen);
         if (initialFullscreen) {
+            document.body.classList.add('fullscreen-active');
             setOpen(false);
         }
 
         document.addEventListener('fullscreenchange', handleFullscreenChange);
-        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            // Cleanup: remove class if component unmounts while in fullscreen
+            document.body.classList.remove('fullscreen-active');
+        };
     }, [setOpen]);
 
     // Calculate width and left offset based on sidebar state

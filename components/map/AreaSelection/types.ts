@@ -12,12 +12,14 @@ export interface Area {
         maxX: number;
         maxY: number;
     };
+    name?: string; // Optional session-only name
 }
 
 export interface Poly {
     id: string;
     type: 'poly';
     points: Array<{ x: number; y: number }>;
+    name?: string; // Optional session-only name
 }
 
 export type SelectionItem = Area | Poly;

@@ -44,6 +44,7 @@ export class CollectionControl extends L.Control {
     private _firstSelectedAreaPosition?: Position;
     private _editing = false;
     private _resizeHandles: L.Marker[] = [];
+    private _centerDragHandle: L.Marker | null = null;
     private _selectedAreaIndex: number | null = null;
     private _selectedPolyArea: boolean = false;
     private _pendingUpdate: number | null = null;
@@ -141,6 +142,11 @@ export class CollectionControl extends L.Control {
 
         if (this._currentDrawable instanceof Areas) {
             if (!this._firstSelectedAreaPosition) {
+                // Check if clicking within or near a selected area
+                if (this._isPositionNearSelectedArea(pos)) {
+                    // Don't start drawing if clicking on/near selected area
+                    return;
+                }
                 this._firstSelectedAreaPosition = pos;
             } else {
                 this._drawnMouseArea && this._map.removeLayer(this._drawnMouseArea);
@@ -150,6 +156,32 @@ export class CollectionControl extends L.Control {
         } else {
             this._currentDrawable.add(pos);
         }
+    }
+
+    // Check if a position is within or near a selected area
+    private _isPositionNearSelectedArea(pos: Position): boolean {
+        // Check if there's a selected area
+        if (this._selectedAreaIndex === null) return false;
+        if (this._selectedAreaIndex < 0 || this._selectedAreaIndex >= this._areas.areas.length) return false;
+        
+        const selectedArea = this._areas.areas[this._selectedAreaIndex];
+        
+        // Get the bounds of the selected area
+        const minX = Math.min(selectedArea.startPosition.x, selectedArea.endPosition.x);
+        const maxX = Math.max(selectedArea.startPosition.x, selectedArea.endPosition.x);
+        const minY = Math.min(selectedArea.startPosition.y, selectedArea.endPosition.y);
+        const maxY = Math.max(selectedArea.startPosition.y, selectedArea.endPosition.y);
+        
+        // Add a buffer of 2 tiles around the area to prevent accidental starts
+        const buffer = 2;
+        
+        // Check if position is within the buffered bounds and on the same plane
+        if (pos.z !== selectedArea.startPosition.z) return false;
+        
+        return pos.x >= (minX - buffer) && 
+               pos.x <= (maxX + buffer) && 
+               pos.y >= (minY - buffer) && 
+               pos.y <= (maxY + buffer);
     }
 
     // Throttled mouse area drawing for better performance (~60fps)
@@ -454,15 +486,26 @@ export class CollectionControl extends L.Control {
                 opacity: 1
             });
             
+            // Make rectangle draggable
+            rectangle.setStyle({ interactive: true });
+            this._makeRectangleDraggable(rectangle, index);
+            
             this._selectedAreaIndex = index;
             this._selectedPolyArea = false;
             this._addResizeHandlesForArea(index);
+            this._addCenterDragHandleForArea(index);
         } else {
             rectangle.setStyle({
                 color: "#33b5e5", // Default blue
                 weight: 1,
-                opacity: 1
+                opacity: 1,
+                interactive: false
             });
+            // Remove drag handlers
+            rectangle.off('mousedown');
+            this._map.off('mousemove');
+            this._map.off('mouseup');
+            this._map.off('mouseleave');
             this._selectedAreaIndex = null;
         }
     }
@@ -478,17 +521,29 @@ export class CollectionControl extends L.Control {
             this._polyArea.polygon.setStyle({
                 color: "#ff9500", // Orange color for selected
                 weight: 2,
-                opacity: 1
+                opacity: 1,
+                interactive: true
             });
+            
+            // Make polygon draggable
+            this._makePolygonDraggable(this._polyArea.polygon);
+            
             this._selectedAreaIndex = null;
             this._selectedPolyArea = true;
             this._addResizeHandlesForPolyArea();
+            this._addCenterDragHandleForPolyArea();
         } else {
             this._polyArea.polygon.setStyle({
                 color: "#33b5e5", // Default blue
                 weight: 1,
-                opacity: 1
+                opacity: 1,
+                interactive: false
             });
+            // Remove drag handlers
+            this._polyArea.polygon.off('mousedown');
+            this._map.off('mousemove');
+            this._map.off('mouseup');
+            this._map.off('mouseleave');
             this._selectedPolyArea = false;
         }
     }
@@ -516,6 +571,264 @@ export class CollectionControl extends L.Control {
         this._selectedPolyArea = false;
     }
 
+    // Move selected area by offset (dx, dy in game coordinates)
+    moveSelectedArea(dx: number, dy: number): boolean {
+        if (this._selectedAreaIndex === null) return false;
+        if (this._selectedAreaIndex < 0 || this._selectedAreaIndex >= this._areas.areas.length) return false;
+        
+        const area = this._areas.areas[this._selectedAreaIndex];
+        const rectangle = this._areas.rectangles[this._selectedAreaIndex];
+        
+        // Update area positions
+        area.startPosition = new Position(
+            area.startPosition.x + dx,
+            area.startPosition.y + dy,
+            area.startPosition.z
+        );
+        area.endPosition = new Position(
+            area.endPosition.x + dx,
+            area.endPosition.y + dy,
+            area.endPosition.z
+        );
+        
+        // Update rectangle bounds
+        const newStartLatLng = area.startPosition.toLatLng(this._map);
+        const newEndLatLng = area.endPosition.toLatLng(this._map);
+        
+        // Apply same logic as Area.toLeaflet() for bounds calculation
+        let startX = area.startPosition.x;
+        let startY = area.startPosition.y;
+        let endX = area.endPosition.x;
+        let endY = area.endPosition.y;
+        
+        if (endX >= startX) {
+            endX += 1;
+        } else {
+            startX += 1;
+        }
+        if (endY >= startY) {
+            endY += 1;
+        } else {
+            startY += 1;
+        }
+        
+        const adjustedStartPos = new Position(startX, startY, area.startPosition.z);
+        const adjustedEndPos = new Position(endX, endY, area.endPosition.z);
+        
+        rectangle.setBounds(
+            L.latLngBounds(
+                adjustedStartPos.toLatLng(this._map),
+                adjustedEndPos.toLatLng(this._map)
+            )
+        );
+        
+        // Update resize handles
+        this._updateResizeHandlePositions();
+        
+        return true;
+    }
+
+    // Move selected polygon by offset (dx, dy in game coordinates)
+    moveSelectedPolyArea(dx: number, dy: number): boolean {
+        if (!this._selectedPolyArea) return false;
+        if (this._polyArea.positions.length === 0) return false;
+        if (!this._polyArea.polygon) return false;
+        
+        // Update all positions
+        this._polyArea.positions = this._polyArea.positions.map(pos => 
+            new Position(pos.x + dx, pos.y + dy, pos.z)
+        );
+        
+        // Update polygon on map
+        const maxZoom = this._map.getMaxZoom();
+        const latLngs = this._polyArea.positions.map(pos => pos.toCentreLatLng(this._map));
+        
+        // Apply coordinate transformation (same as toLeaflet())
+        for (let i = 0; i < latLngs.length; i++) {
+            const point = this._map.project(latLngs[i], maxZoom);
+            point.x -= 16;
+            point.y += 16;
+            latLngs[i] = this._map.unproject(point, maxZoom);
+        }
+        
+        this._polyArea.polygon.setLatLngs([latLngs]);
+        
+        // Update resize handles
+        this._updateResizeHandlePositions();
+        
+        return true;
+    }
+
+    // Get selected item info
+    getSelectedItem(): { type: 'area' | 'poly' | null; index: number | null } {
+        if (this._selectedAreaIndex !== null) {
+            return { type: 'area', index: this._selectedAreaIndex };
+        }
+        if (this._selectedPolyArea) {
+            return { type: 'poly', index: 0 };
+        }
+        return { type: null, index: null };
+    }
+
+    // Make rectangle draggable
+    private _makeRectangleDraggable(rectangle: L.Rectangle, index: number) {
+        let isDragging = false;
+        let startLatLng: L.LatLng | null = null;
+        let startAreaPositions: { start: Position; end: Position } | null = null;
+
+        rectangle.on('mousedown', (e: L.LeafletMouseEvent) => {
+            // Don't start drag if clicking on resize handles
+            if ((e.originalEvent?.target as HTMLElement)?.closest('.resize-handle')) {
+                return;
+            }
+            
+            isDragging = true;
+            startLatLng = e.latlng;
+            const area = this._areas.areas[index];
+            startAreaPositions = {
+                start: new Position(area.startPosition.x, area.startPosition.y, area.startPosition.z),
+                end: new Position(area.endPosition.x, area.endPosition.y, area.endPosition.z)
+            };
+            L.DomUtil.addClass(this._map.getContainer(), 'leaflet-dragging');
+        });
+
+        const handleMouseMove = (e: L.LeafletMouseEvent) => {
+            if (!isDragging || !startLatLng || !startAreaPositions) return;
+            
+            const currentLatLng = e.latlng;
+            const startPos = Position.fromLatLng(this._map, startLatLng, (this._map as any).plane);
+            const currentPos = Position.fromLatLng(this._map, currentLatLng, (this._map as any).plane);
+            
+            const dx = currentPos.x - startPos.x;
+            const dy = currentPos.y - startPos.y;
+            
+            // Move the area
+            const area = this._areas.areas[index];
+            area.startPosition = new Position(
+                startAreaPositions.start.x + dx,
+                startAreaPositions.start.y + dy,
+                startAreaPositions.start.z
+            );
+            area.endPosition = new Position(
+                startAreaPositions.end.x + dx,
+                startAreaPositions.end.y + dy,
+                startAreaPositions.end.z
+            );
+            
+            // Update rectangle bounds
+            const newStartLatLng = area.startPosition.toLatLng(this._map);
+            const newEndLatLng = area.endPosition.toLatLng(this._map);
+            
+            let startX = area.startPosition.x;
+            let startY = area.startPosition.y;
+            let endX = area.endPosition.x;
+            let endY = area.endPosition.y;
+            
+            if (endX >= startX) {
+                endX += 1;
+            } else {
+                startX += 1;
+            }
+            if (endY >= startY) {
+                endY += 1;
+            } else {
+                startY += 1;
+            }
+            
+            const adjustedStartPos = new Position(startX, startY, area.startPosition.z);
+            const adjustedEndPos = new Position(endX, endY, area.endPosition.z);
+            
+            rectangle.setBounds(
+                L.latLngBounds(
+                    adjustedStartPos.toLatLng(this._map),
+                    adjustedEndPos.toLatLng(this._map)
+                )
+            );
+            
+            // Update resize handles
+            this._updateResizeHandlePositions();
+        };
+
+        const handleMouseUp = () => {
+            if (isDragging) {
+                isDragging = false;
+                startLatLng = null;
+                startAreaPositions = null;
+                L.DomUtil.removeClass(this._map.getContainer(), 'leaflet-dragging');
+            }
+        };
+
+        this._map.on('mousemove', handleMouseMove);
+        this._map.on('mouseup', handleMouseUp);
+        this._map.on('mouseleave', handleMouseUp);
+    }
+
+    // Make polygon draggable
+    private _makePolygonDraggable(polygon: L.Polygon) {
+        let isDragging = false;
+        let startLatLng: L.LatLng | null = null;
+        let startPositions: Position[] | null = null;
+
+        polygon.on('mousedown', (e: L.LeafletMouseEvent) => {
+            // Don't start drag if clicking on resize handles
+            if ((e.originalEvent?.target as HTMLElement)?.closest('.resize-handle')) {
+            return;
+        }
+            
+            isDragging = true;
+            startLatLng = e.latlng;
+            startPositions = this._polyArea.positions.map(pos => 
+                new Position(pos.x, pos.y, pos.z)
+            );
+            L.DomUtil.addClass(this._map.getContainer(), 'leaflet-dragging');
+        });
+
+        const handleMouseMove = (e: L.LeafletMouseEvent) => {
+            if (!isDragging || !startLatLng || !startPositions) return;
+            
+            const currentLatLng = e.latlng;
+            const startPos = Position.fromLatLng(this._map, startLatLng, (this._map as any).plane);
+            const currentPos = Position.fromLatLng(this._map, currentLatLng, (this._map as any).plane);
+            
+            const dx = currentPos.x - startPos.x;
+            const dy = currentPos.y - startPos.y;
+            
+            // Update all positions
+            this._polyArea.positions = startPositions.map(pos => 
+                new Position(pos.x + dx, pos.y + dy, pos.z)
+            );
+            
+            // Update polygon on map
+            const maxZoom = this._map.getMaxZoom();
+            const latLngs = this._polyArea.positions.map(pos => pos.toCentreLatLng(this._map));
+            
+            for (let i = 0; i < latLngs.length; i++) {
+                const point = this._map.project(latLngs[i], maxZoom);
+                point.x -= 16;
+                point.y += 16;
+                latLngs[i] = this._map.unproject(point, maxZoom);
+            }
+            
+            polygon.setLatLngs([latLngs]);
+            
+            // Update resize handles
+            this._updateResizeHandlePositions();
+        };
+
+        const handleMouseUp = () => {
+            if (isDragging) {
+                isDragging = false;
+                startLatLng = null;
+                startPositions = null;
+                L.DomUtil.removeClass(this._map.getContainer(), 'leaflet-dragging');
+            }
+        };
+
+        this._map.on('mousemove', handleMouseMove);
+        this._map.on('mouseup', handleMouseUp);
+        this._map.on('mouseleave', handleMouseUp);
+    }
+
     // Add resize handles for an area
     private _addResizeHandlesForArea(index: number) {
         if (index < 0 || index >= this._areas.rectangles.length) return;
@@ -523,19 +836,19 @@ export class CollectionControl extends L.Control {
         const rectangle = this._areas.rectangles[index];
         const bounds = rectangle.getBounds();
         
-        // Create 4 corner handles
+        // Create 4 corner handles with appropriate resize cursors
         const corners = [
-            bounds.getNorthWest(), // Top-left (NW)
-            bounds.getNorthEast(), // Top-right (NE)
-            bounds.getSouthEast(), // Bottom-right (SE)
-            bounds.getSouthWest()  // Bottom-left (SW)
+            { latLng: bounds.getNorthWest(), cursor: 'nw-resize' }, // Top-left (NW)
+            { latLng: bounds.getNorthEast(), cursor: 'ne-resize' }, // Top-right (NE)
+            { latLng: bounds.getSouthEast(), cursor: 'se-resize' }, // Bottom-right (SE)
+            { latLng: bounds.getSouthWest(), cursor: 'sw-resize' }  // Bottom-left (SW)
         ];
         
-        corners.forEach((latLng, cornerIndex) => {
-            const handle = L.marker(latLng, {
+        corners.forEach((corner, cornerIndex) => {
+            const handle = L.marker(corner.latLng, {
                 icon: L.divIcon({
                     className: 'resize-handle',
-                    html: '<div style="width: 16px; height: 16px; background: #ff9500; border: 3px solid white; border-radius: 50%; cursor: move; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>',
+                    html: `<div style="width: 16px; height: 16px; background: #ff9500; border: 3px solid white; border-radius: 50%; cursor: ${corner.cursor}; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>`,
                     iconSize: [16, 16],
                     iconAnchor: [8, 8]
                 }),
@@ -552,7 +865,7 @@ export class CollectionControl extends L.Control {
                 const currentBounds = rectangle.getBounds();
                 
                 // Get all corners as LatLngs (no conversion - these are the exact visual positions)
-                const corners = [
+                const cornerLatLngs = [
                     currentBounds.getNorthWest(), // 0: NW
                     currentBounds.getNorthEast(), // 1: NE
                     currentBounds.getSouthEast(), // 2: SE
@@ -560,7 +873,7 @@ export class CollectionControl extends L.Control {
                 ];
                 
                 // Opposite corner mapping: 0=NW->SE, 1=NE->SW, 2=SE->NW, 3=SW->NE
-                const oppositeCorners = [corners[2], corners[3], corners[0], corners[1]];
+                const oppositeCorners = [cornerLatLngs[2], cornerLatLngs[3], cornerLatLngs[0], cornerLatLngs[1]];
                 fixedCornerLatLng = oppositeCorners[cornerIndex];
             });
             
@@ -589,12 +902,20 @@ export class CollectionControl extends L.Control {
     private _updateResizeHandlePositions() {
         if (this._selectedAreaIndex !== null) {
             // Clear and recreate handles for area
+            const shouldHaveCenterHandle = this._centerDragHandle !== null;
             this._clearResizeHandles();
             this._addResizeHandlesForArea(this._selectedAreaIndex);
+            if (shouldHaveCenterHandle) {
+                this._addCenterDragHandleForArea(this._selectedAreaIndex);
+            }
         } else if (this._selectedPolyArea) {
             // Clear and recreate handles for polygon
+            const shouldHaveCenterHandle = this._centerDragHandle !== null;
             this._clearResizeHandles();
             this._addResizeHandlesForPolyArea();
+            if (shouldHaveCenterHandle) {
+                this._addCenterDragHandleForPolyArea();
+            }
         }
     }
 
@@ -753,6 +1074,234 @@ export class CollectionControl extends L.Control {
             this._map.removeLayer(handle);
         });
         this._resizeHandles = [];
+        
+        // Clear center drag handle
+        if (this._centerDragHandle) {
+            this._map.removeLayer(this._centerDragHandle);
+            this._centerDragHandle = null;
+        }
+    }
+
+    // Add center drag handle for area
+    private _addCenterDragHandleForArea(index: number) {
+        if (index < 0 || index >= this._areas.rectangles.length) return;
+        
+        const rectangle = this._areas.rectangles[index];
+        const bounds = rectangle.getBounds();
+        const centerLatLng = bounds.getCenter();
+        
+        const centerHandle = L.marker(centerLatLng, {
+            icon: L.divIcon({
+                className: 'center-drag-handle',
+                html: '<div style="width: 24px; height: 24px; background: #33b5e5; border: 3px solid white; border-radius: 50%; cursor: move; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>',
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+            }),
+            draggable: true,
+            zIndexOffset: 1001
+        });
+        
+        let startAreaPositions: { start: Position; end: Position } | null = null;
+        let startDragLatLng: L.LatLng | null = null;
+        
+        centerHandle.on('dragstart', () => {
+            const area = this._areas.areas[index];
+            startAreaPositions = {
+                start: new Position(area.startPosition.x, area.startPosition.y, area.startPosition.z),
+                end: new Position(area.endPosition.x, area.endPosition.y, area.endPosition.z)
+            };
+            startDragLatLng = centerHandle.getLatLng();
+        });
+        
+        const dragHandler = throttle((e: L.LeafletEvent) => {
+            if (!startAreaPositions || !startDragLatLng) return;
+            
+            const marker = e.target as L.Marker;
+            const currentLatLng = marker.getLatLng();
+            
+            const startPos = Position.fromLatLng(this._map, startDragLatLng, (this._map as any).plane);
+            const currentPos = Position.fromLatLng(this._map, currentLatLng, (this._map as any).plane);
+            
+            const dx = currentPos.x - startPos.x;
+            const dy = currentPos.y - startPos.y;
+            
+            // Move the area
+            const area = this._areas.areas[index];
+            area.startPosition = new Position(
+                startAreaPositions.start.x + dx,
+                startAreaPositions.start.y + dy,
+                startAreaPositions.start.z
+            );
+            area.endPosition = new Position(
+                startAreaPositions.end.x + dx,
+                startAreaPositions.end.y + dy,
+                startAreaPositions.end.z
+            );
+            
+            // Update rectangle bounds
+            let startX = area.startPosition.x;
+            let startY = area.startPosition.y;
+            let endX = area.endPosition.x;
+            let endY = area.endPosition.y;
+            
+            if (endX >= startX) {
+                endX += 1;
+            } else {
+                startX += 1;
+            }
+            if (endY >= startY) {
+                endY += 1;
+            } else {
+                startY += 1;
+            }
+            
+            const adjustedStartPos = new Position(startX, startY, area.startPosition.z);
+            const adjustedEndPos = new Position(endX, endY, area.endPosition.z);
+            
+            rectangle.setBounds(
+                L.latLngBounds(
+                    adjustedStartPos.toLatLng(this._map),
+                    adjustedEndPos.toLatLng(this._map)
+                )
+            );
+            
+            // Update resize handles (corner dots) in real-time
+            const newBounds = rectangle.getBounds();
+            const corners = [
+                newBounds.getNorthWest(), // Top-left (NW)
+                newBounds.getNorthEast(), // Top-right (NE)
+                newBounds.getSouthEast(), // Bottom-right (SE)
+                newBounds.getSouthWest()  // Bottom-left (SW)
+            ];
+            
+            // Update each corner handle position
+            this._resizeHandles.forEach((handle, cornerIndex) => {
+                if (cornerIndex < corners.length) {
+                    handle.setLatLng(corners[cornerIndex]);
+                }
+            });
+            
+            // Update center handle position
+            centerHandle.setLatLng(newBounds.getCenter());
+        }, 16);
+        
+        centerHandle.on('drag', dragHandler);
+        
+        centerHandle.on('dragend', () => {
+            // Final update to ensure everything is in sync
+            this._updateResizeHandlePositions();
+            // Update center handle position
+            const newBounds = rectangle.getBounds();
+            centerHandle.setLatLng(newBounds.getCenter());
+        });
+        
+        centerHandle.addTo(this._map);
+        this._centerDragHandle = centerHandle;
+    }
+
+    // Add center drag handle for polygon
+    private _addCenterDragHandleForPolyArea() {
+        if (!this._polyArea.polygon || this._polyArea.positions.length === 0) return;
+        
+        // Calculate center of polygon
+        const latLngs = this._polyArea.polygon.getLatLngs()[0] as L.LatLng[];
+        let sumLat = 0;
+        let sumLng = 0;
+        latLngs.forEach(latLng => {
+            sumLat += latLng.lat;
+            sumLng += latLng.lng;
+        });
+        const centerLatLng = L.latLng(sumLat / latLngs.length, sumLng / latLngs.length);
+        
+        const centerHandle = L.marker(centerLatLng, {
+            icon: L.divIcon({
+                className: 'center-drag-handle',
+                html: '<div style="width: 24px; height: 24px; background: #33b5e5; border: 3px solid white; border-radius: 50%; cursor: move; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>',
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+            }),
+            draggable: true,
+            zIndexOffset: 1001
+        });
+        
+        let startPositions: Position[] | null = null;
+        let startDragLatLng: L.LatLng | null = null;
+        
+        centerHandle.on('dragstart', () => {
+            startPositions = this._polyArea.positions.map(pos => 
+                new Position(pos.x, pos.y, pos.z)
+            );
+            startDragLatLng = centerHandle.getLatLng();
+        });
+        
+        const dragHandler = throttle((e: L.LeafletEvent) => {
+            if (!startPositions || !startDragLatLng || !this._polyArea.polygon) return;
+            
+            const marker = e.target as L.Marker;
+            const currentLatLng = marker.getLatLng();
+            
+            const startPos = Position.fromLatLng(this._map, startDragLatLng, (this._map as any).plane);
+            const currentPos = Position.fromLatLng(this._map, currentLatLng, (this._map as any).plane);
+            
+            const dx = currentPos.x - startPos.x;
+            const dy = currentPos.y - startPos.y;
+            
+            // Update all positions
+            this._polyArea.positions = startPositions.map(pos => 
+                new Position(pos.x + dx, pos.y + dy, pos.z)
+            );
+            
+            // Update polygon on map
+            const maxZoom = this._map.getMaxZoom();
+            const newLatLngs = this._polyArea.positions.map(pos => pos.toCentreLatLng(this._map));
+            
+            for (let i = 0; i < newLatLngs.length; i++) {
+                const point = this._map.project(newLatLngs[i], maxZoom);
+                point.x -= 16;
+                point.y += 16;
+                newLatLngs[i] = this._map.unproject(point, maxZoom);
+            }
+            
+            this._polyArea.polygon.setLatLngs([newLatLngs]);
+            
+            // Update resize handles (vertex dots) in real-time
+            // Update each vertex handle position to match the new polygon vertices
+            this._resizeHandles.forEach((handle, vertexIndex) => {
+                if (vertexIndex < newLatLngs.length) {
+                    handle.setLatLng(newLatLngs[vertexIndex]);
+                }
+            });
+            
+            // Update center handle position
+            let sumLat = 0;
+            let sumLng = 0;
+            newLatLngs.forEach(latLng => {
+                sumLat += latLng.lat;
+                sumLng += latLng.lng;
+            });
+            centerHandle.setLatLng(L.latLng(sumLat / newLatLngs.length, sumLng / newLatLngs.length));
+        }, 16);
+        
+        centerHandle.on('drag', dragHandler);
+        
+        centerHandle.on('dragend', () => {
+            // Final update to ensure everything is in sync
+            this._updateResizeHandlePositions();
+            // Update center handle position
+            if (this._polyArea.polygon) {
+                const latLngs = this._polyArea.polygon.getLatLngs()[0] as L.LatLng[];
+                let sumLat = 0;
+                let sumLng = 0;
+                latLngs.forEach(latLng => {
+                    sumLat += latLng.lat;
+                    sumLng += latLng.lng;
+                });
+                centerHandle.setLatLng(L.latLng(sumLat / latLngs.length, sumLng / latLngs.length));
+            }
+        });
+        
+        centerHandle.addTo(this._map);
+        this._centerDragHandle = centerHandle;
     }
 
 }
