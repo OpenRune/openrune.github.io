@@ -50,7 +50,7 @@ const OSRSMap: React.FC = () => {
         map.updateMapPath = function () {
             if (map.tile_layer) map.removeLayer(map.tile_layer);
             map.tile_layer = L.tileLayer(
-                `http://150.107.201.110:8090/map/{z}/${map.plane}_{x}_{y}.png`,
+                `api/map/{z}/${map.plane}_{x}_{y}.png`,
                 {
                     minZoom: 7,
                     maxZoom: 11,

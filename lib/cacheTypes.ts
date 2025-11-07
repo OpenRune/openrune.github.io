@@ -20,14 +20,6 @@ export const BASE_CACHE_TYPES: CacheType[] = [
     description: 'Old School RuneScape cache server',
   },
   {
-    id: 'sailing',
-    name: 'Sailing',
-    ip: '150.107.201.110',
-    port: 8091,
-    image: '/cache-sailing.png',
-    description: 'Sailing cache server',
-  },
-  {
     id: 'rs3',
     name: 'RS3',
     ip: '150.107.201.110',
