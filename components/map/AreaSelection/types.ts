@@ -1,0 +1,38 @@
+import { Position } from '@/lib/map/model/Position';
+import { CollectionControl } from '@/lib/map/controls/CollectionControl';
+
+export type ToolType = 'area' | 'poly' | null;
+
+export interface Area {
+    id: string;
+    type: 'area';
+    bounds: {
+        minX: number;
+        minY: number;
+        maxX: number;
+        maxY: number;
+    };
+}
+
+export interface Poly {
+    id: string;
+    type: 'poly';
+    points: Array<{ x: number; y: number }>;
+}
+
+export type SelectionItem = Area | Poly;
+
+export interface AreaSelectionProps {
+    onItemClick?: (item: SelectionItem) => void;
+    onJumpToPosition?: (position: Position) => void;
+    onItemSelected?: (item: SelectionItem | null) => void;
+    collectionControl?: CollectionControl | null;
+    importMode?: boolean;
+    importFormat?: 'normal' | '117hd';
+    onImportModeChange?: (isImportMode: boolean) => void;
+}
+
+export type ExportFormat = 'json' | 'java' | 'array' | 'raw';
+export type ImportFormat = 'normal' | '117hd';
+export type ImportType = 'area' | 'poly' | 'auto';
+

@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   devIndicators: {
-    position: 'top-right',
+      position: 'bottom-right',
   },
   async rewrites() {
     // Use cache-proxy route for dynamic cache type routing

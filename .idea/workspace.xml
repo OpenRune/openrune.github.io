@@ -5,7 +5,31 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="51982a52-4621-4b78-827a-2c8ff91c7405" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/lib/map/controls/CollectionControl.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/controls/CoordinatesControl.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/controls/GridControl.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/controls/PlaneControl.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/controls/RegionBaseCoordinatesControl.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/controls/RegionLabelsCanvas.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/converters/117hd/AABB.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/converters/117hd/HD117AreasConverter.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/converters/117hd/RegionBox.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/converters/Converter.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/converters/dreambot/DreamBotPathConverter.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/converters/osbot/OSBotAreasConverter.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/converters/osbot/OSBotConverter.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/converters/osbot/OSBotPathConverter.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/converters/runelite/RuneLiteAreasConverter.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/converters/runelite/RuneLitePathConverter.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/model/Area.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/model/Areas.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/model/Path.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/map/model/PolyArea.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/map/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/map/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/next.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/next.config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -24,32 +48,46 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1&quot;: &quot;true&quot;,
-    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;live&quot;,
-    &quot;js.debugger.nextJs.config.created.client&quot;: &quot;true&quot;,
-    &quot;js.debugger.nextJs.config.created.server&quot;: &quot;true&quot;,
-    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;npm.Next.js: server-side.executor&quot;: &quot;Run&quot;,
-    &quot;npm.build.executor&quot;: &quot;Run&quot;,
-    &quot;npm.start.executor&quot;: &quot;Run&quot;,
-    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;D:\\openrune.github.io\\node_modules\\typescript\\lib&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "git-widget-placeholder": "live",
+    "js.debugger.nextJs.config.created.client": "true",
+    "js.debugger.nextJs.config.created.server": "true",
+    "junie.onboarding.icon.badge.shown": "true",
+    "last_opened_file_path": "D:/openrune.github.io/components/map",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "npm.Next.js: server-side.executor": "Run",
+    "npm.build.executor": "Run",
+    "npm.start.executor": "Run",
+    "to.speed.mode.migration.done": "true",
+    "ts.external.directory.path": "D:\\openrune.github.io\\node_modules\\typescript\\lib",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
-  <component name="RunManager" selected="npm.Next.js: server-side">
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\openrune.github.io\components\map" />
+      <recent name="D:\openrune.github.io\components" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="D:\openrune.github.io\lib\map\model" />
+      <recent name="D:\openrune.github.io\lib\map\controls" />
+      <recent name="D:\openrune.github.io\lib\map" />
+      <recent name="D:\openrune.github.io\components\map\js" />
+      <recent name="D:\openrune.github.io\components\map" />
+    </key>
+  </component>
+  <component name="RunManager" selected="npm.build">
     <configuration name="Next.js: debug client-side" type="JavascriptDebugType" uri="http://localhost:3000/">
       <method v="2" />
     </configuration>
