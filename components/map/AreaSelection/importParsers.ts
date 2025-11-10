@@ -11,13 +11,54 @@ export function parseAndImport117HD(
     if (!collectionControl || !text.trim()) return;
     
     try {
-        const parsed = JSON.parse(text.trim());
-        if (!Array.isArray(parsed)) {
-            throw new Error('117HD format must be an array of area objects');
+        const rawText = text.trim();
+        let parsed: any;
+        try {
+            parsed = JSON.parse(rawText);
+        } catch (initialError) {
+            const candidate = `[${rawText.replace(/,\s*$/, '')}]`;
+            try {
+                parsed = JSON.parse(candidate);
+            } catch (wrappedError) {
+                throw initialError;
+            }
         }
+        const parsedArray = Array.isArray(parsed) ? parsed : [parsed];
+
+        if (!Array.isArray(parsedArray) || parsedArray.length === 0) {
+            throw new Error('117HD format must contain at least one area object');
+        }
+
+        const convertRegionBoxToAabb = (box: number[]): number[] | null => {
+            if (!Array.isArray(box) || box.length === 0) {
+                return null;
+            }
+
+            const from = box[0];
+            const to = box.length > 1 ? box[1] : box[0];
+
+            if (typeof from !== 'number' || typeof to !== 'number' || Number.isNaN(from) || Number.isNaN(to)) {
+                return null;
+            }
+
+            let x1 = from >>> 8;
+            let y1 = from & 0xFF;
+            let x2 = to >>> 8;
+            let y2 = to & 0xFF;
+
+            if (x1 > x2) [x1, x2] = [x2, x1];
+            if (y1 > y2) [y1, y2] = [y2, y1];
+
+            const minX = x1 << 6;
+            const minY = y1 << 6;
+            const maxX = ((x2 + 1) << 6) - 1;
+            const maxY = ((y2 + 1) << 6) - 1;
+
+            return [minX, minY, maxX, maxY];
+        };
         
         const areaMap = new Map<string, any>();
-        parsed.forEach(item => {
+        parsedArray.forEach(item => {
             if (item.name) {
                 areaMap.set(item.name, item);
             }
@@ -49,13 +90,20 @@ export function parseAndImport117HD(
                     aabbs: areaDef.aabbs
                 });
             }
+
+            if (areaDef.regionBoxes && Array.isArray(areaDef.regionBoxes)) {
+                resolved.push({
+                    name: areaDef.name,
+                    regionBoxes: areaDef.regionBoxes
+                });
+            }
             
             return resolved;
         };
         
         const allAABBs: number[][] = [];
         
-        parsed.forEach(item => {
+        parsedArray.forEach(item => {
             if (item.name && SKIP_AREAS.has(item.name)) {
                 return;
             }
@@ -72,6 +120,15 @@ export function parseAndImport117HD(
                             allAABBs.push(aabb);
                         });
                     }
+
+                    if (resolvedItem.regionBoxes && Array.isArray(resolvedItem.regionBoxes)) {
+                        resolvedItem.regionBoxes.forEach((box: number[]) => {
+                            const converted = convertRegionBoxToAabb(box);
+                            if (converted) {
+                                allAABBs.push(converted);
+                            }
+                        });
+                    }
                 });
                 
                 if (item.aabbs && Array.isArray(item.aabbs) && item.aabbs.length > 0) {
@@ -79,9 +136,24 @@ export function parseAndImport117HD(
                         allAABBs.push(aabb);
                     });
                 }
+                if (item.regionBoxes && Array.isArray(item.regionBoxes) && item.regionBoxes.length > 0) {
+                    item.regionBoxes.forEach((box: number[]) => {
+                        const converted = convertRegionBoxToAabb(box);
+                        if (converted) {
+                            allAABBs.push(converted);
+                        }
+                    });
+                }
             } else if (item.aabbs && Array.isArray(item.aabbs) && item.aabbs.length > 0) {
                 item.aabbs.forEach((aabb: number[]) => {
                     allAABBs.push(aabb);
+                });
+            } else if (item.regionBoxes && Array.isArray(item.regionBoxes) && item.regionBoxes.length > 0) {
+                item.regionBoxes.forEach((box: number[]) => {
+                    const converted = convertRegionBoxToAabb(box);
+                    if (converted) {
+                        allAABBs.push(converted);
+                    }
                 });
             }
         });
