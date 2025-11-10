@@ -9,6 +9,7 @@ import { PolyArea } from '../model/PolyArea';
 
 import { HD117AreasConverter } from '../converters/117hd/HD117AreasConverter';
 import { RuneLitePathConverter } from '../converters/runelite/RuneLitePathConverter';
+import { isAreaInViewport, isPolygonInViewport } from '../utils/viewportCulling';
 
 type ConverterSet = {
     areas_converter: HD117AreasConverter;
@@ -48,6 +49,8 @@ export class CollectionControl extends L.Control {
     private _selectedAreaIndex: number | null = null;
     private _selectedPolyArea: boolean = false;
     private _pendingUpdate: number | null = null;
+    private _viewportUpdateTimer: number | null = null;
+    private _isViewportCullingEnabled: boolean = true;
 
     constructor(options?: L.ControlOptions) {
         super(options);
@@ -122,6 +125,17 @@ export class CollectionControl extends L.Control {
         // Attach map event handlers for drawing functionality
         this._map.on('click', this._addPosition, this);
         this._map.on('mousemove', this._drawMouseAreaThrottled, this);
+        
+        // Attach viewport change handlers for culling
+        this._map.on('moveend', this._updateViewportVisibility, this);
+        this._map.on('zoomend', this._updateViewportVisibility, this);
+        this._map.on('move', this._updateViewportVisibilityThrottled, this);
+        this._map.on('planeChanged', this._updateViewportVisibility, this);
+        
+        // Initial viewport visibility update after a short delay to ensure map is fully initialized
+        setTimeout(() => {
+            this._updateViewportVisibility();
+        }, 100);
 
         return container;
     }
@@ -130,9 +144,17 @@ export class CollectionControl extends L.Control {
         // Clean up event handlers and cancel pending updates
         this._map.off('click', this._addPosition, this);
         this._map.off('mousemove', this._drawMouseAreaThrottled, this);
+        this._map.off('moveend', this._updateViewportVisibility, this);
+        this._map.off('zoomend', this._updateViewportVisibility, this);
+        this._map.off('move', this._updateViewportVisibilityThrottled, this);
+        this._map.off('planeChanged', this._updateViewportVisibility, this);
         if (this._pendingUpdate !== null) {
             cancelAnimationFrame(this._pendingUpdate);
             this._pendingUpdate = null;
+        }
+        if (this._viewportUpdateTimer !== null) {
+            clearTimeout(this._viewportUpdateTimer);
+            this._viewportUpdateTimer = null;
         }
     }
 
@@ -186,6 +208,94 @@ export class CollectionControl extends L.Control {
 
     // Throttled mouse area drawing for better performance (~60fps)
     private _drawMouseAreaThrottled!: ((e: L.LeafletMouseEvent) => void);
+    
+    // Update visibility of areas and polygons based on viewport
+    private _updateViewportVisibility = () => {
+        if (!this._isViewportCullingEnabled) return;
+        
+        const plane = (this._map as any).plane || 0;
+        // Large padding in game coordinates to prevent pop-in when panning
+        // This is roughly 4-5 regions worth of buffer
+        const viewportPadding = 400;
+        
+        // Update area visibility
+        this._areas.areas.forEach((area, index) => {
+            // Always show selected area
+            if (index === this._selectedAreaIndex) {
+                if (!this._areas.featureGroup.hasLayer(this._areas.rectangles[index])) {
+                    this._areas.featureGroup.addLayer(this._areas.rectangles[index]);
+                }
+                return;
+            }
+            
+            // Check if area is on current plane
+            if (area.startPosition.z !== plane) {
+                // Hide areas on different planes
+                if (this._areas.featureGroup.hasLayer(this._areas.rectangles[index])) {
+                    this._areas.featureGroup.removeLayer(this._areas.rectangles[index]);
+                }
+                return;
+            }
+            
+            // Check if area is in viewport
+            const isVisible = isAreaInViewport(this._map, area, viewportPadding);
+            
+            if (isVisible) {
+                if (!this._areas.featureGroup.hasLayer(this._areas.rectangles[index])) {
+                    this._areas.featureGroup.addLayer(this._areas.rectangles[index]);
+                }
+            } else {
+                if (this._areas.featureGroup.hasLayer(this._areas.rectangles[index])) {
+                    this._areas.featureGroup.removeLayer(this._areas.rectangles[index]);
+                }
+            }
+        });
+        
+        // Update polygon visibility
+        if (this._polyArea.polygon && this._polyArea.positions.length > 0) {
+            // Always show selected polygon
+            if (this._selectedPolyArea) {
+                if (!this._polyArea.featureGroup.hasLayer(this._polyArea.polygon)) {
+                    this._polyArea.featureGroup.addLayer(this._polyArea.polygon);
+                }
+                return;
+            }
+            
+            // Check if polygon is on current plane (all positions should be on same plane)
+            const firstPos = this._polyArea.positions[0];
+            if (firstPos && firstPos.z !== plane) {
+                // Hide polygon on different plane
+                if (this._polyArea.featureGroup.hasLayer(this._polyArea.polygon)) {
+                    this._polyArea.featureGroup.removeLayer(this._polyArea.polygon);
+                }
+                return;
+            }
+            
+            // Check if polygon is in viewport
+            const isVisible = isPolygonInViewport(this._map, this._polyArea.positions, viewportPadding);
+            
+            if (isVisible) {
+                if (!this._polyArea.featureGroup.hasLayer(this._polyArea.polygon)) {
+                    this._polyArea.featureGroup.addLayer(this._polyArea.polygon);
+                }
+            } else {
+                if (this._polyArea.featureGroup.hasLayer(this._polyArea.polygon)) {
+                    this._polyArea.featureGroup.removeLayer(this._polyArea.polygon);
+                }
+            }
+        }
+    };
+    
+    // Throttled viewport visibility update
+    private _updateViewportVisibilityThrottled = () => {
+        if (this._viewportUpdateTimer !== null) {
+            clearTimeout(this._viewportUpdateTimer);
+        }
+        this._viewportUpdateTimer = window.setTimeout(() => {
+            this._updateViewportVisibility();
+            this._viewportUpdateTimer = null;
+        }, 150); // Update every 150ms during movement
+    };
 
     private _toggleCollectionMode(drawable?: Areas | PolyArea, converter?: keyof ConverterSet) {
         if (!drawable || this._currentDrawable === drawable) {
@@ -212,6 +322,9 @@ export class CollectionControl extends L.Control {
 
         this._currentDrawable = drawable;
         this._map.addLayer(this._currentDrawable.featureGroup);
+        
+        // Update viewport visibility after adding drawable
+        this._updateViewportVisibility();
     }
 
 
@@ -257,6 +370,8 @@ export class CollectionControl extends L.Control {
                 if (!this._map.hasLayer(this._areas.featureGroup)) {
                     this._map.addLayer(this._areas.featureGroup);
                 }
+            // Update viewport visibility after import
+            this._updateViewportVisibility();
             } else {
                 this._currentDrawable = this._polyArea;
                 this._currentConverter = 'polyarea_converter';
@@ -282,6 +397,8 @@ export class CollectionControl extends L.Control {
                 // Type assertion needed because converter.fromJava accepts union types
                 (converter.fromJava as any)(plainText, this._currentDrawable);
             }
+            // Update viewport visibility after import
+            this._updateViewportVisibility();
         } catch (error) {
             throw error;
         }
@@ -304,12 +421,12 @@ export class CollectionControl extends L.Control {
             }
         }
         
-        // Ensure polygon is visible on map
-        if (this._polyArea.polygon) {
+        // Ensure polygon featureGroup is added to map
             if (!this._map.hasLayer(this._polyArea.featureGroup)) {
                 this._map.addLayer(this._polyArea.featureGroup);
             }
-        }
+        // Update viewport visibility after import
+        this._updateViewportVisibility();
     }
 
     isEditing(): boolean {
@@ -349,6 +466,7 @@ export class CollectionControl extends L.Control {
         const rectangle = this._areas.rectangles[index];
         
         if (visible) {
+            // Only add if it should be visible (viewport culling will handle it, but this overrides)
             if (!this._areas.featureGroup.hasLayer(rectangle)) {
                 this._areas.featureGroup.addLayer(rectangle);
             }
@@ -360,6 +478,25 @@ export class CollectionControl extends L.Control {
             if (this._selectedAreaIndex === index) {
                 this._clearResizeHandles();
                 this._selectedAreaIndex = null;
+            }
+        }
+    }
+    
+    // Enable/disable viewport culling
+    setViewportCullingEnabled(enabled: boolean) {
+        this._isViewportCullingEnabled = enabled;
+        if (enabled) {
+            // Update visibility when enabling
+            this._updateViewportVisibility();
+        } else {
+            // Show all areas when disabling
+            this._areas.rectangles.forEach(rectangle => {
+                if (!this._areas.featureGroup.hasLayer(rectangle)) {
+                    this._areas.featureGroup.addLayer(rectangle);
+                }
+            });
+            if (this._polyArea.polygon && !this._polyArea.featureGroup.hasLayer(this._polyArea.polygon)) {
+                this._polyArea.featureGroup.addLayer(this._polyArea.polygon);
             }
         }
     }

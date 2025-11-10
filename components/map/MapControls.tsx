@@ -11,17 +11,59 @@ import { ObjectFinder, ObjectPosition } from './ObjectFinder';
 import { AreaSelection } from './AreaSelection';
 import { Position } from '@/lib/map/model/Position';
 import { CollectionControl } from '@/lib/map/controls/CollectionControl';
+import { QueryResultsPanel, QueryResultsFormat } from './QueryResultsModal';
 
 interface MapControlsProps {
   className?: string;
   children?: React.ReactNode;
   combined?: boolean; // If true, combine fullscreen and settings in one card
   onJumpToPosition?: (position: Position) => void;
-  onObjectSearch?: (query: string, mode: 'gameval' | 'id') => Promise<ObjectPosition[]>;
+  onObjectPositionsChange?: (positions: ObjectPosition[]) => void;
+  onObjectCurrentIndexChange?: (index: number) => void;
+  onObjectSearchQueryChange?: (query: string) => void;
+  objectSearchQuery?: string;
+  objectPositions?: ObjectPosition[];
+  objectCurrentIndex?: number;
   collectionControl?: CollectionControl | null;
+  queryResults?: any[];
+  resultsFormat?: QueryResultsFormat;
+  onResultsFormatChange?: (format: QueryResultsFormat) => void;
+  showQueryResults?: boolean;
+  onCloseQueryResults?: () => void;
+  onResultClick?: (result: any) => void;
+  resultsSource?: 'display' | 'highlight' | null;
+  onHighlightIndexChange?: (index: number, result: any) => void;
+  onMarkAll?: () => void;
+  onUnmarkAll?: () => void;
+  markAllActive?: boolean;
+  getResultExtras?: (result: any) => { name?: string; imageUrl?: string } | null;
 }
 
-export function MapControls({ className, children, combined = false, onJumpToPosition, onObjectSearch, collectionControl }: MapControlsProps) {
+export function MapControls({
+  className,
+  children,
+  combined = false,
+  onJumpToPosition,
+  onObjectPositionsChange,
+  onObjectCurrentIndexChange,
+  onObjectSearchQueryChange,
+  objectSearchQuery,
+  objectPositions,
+  objectCurrentIndex,
+  collectionControl,
+  queryResults = [],
+  resultsFormat = 'table',
+  onResultsFormatChange,
+  showQueryResults = false,
+  onCloseQueryResults,
+  onResultClick,
+  resultsSource = null,
+  onHighlightIndexChange,
+  onMarkAll,
+  onUnmarkAll,
+  markAllActive,
+  getResultExtras,
+}: MapControlsProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [importMode, setImportMode] = useState(false);
@@ -45,6 +87,13 @@ export function MapControls({ className, children, combined = false, onJumpToPos
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  useEffect(() => {
+    if (showQueryResults) {
+      setSettingsOpen(true);
+      setImportMode(false);
+    }
+  }, [showQueryResults]);
+
   if (combined) {
     // Combined layout for main map page
     return (
@@ -55,7 +104,13 @@ export function MapControls({ className, children, combined = false, onJumpToPos
             <Button
               variant="outline"
               size="default"
-              onClick={() => setSettingsOpen(!settingsOpen)}
+              onClick={() => {
+                if (showQueryResults) {
+                  setSettingsOpen(true)
+                  return
+                }
+                setSettingsOpen(!settingsOpen)
+              }}
               className={cn(
                 "h-9 px-3 border-border hover:bg-gray-800 text-white",
                 settingsOpen 
@@ -85,7 +140,34 @@ export function MapControls({ className, children, combined = false, onJumpToPos
             <div className="absolute top-full right-0 mt-2 z-[1001]">
               <Card className="w-80 h-[70vh] shadow-xl border animate-in fade-in-0 slide-in-from-top-2 duration-200 flex flex-col">
                 <CardContent className="px-4 pt-0 pb-4 flex-1 flex flex-col overflow-hidden">
-                  {importMode ? (
+                  {showQueryResults ? (
+                    <div className="flex flex-col flex-1 overflow-hidden">
+                      <QueryResultsPanel
+                        results={queryResults}
+                        format={resultsFormat}
+                        onFormatChange={onResultsFormatChange}
+                        onResultClick={onResultClick}
+                        variant={resultsSource === 'highlight' ? 'highlight' : 'display'}
+                        onHighlightIndexChange={onHighlightIndexChange}
+                        onMarkAll={onMarkAll}
+                        onUnmarkAll={onUnmarkAll}
+                        markAllActive={markAllActive}
+                        onClosePanel={onCloseQueryResults}
+                        getResultExtras={getResultExtras}
+                      />
+                      <div className="pt-3">
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => {
+                            onCloseQueryResults?.();
+                          }}
+                        >
+                          Return to Settings
+                        </Button>
+                      </div>
+                    </div>
+                  ) : importMode ? (
                     <Tabs defaultValue="normal" className="flex flex-col flex-1 overflow-hidden" key="import-tabs">
                       <TabsList className="grid w-full grid-cols-2 mb-4">
                         <TabsTrigger value="normal">Normal</TabsTrigger>
@@ -157,7 +239,12 @@ export function MapControls({ className, children, combined = false, onJumpToPos
                         {onJumpToPosition ? (
                           <ObjectFinder 
                             onJumpToPosition={onJumpToPosition}
-                            onSearch={onObjectSearch}
+                            onPositionsChange={onObjectPositionsChange}
+                            onCurrentIndexChange={onObjectCurrentIndexChange}
+                            onSearchQueryChange={onObjectSearchQueryChange}
+                            initialSearchQuery={objectSearchQuery}
+                            initialPositions={objectPositions}
+                            initialCurrentIndex={objectCurrentIndex}
                           />
                         ) : (
                           <div className="space-y-3 text-sm text-muted-foreground">
@@ -201,7 +288,13 @@ export function MapControls({ className, children, combined = false, onJumpToPos
           <Button
             variant="outline"
             size="default"
-            onClick={() => setSettingsOpen(!settingsOpen)}
+            onClick={() => {
+              if (showQueryResults) {
+                setSettingsOpen(true)
+                return
+              }
+              setSettingsOpen(!settingsOpen)
+            }}
             className={cn(
               "h-9 px-3 border-border hover:bg-gray-800 text-white",
               settingsOpen 
@@ -219,7 +312,34 @@ export function MapControls({ className, children, combined = false, onJumpToPos
             <div className="absolute top-full right-0 mt-2 z-[1001]">
               <Card className="w-80 h-[70vh] shadow-xl border animate-in fade-in-0 slide-in-from-top-2 duration-200 flex flex-col">
                 <CardContent className="px-4 pt-0 pb-4 flex-1 flex flex-col overflow-hidden">
-                  {importMode ? (
+                  {showQueryResults ? (
+                    <div className="flex flex-col flex-1 overflow-hidden">
+                      <QueryResultsPanel
+                        results={queryResults}
+                        format={resultsFormat}
+                        onFormatChange={onResultsFormatChange}
+                        onResultClick={onResultClick}
+                        variant={resultsSource === 'highlight' ? 'highlight' : 'display'}
+                        onHighlightIndexChange={onHighlightIndexChange}
+                        onMarkAll={onMarkAll}
+                        onUnmarkAll={onUnmarkAll}
+                        markAllActive={markAllActive}
+                        onClosePanel={onCloseQueryResults}
+                        getResultExtras={getResultExtras}
+                      />
+                      <div className="pt-3">
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => {
+                            onCloseQueryResults?.();
+                          }}
+                        >
+                          Return to Settings
+                        </Button>
+                      </div>
+                    </div>
+                  ) : importMode ? (
                     <Tabs defaultValue="normal" className="flex flex-col flex-1 overflow-hidden" key="import-tabs">
                       <TabsList className="grid w-full grid-cols-2 mb-4">
                         <TabsTrigger value="normal">Normal</TabsTrigger>
@@ -291,7 +411,12 @@ export function MapControls({ className, children, combined = false, onJumpToPos
                         {onJumpToPosition ? (
                           <ObjectFinder 
                             onJumpToPosition={onJumpToPosition}
-                            onSearch={onObjectSearch}
+                            onPositionsChange={onObjectPositionsChange}
+                            onCurrentIndexChange={onObjectCurrentIndexChange}
+                            onSearchQueryChange={onObjectSearchQueryChange}
+                            initialSearchQuery={objectSearchQuery}
+                            initialPositions={objectPositions}
+                            initialCurrentIndex={objectCurrentIndex}
                           />
                         ) : (
                           <div className="space-y-3 text-sm text-muted-foreground">

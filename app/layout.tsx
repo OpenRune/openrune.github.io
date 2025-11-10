@@ -20,6 +20,7 @@ import { CacheStatusWrapper } from "@/components/layout/cache-status-wrapper";
 import { ContentWrapper } from "@/components/layout/content-wrapper";
 import { DownloadManagerProvider } from "@/components/download-manager";
 import UpdateModalWrapper from "@/components/ui/update-modal";
+import { GamevalProvider } from "@/lib/gamevals/GamevalProvider";
 
 const META_THEME_COLORS = {
     light: '#ffffff',
@@ -83,10 +84,11 @@ export default async function RootLayout({
                 <Providers activeThemeValue={activeThemeValue as string}>
                     <SettingsProvider>
                         <CacheTypeProvider>
-                            <DownloadManagerProvider>
-                                <ClientToaster />
-                                <UpdateModalWrapper />
-                                <SidebarProvider defaultOpen={true}>
+                            <GamevalProvider>
+                                <DownloadManagerProvider>
+                                    <ClientToaster />
+                                    <UpdateModalWrapper />
+                                    <SidebarProvider defaultOpen={true}>
                                     <AppSidebar/>
                                     <FloatingSidebarTrigger />
                                     <SidebarInset>
@@ -98,6 +100,7 @@ export default async function RootLayout({
                                     </SidebarInset>
                                 </SidebarProvider>
                             </DownloadManagerProvider>
+                            </GamevalProvider>
                         </CacheTypeProvider>
                     </SettingsProvider>
                 </Providers>

@@ -22,7 +22,7 @@ export class PlaneControl extends L.Control {
 
     setPlane(plane: number): void {
         if (!this.mapRef) return;
-        if (plane < 0 || plane > 4) return;
+        if (plane < 0 || plane > 3) return;
 
         this.mapRef.plane = plane;
         this.mapRef.updateMapPath?.();
@@ -34,7 +34,7 @@ export class PlaneControl extends L.Control {
         if (this.mapRef.plane == null) this.mapRef.plane = 0;
 
         const newPlane = this.mapRef.plane + delta;
-        if (newPlane < 0 || newPlane > 4) return;
+        if (newPlane < 0 || newPlane > 3) return;
 
         this.setPlane(newPlane);
     }

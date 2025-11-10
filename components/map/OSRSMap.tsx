@@ -1,205 +1,431 @@
-import { useEffect, useRef, useState } from 'react';
-import type { LeafletMouseEvent, Map as LeafletMap, TileLayer } from 'leaflet';
-import L from 'leaflet';
-import { MAX_X, MAX_Y, MIN_X, MIN_Y, Region, REGION_HEIGHT, REGION_WIDTH } from '@/lib/map/model/Region';
+import { useEffect, useRef, useState, useCallback, useMemo, startTransition } from 'react';
+import { Region } from '@/lib/map/model/Region';
 import { Position } from '@/lib/map/model/Position';
+import { useGamevals, OBJTYPES } from '@/lib/gamevals';
 import { MapInfoPanel } from './MapInfoPanel';
 import { MapControls } from './MapControls';
-import 'leaflet/dist/leaflet.css';
-import { GridControl } from '@/lib/map/controls/GridControl';
-import {RegionLabelsControl} from "@/lib/map/controls/RegionLabelsCanvas";
-import {PlaneControl} from "@/lib/map/controls/PlaneControl";
-import {CoordinatesControl} from "@/lib/map/controls/CoordinatesControl";
-import {RegionBaseCoordinatesControl} from "@/lib/map/controls/RegionBaseCoordinatesControl";
-import {RegionLookupControl} from "@/lib/map/controls/RegionLookupControl";
+import { BaseMap, BaseMapInstance } from './BaseMap';
 import { useSidebar } from "@/components/ui/sidebar";
 import { ObjectPosition } from './ObjectFinder';
 import { AreaSelection } from './AreaSelection';
-import { CollectionControl } from '@/lib/map/controls/CollectionControl';
 import { SelectionControls } from './SelectionControls';
+import { useBlockEditor } from './useBlockEditor';
+import { toast } from 'sonner';
+import { useQueryExecution } from './hooks/useQueryExecution';
+import { useObjectMarkers } from './hooks/useObjectMarkers';
+import { useMapControls } from './hooks/useMapControls';
+import { QueryBuilderButton } from './QueryBuilderButton';
+import L from 'leaflet';
 
+interface OSRSMapProps {
+    initialObjectId?: number;
+    compact?: boolean;
+}
 
-const OSRSMap: React.FC = () => {
-    const mapRef = useRef<HTMLDivElement>(null);
-    const mapInstanceRef = useRef<LeafletMap & { plane: number; tile_layer?: TileLayer; updateMapPath?: () => void } | null>(null);
-    const prevMouseRectRef = useRef<L.Rectangle | null>(null);
-    const prevMousePosRef = useRef<Position | null>(null);
+const DEFAULT_CENTER = { lat: -24.0, lng: 47.0 };
+const DEFAULT_ZOOM = 5;
+const DEFAULT_PLANE = 0;
+const MAX_ZOOM = 8;
+const MIN_ZOOM = 4;
 
+const OBJECT_TYPES: Record<number, string> = {
+    0: 'WallStraight',
+    1: 'WallDiagonalCorner',
+    2: 'WallCorner',
+    3: 'WallSquareCorner',
+    4: 'WallDecorStraightNoOffset',
+    5: 'WallDecorStraightOffset',
+    6: 'WallDecorDiagonalOffset',
+    7: 'WallDecorDiagonalNoOffset',
+    8: 'WallDecorDiagonalBoth',
+    9: 'WallDiagonal',
+    10: 'CentrepieceStraight',
+    11: 'CentrepieceDiagonal',
+    12: 'RoofStraight',
+    13: 'RoofDiagonalWithRoofEdge',
+    14: 'RoofDiagonal',
+    15: 'RoofCornerConcave',
+    16: 'RoofCornerConvex',
+    17: 'RoofFlat',
+    18: 'RoofEdgeStraight',
+    19: 'RoofEdgeDiagonalCorner',
+    20: 'RoofEdgeCorner',
+    21: 'WallEdgeSquarecorner',
+    22: 'GroundDecor',
+};
+
+const MARKER_ICON_SIZE: [number, number] = [20, 20];
+const MARKER_ICON_ANCHOR: [number, number] = [10, 10];
+
+const createMarkerIcon = (color: string, selected = false) =>
+    L.divIcon({
+        className: 'object-marker',
+        html: `<div style="
+            width: 20px;
+            height: 20px;
+            background: ${color};
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            cursor: pointer;
+            ${selected ? 'animation: pulse 2s infinite;' : ''}
+        "></div>`,
+        iconSize: MARKER_ICON_SIZE,
+        iconAnchor: MARKER_ICON_ANCHOR,
+    });
+
+const OSRSMap: React.FC<OSRSMapProps> = ({ initialObjectId, compact = false }) => {
+    const mapInstanceRef = useRef<BaseMapInstance | null>(null);
     const [plane, setPlane] = useState<number>(0);
     const [currentPosition, setCurrentPosition] = useState<Position | null>(null);
     const [zoom, setZoom] = useState<number>(7);
     const [showRegionGrid, setShowRegionGrid] = useState<boolean>(false);
     const [showLabels, setShowLabels] = useState<boolean>(false);
     const [selectedItemType, setSelectedItemType] = useState<'area' | 'poly' | null>(null);
-    const { state } = useSidebar();
+    const [objectPositions, setObjectPositions] = useState<ObjectPosition[]>([]);
+    const [currentObjectIndex, setCurrentObjectIndex] = useState<number>(-1);
+    const [objectSearchQuery, setObjectSearchQuery] = useState<string>('');
+    const [queryResults, setQueryResults] = useState<any[]>([]);
+    const [resultsFormat, setResultsFormat] = useState<'table' | 'json' | 'list'>('table');
+    const [showResultsInSettings, setShowResultsInSettings] = useState<boolean>(false);
+    const [resultsSource, setResultsSource] = useState<'display' | 'highlight' | null>(null);
+    const [highlightSelectionIndex, setHighlightSelectionIndex] = useState<number>(0);
+    const highlightMarkersRef = useRef<Map<number, L.Marker>>(new Map());
+    const [markAllActive, setMarkAllActive] = useState<boolean>(false);
+    const { lookupGameval, loadGamevalType, hasLoaded } = useGamevals();
 
-    const gridControlRef = useRef<GridControl | null>(null);
-    const labelsControlRef = useRef<RegionLabelsControl | null>(null);
-    const planeControlRef = useRef<PlaneControl | null>(null);
-    const coordinatesControlRef = useRef<CoordinatesControl | null>(null);
-    const regionBaseCoordinatesControlRef = useRef<RegionBaseCoordinatesControl | null>(null);
-    const regionLookupControlRef = useRef<RegionLookupControl | null>(null);
-    const collectionControlRef = useRef<CollectionControl | null>(null);
-
-    // Initialize map
     useEffect(() => {
-        if (!mapRef.current || typeof window === 'undefined' || mapInstanceRef.current) return;
+        loadGamevalType(OBJTYPES).catch(console.error);
+    }, [loadGamevalType]);
 
-        const map = L.map(mapRef.current, { zoomControl: false, renderer: L.canvas() }) as L.Map & { plane: number; tile_layer?: TileLayer; updateMapPath?: () => void };
-        map.plane = plane;
+    const getResultExtras = useCallback((result: any) => {
+        if (!result) return null;
+        const name = hasLoaded(OBJTYPES) && typeof result.objectId === 'number'
+            ? lookupGameval(OBJTYPES, result.objectId)
+            : undefined;
+        const orientation = result.orientation ?? 1;
+        const imageUrl = result.objectId !== undefined
+            ? `https://chisel.weirdgloop.org/static/img/osrs-object/${result.objectId}_orient${orientation}.png`
+            : undefined;
 
-        // Update map tiles
-        map.updateMapPath = function () {
-            if (map.tile_layer) map.removeLayer(map.tile_layer);
-            
-            // Check if we're on localhost - if so, use direct backend URL
-            // Otherwise use API proxy route
-            const isLocalhost = typeof window !== 'undefined' && (
-                window.location.hostname === 'localhost' ||
-                window.location.hostname === '127.0.0.1' ||
-                process.env.NODE_ENV === 'development'
-            );
-            
-            const tileUrl = isLocalhost
-                ? `http://150.107.201.110:8090/map/{z}/${map.plane}_{x}_{y}.png`
-                : `api/map/{z}/${map.plane}_{x}_{y}.png`;
-            
-            map.tile_layer = L.tileLayer(
-                tileUrl,
-                {
-                    minZoom: 7,
-                    maxZoom: 11,
-                    attribution: 'Map data',
-                    noWrap: true,
-                    tms: true,
-                    // Performance optimizations for Firefox
-                    updateWhenIdle: false,
-                    updateWhenZooming: false,
-                    keepBuffer: 4
-                }
-            );
-            map.tile_layer.addTo(map);
-            map.invalidateSize();
-        };
-        map.updateMapPath();
-        map.getContainer().focus();
+        return { name, imageUrl };
+    }, [lookupGameval, hasLoaded]);
 
-        // Mouse hover highlight
-        map.on('mousemove', (e: LeafletMouseEvent) => {
-            const mousePos = Position.fromLatLng(map, e.latlng, map.plane);
-            if (!prevMousePosRef.current || !prevMousePosRef.current.equals(mousePos)) {
-                prevMousePosRef.current = mousePos;
-                setCurrentPosition(mousePos);
+    const buildMarkerTooltip = useCallback((result: any) => {
+         const extras = getResultExtras(result);
+         const name = extras?.name ?? `Object ${result.objectId}`;
+         const coords = `(${result.x}, ${result.y}, ${result.z})`;
+         const orientation = result.orientation ?? 'N/A';
+         const packedValue = Position.toPacked(result.x, result.y, result.z);
+         const typeName = result.type !== undefined
+             ? (OBJECT_TYPES[result.type] ?? `Type ${result.type}`)
+             : 'Unknown';
 
-                if (prevMouseRectRef.current) map.removeLayer(prevMouseRectRef.current);
-                const mouseRect = mousePos.toLeaflet(map);
-                prevMouseRectRef.current = mouseRect;
-                mouseRect.addTo(map);
+        const imageHtml = extras?.imageUrl
+            ? `<div class="tooltip-card__image"><img src="${extras.imageUrl}" alt="${name}" onerror="this.style.display='none';" /></div>`
+            : "";
+
+        return `
+            <div class="tooltip-card">
+                <div class="tooltip-card__title">${name}</div>
+                <div class="tooltip-card__grid">
+                    <span class="tooltip-card__label">Coords</span><span>${coords}</span>
+                    <span class="tooltip-card__label">Packed</span><span>${packedValue}</span>
+                    <span class="tooltip-card__label">Object ID</span><span>${result.objectId ?? 'N/A'}</span>
+                    <span class="tooltip-card__label">Orientation</span><span>${orientation}</span>
+                    <span class="tooltip-card__label">Type</span><span>${typeName}</span>
+                </div>
+                ${imageHtml}
+            </div>
+        `;
+    }, [getResultExtras]);
+
+    const highlightedSingleMarkerRef = useRef<L.Marker | null>(null);
+    const { state } = useSidebar();
+    const hasSearchedInitialObjectRef = useRef<boolean>(false);
+    const shouldFitBoundsRef = useRef<boolean>(false);
+    const isInternalPlaneUpdateRef = useRef(false);
+
+    const markerIcons = useMemo(() => ({
+        default: createMarkerIcon('#33b5e5'),
+        selected: createMarkerIcon('#ff4444', true),
+    }), []);
+
+    // Use map controls hook
+    const {
+        gridControlRef,
+        labelsControlRef,
+        planeControlRef,
+        coordinatesControlRef,
+        regionBaseCoordinatesControlRef,
+        regionLookupControlRef,
+        collectionControlRef,
+        initializeControls,
+    } = useMapControls({
+        compact,
+        showRegionGrid,
+        showLabels,
+        setZoom,
+    });
+
+    // Use object markers hook
+    const { objectMarkersRef, objectMarkerLayerRef } = useObjectMarkers({
+        mapInstanceRef,
+        objectPositions,
+        currentObjectIndex,
+        plane,
+        shouldFitBoundsRef,
+    });
+
+    // Handle results change from query execution
+    const handleResultsChange = useCallback((results: any[], format: 'table' | 'json' | 'list', source: 'display' | 'highlight') => {
+        startTransition(() => {
+            setQueryResults(results);
+            setResultsFormat(source === 'highlight' ? 'list' : format);
+            setResultsSource(source);
+            setShowResultsInSettings(true);
+            if (source === 'highlight') {
+                setHighlightSelectionIndex(0);
+                setMarkAllActive(false);
             }
         });
-
-        map.getContainer().addEventListener('mouseleave', () => {
-            const centre = map.getBounds().getCenter();
-            const centrePos = Position.fromLatLng(map, centre, map.plane);
-            setCurrentPosition(centrePos);
-
-            prevMousePosRef.current = null;
-            if (prevMouseRectRef.current) {
-                map.removeLayer(prevMouseRectRef.current);
-                prevMouseRectRef.current = null;
-            }
-        });
-
-        // Center from URL
-        const currentUrl = new URL(window.location.href);
-        const urlCentreX = currentUrl.searchParams.get("centreX");
-        const urlCentreY = currentUrl.searchParams.get("centreY");
-        const urlCentreZ = currentUrl.searchParams.get("centreZ");
-        const urlZoom = currentUrl.searchParams.get("zoom");
-        const urlRegionID = currentUrl.searchParams.get("regionID");
-
-        let initialZoom = urlZoom ? Number(urlZoom) : 7;
-        let centreLatLng: [number, number] = [-79, -137];
-
-        if (urlCentreX && urlCentreY && urlCentreZ) {
-            const centrePos = new Position(Number(urlCentreX), Number(urlCentreY), Number(urlCentreZ));
-            centreLatLng = centrePos.toLatLng(map);
-        } else if (urlRegionID) {
-            const region = new Region(Number(urlRegionID));
-            const centrePos = region.toCentrePosition();
-            centreLatLng = centrePos.toLatLng(map);
-            initialZoom = urlZoom ? Number(urlZoom) : 9;
-        }
-
-        // Add our GridControl plugin (hidden, controlled via React)
-        const gridControl = new GridControl({ position: 'bottomleft' });
-        gridControl.addTo(map);
-        gridControlRef.current = gridControl;
-
-        const planeControl = new PlaneControl({ position: 'bottomleft' });
-        planeControl.addTo(map);
-        planeControlRef.current = planeControl;
-
-        const regionLabelsControl = new RegionLabelsControl({ position: 'bottomleft' });
-        regionLabelsControl.addTo(map);
-        labelsControlRef.current = regionLabelsControl;
-
-        const coordinatesControl = new CoordinatesControl({ position: 'bottomleft' });
-        coordinatesControl.addTo(map);
-        coordinatesControlRef.current = coordinatesControl;
-
-        const regionBaseCoordinatesControl = new RegionBaseCoordinatesControl({ position: 'bottomleft' });
-        regionBaseCoordinatesControl.addTo(map);
-        regionBaseCoordinatesControlRef.current = regionBaseCoordinatesControl;
-
-        const regionLookupControl = new RegionLookupControl({ position: 'bottomleft' });
-        regionLookupControl.addTo(map);
-        regionLookupControlRef.current = regionLookupControl;
-
-        // Add HD117 collection control
-        const collectionControl = new CollectionControl({
-            position: 'bottomleft'
-        });
-        collectionControl.addTo(map);
-        collectionControlRef.current = collectionControl;
-
-        map.setView(centreLatLng, initialZoom);
-        setZoom(map.getZoom());
-        setCurrentPosition(Position.fromLatLng(map, map.getBounds().getCenter(), plane));
-
-        mapInstanceRef.current = map;
-
-        return () => {
-            if (gridControlRef.current) {
-                map.removeControl(gridControlRef.current);
-            }
-            if (labelsControlRef.current) {
-                map.removeControl(labelsControlRef.current);
-            }
-            if (planeControlRef.current) {
-                map.removeControl(planeControlRef.current);
-            }
-            if (coordinatesControlRef.current) {
-                map.removeControl(coordinatesControlRef.current);
-            }
-            if (regionBaseCoordinatesControlRef.current) {
-                map.removeControl(regionBaseCoordinatesControlRef.current);
-            }
-            if (regionLookupControlRef.current) {
-                map.removeControl(regionLookupControlRef.current);
-            }
-            map.remove();
-            mapInstanceRef.current = null;
-        };
     }, []);
 
-    // Update plane tiles and controls
-    useEffect(() => {
-        if (mapInstanceRef.current && mapInstanceRef.current.updateMapPath) {
-            mapInstanceRef.current.plane = plane;
-            mapInstanceRef.current.updateMapPath();
+    // Use query execution hook
+    const { handleBlockExecute } = useQueryExecution({
+        mapInstanceRef,
+        objectMarkersRef,
+        objectMarkerLayerRef,
+        onResultsChange: handleResultsChange,
+    });
 
-            // Dispatch planeChanged event for PlaneControl (if any listeners need it)
+
+    const { CommandPalette, BlockEditorComponent, openBlockEditor, isOpen: isBlockEditorOpen, setBlockEditorOpen } = useBlockEditor({
+        onExecute: handleBlockExecute,
+        mapInstance: mapInstanceRef.current,
+    });
+
+    const updateHighlightMarkers = useCallback((selectedIndex: number, markers?: Map<number, L.Marker>) => {
+        const candidate = markers ?? (highlightMarkersRef.current.size > 0 ? highlightMarkersRef.current : objectMarkerLayerRef.current);
+        if (!candidate) return;
+        candidate.forEach((marker, index) => {
+            if (!marker) return;
+            const isSelected = index === selectedIndex;
+            marker.setIcon(isSelected ? markerIcons.selected : markerIcons.default);
+        });
+    }, [markerIcons, objectMarkerLayerRef]);
+
+    const clearHighlightMarkers = useCallback(() => {
+        highlightMarkersRef.current.forEach((marker) => {
+            marker.remove();
+        });
+        highlightMarkersRef.current = new Map();
+        highlightedSingleMarkerRef.current?.remove();
+        highlightedSingleMarkerRef.current = null;
+        setMarkAllActive(false);
+    }, []);
+
+    const markResultOnMap = useCallback((result: any, index: number) => {
+        if (!mapInstanceRef.current) return;
+        const position = new Position(result.x, result.y, result.z);
+        const latLng = position.toCentreLatLng(mapInstanceRef.current);
+
+        const next = markAllActive ? new Map(highlightMarkersRef.current) : new Map<number, L.Marker>();
+
+        if (!markAllActive) {
+            highlightMarkersRef.current.forEach((marker) => marker.remove());
+            highlightedSingleMarkerRef.current?.remove();
+            highlightedSingleMarkerRef.current = null;
+        }
+
+        let marker = next.get(index);
+        if (!marker) {
+            marker = L.marker(latLng, { icon: markerIcons.default });
+            marker.addTo(mapInstanceRef.current!);
+        } else {
+            marker.setLatLng(latLng);
+        }
+
+        marker.unbindTooltip();
+        marker.bindTooltip(buildMarkerTooltip(result), {
+            className: 'highlight-marker-tooltip',
+            direction: 'top',
+            offset: [0, -16],
+            opacity: 1,
+            permanent: false,
+            sticky: false,
+        });
+
+        next.set(index, marker);
+        if (!markAllActive) {
+            highlightedSingleMarkerRef.current = marker;
+        }
+
+        highlightMarkersRef.current = next;
+    }, [markAllActive, buildMarkerTooltip, markerIcons, mapInstanceRef]);
+
+    const markAllResults = useCallback(() => {
+        if (!mapInstanceRef.current) return;
+        clearHighlightMarkers();
+        highlightedSingleMarkerRef.current?.remove();
+        highlightedSingleMarkerRef.current = null;
+        const markers = new Map<number, L.Marker>();
+
+        queryResults.forEach((result, index) => {
+            const position = new Position(result.x, result.y, result.z);
+            const latLng = position.toCentreLatLng(mapInstanceRef.current!);
+            const marker = L.marker(latLng, { icon: markerIcons.default });
+            marker.addTo(mapInstanceRef.current!);
+            marker.bindTooltip(buildMarkerTooltip(result), {
+                className: 'highlight-marker-tooltip',
+                direction: 'top',
+                offset: [0, -16],
+                opacity: 1,
+                permanent: false,
+                sticky: false,
+            });
+            markers.set(index, marker);
+        });
+
+        highlightMarkersRef.current = markers;
+        setMarkAllActive(true);
+        updateHighlightMarkers(highlightSelectionIndex, markers);
+    }, [clearHighlightMarkers, queryResults, highlightSelectionIndex, updateHighlightMarkers, buildMarkerTooltip, markerIcons]);
+
+    const unmarkAllResults = useCallback(() => {
+        clearHighlightMarkers();
+        highlightedSingleMarkerRef.current?.remove();
+        highlightedSingleMarkerRef.current = null;
+        setMarkAllActive(false);
+    }, [clearHighlightMarkers]);
+
+    useEffect(() => {
+        if (resultsSource === 'highlight') {
+            updateHighlightMarkers(highlightSelectionIndex);
+        }
+    }, [highlightSelectionIndex, resultsSource, updateHighlightMarkers]);
+
+    const handleResultSelect = useCallback((result: any) => {
+        if (!mapInstanceRef.current) return;
+        const position = new Position(result.x, result.y, result.z);
+        const latLng = position.toCentreLatLng(mapInstanceRef.current);
+        mapInstanceRef.current.panTo(latLng);
+        if (result.z !== plane && result.z >= 0 && result.z <= 3) {
+            setPlane(result.z);
+        }
+        markResultOnMap(result, highlightSelectionIndex);
+    }, [plane, markResultOnMap, highlightSelectionIndex]);
+
+    useEffect(() => {
+        if (showResultsInSettings && resultsSource === 'display') {
+            setBlockEditorOpen(true);
+        }
+    }, [showResultsInSettings, resultsSource, setBlockEditorOpen]);
+
+    useEffect(() => {
+        if (!isBlockEditorOpen && resultsSource !== 'highlight') {
+            setShowResultsInSettings(false);
+            setResultsSource(null);
+        }
+    }, [isBlockEditorOpen, resultsSource]);
+
+    // Initialize controls when map is ready
+    const handleMapReady = useCallback((map: BaseMapInstance) => {
+        mapInstanceRef.current = map;
+
+        // Sync initial plane state from map
+        isInternalPlaneUpdateRef.current = true;
+        setPlane(map.plane);
+        isInternalPlaneUpdateRef.current = false;
+
+        // Initialize map controls
+        initializeControls(map);
+
+        // Initialize object markers layer (always needed for object location)
+        if (!objectMarkersRef.current) {
+            const objectMarkers = L.featureGroup();
+            objectMarkers.addTo(map);
+            objectMarkersRef.current = objectMarkers;
+        }
+
+        // If we have an initial object ID, search for it once map is ready
+        if (initialObjectId && !hasSearchedInitialObjectRef.current) {
+            hasSearchedInitialObjectRef.current = true;
+            
+            const fetchObjectLocations = async () => {
+                try {
+                    const response = await fetch(`/api/map/objects/${initialObjectId}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.locations && data.locations.length > 0) {
+                            const positions: ObjectPosition[] = data.locations.map((loc: any) => ({
+                                x: loc.position.x,
+                                y: loc.position.y,
+                                z: loc.position.z,
+                                objectId: loc.id,
+                                orientation: loc.orientation,
+                            }));
+                            
+                            setObjectPositions(positions);
+                            setObjectSearchQuery(initialObjectId.toString());
+                            shouldFitBoundsRef.current = true;
+                            
+                            // Show toast notification with count (like ObjectFinder does)
+                            if (positions.length > 0) {
+                                toast.success(`Found ${positions.length} object${positions.length > 1 ? 's' : ''}`, {
+                                    description: `Object ID: ${initialObjectId}`
+                                });
+                            }
+                            
+                            // Wait a bit for map to settle, then jump to first result
+                            setTimeout(() => {
+                                if (mapInstanceRef.current && positions.length > 0) {
+                                    const firstPos = new Position(positions[0].x, positions[0].y, positions[0].z);
+                                    const latLng = firstPos.toCentreLatLng(mapInstanceRef.current);
+                                    mapInstanceRef.current.panTo(latLng);
+                                    
+                                    if (positions[0].z !== map.plane && positions[0].z >= 0 && positions[0].z <= 3) {
+                                        setPlane(positions[0].z);
+                                    }
+                                    
+                                    setCurrentObjectIndex(0);
+                                }
+                            }, 300);
+                        } else {
+                            toast.error(`No locations found for object ID ${initialObjectId}`);
+                        }
+                    } else {
+                        toast.error(`Failed to fetch object ${initialObjectId}`);
+                    }
+                } catch (error) {
+                    console.error('Error fetching object locations:', error);
+                    toast.error(`Error fetching object ${initialObjectId}`);
+                }
+            };
+            
+            fetchObjectLocations();
+        }
+
+        // Cleanup function will be handled by BaseMap
+    }, [initialObjectId, compact, initializeControls]);
+
+    // Update plane when it changes externally (from OSRSMap controls)
+    useEffect(() => {
+        // Skip if this is an internal update from BaseMap
+        if (isInternalPlaneUpdateRef.current) return;
+
+        if (mapInstanceRef.current && mapInstanceRef.current.plane !== plane) {
+            // Update map plane via BaseMap's setPlane method if available
+            const setPlaneMethod = (mapInstanceRef.current as any).setPlane;
+            if (setPlaneMethod) {
+                setPlaneMethod(plane);
+            } else {
+                // Fallback: directly update if setPlane not available yet
+            mapInstanceRef.current.plane = plane;
+                mapInstanceRef.current.updateMapPath?.();
+            }
+
+            // Dispatch planeChanged event for PlaneControl
             if (planeControlRef.current && mapInstanceRef.current) {
                 mapInstanceRef.current.fire('planeChanged', { plane });
             }
@@ -215,26 +441,13 @@ const OSRSMap: React.FC = () => {
         }
     }, [plane]);
 
-    // Sync React state with Leaflet controls
+    // Reset search ref when initialObjectId changes (so new searches work)
     useEffect(() => {
-        if (!gridControlRef.current) return;
-        const control = gridControlRef.current;
-        const isEnabled = control.isEnabled();
-        
-        if (showRegionGrid !== isEnabled) {
-            control.setEnabled(showRegionGrid);
+        if (initialObjectId !== undefined) {
+            hasSearchedInitialObjectRef.current = false;
         }
-    }, [showRegionGrid]);
+    }, [initialObjectId]);
 
-    useEffect(() => {
-        if (!labelsControlRef.current) return;
-        const control = labelsControlRef.current;
-        const isVisible = control.isVisible();
-        
-        if (showLabels !== isVisible) {
-            control.setVisible(showLabels);
-        }
-    }, [showLabels]);
 
     // Invalidate map size when sidebar state changes (to handle resize)
     useEffect(() => {
@@ -250,27 +463,6 @@ const OSRSMap: React.FC = () => {
         }
     }, [state]);
 
-
-    // Update URL params
-    useEffect(() => {
-        if (!mapInstanceRef.current) return;
-        const map = mapInstanceRef.current;
-
-        const updateUrl = () => {
-            const centre = map.getBounds().getCenter();
-            const centrePos = Position.fromLatLng(map, centre, map.plane);
-            const zoom = map.getZoom();
-            window.history.replaceState(null, '', `?centreX=${centrePos.x}&centreY=${centrePos.y}&centreZ=${centrePos.z}&zoom=${zoom}`);
-        };
-
-        map.on('moveend', updateUrl);
-        map.on('zoomend', updateUrl);
-
-        return () => {
-            map.off('moveend', updateUrl);
-            map.off('zoomend', updateUrl);
-        };
-    }, []);
 
     // Keyboard controls for moving selected areas
     useEffect(() => {
@@ -325,18 +517,33 @@ const OSRSMap: React.FC = () => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
+
+    // Handle plane changes from BaseMap (e.g., from URL params)
+    const handlePlaneChange = useCallback((newPlane: number) => {
+        if (!isInternalPlaneUpdateRef.current && newPlane !== plane) {
+            isInternalPlaneUpdateRef.current = true;
+            setPlane(newPlane);
+            isInternalPlaneUpdateRef.current = false;
+        }
+    }, [plane]);
+
     return (
-        <div style={{ width: '100%', height: '100%', position: 'relative', backgroundColor: '#000' }}>
-            <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+        <>
+            <BaseMap
+                onMapReady={handleMapReady}
+                onPositionChange={setCurrentPosition}
+                onPlaneChange={handlePlaneChange}
+                initialPlane={plane}
+                showCoordinates={compact}
+                showFullscreen={false}
+            >
+                {!compact && (
+                    <>
             <MapInfoPanel
                 position={currentPosition}
                 plane={plane}
                 onPlaneChange={(newPlane) => {
                     setPlane(newPlane);
-                    if (mapInstanceRef.current) {
-                        mapInstanceRef.current.plane = newPlane;
-                        mapInstanceRef.current.updateMapPath?.();
-                    }
                 }}
                 zoom={zoom}
                 onZoomChange={newZoom => {
@@ -349,10 +556,12 @@ const OSRSMap: React.FC = () => {
                 onShowLabelsChange={setShowLabels}
                 onGoToCoordinates={(x, y, z) => {
                     if (coordinatesControlRef.current) {
-                        coordinatesControlRef.current.goToCoordinates(x, y, z);
+                                    // Cap z at 3
+                                    const cappedZ = Math.max(0, Math.min(3, z));
+                                    coordinatesControlRef.current.goToCoordinates(x, y, cappedZ);
                         // Update plane if different
-                        if (z !== plane) {
-                            setPlane(z);
+                                    if (cappedZ !== plane) {
+                                        setPlane(cappedZ);
                         }
                     }
                 }}
@@ -381,7 +590,7 @@ const OSRSMap: React.FC = () => {
                         // Update plane if the region's plane is different
                         const region = new Region(regionId);
                         const centerPos = region.toCentrePosition();
-                        if (centerPos.z !== plane && centerPos.z >= 0 && centerPos.z <= 4) {
+                                    if (centerPos.z !== plane && centerPos.z >= 0 && centerPos.z <= 3) {
                             setPlane(centerPos.z);
                         }
                     }
@@ -394,86 +603,46 @@ const OSRSMap: React.FC = () => {
                     if (mapInstanceRef.current) {
                         const latLng = position.toCentreLatLng(mapInstanceRef.current);
                         mapInstanceRef.current.panTo(latLng);
-                        // Update plane if different
-                        if (position.z !== plane) {
+                                    // Update plane if different (cap at 3)
+                                    if (position.z !== plane && position.z >= 0 && position.z <= 3) {
                             setPlane(position.z);
                         }
                     }
                 }}
-                onObjectSearch={async (query: string, mode: 'gameval' | 'id') => {
-                    // TODO: Replace with actual API call when available
-                    // Mock data for UI testing
-                    try {
-                        // Simulate API delay
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        
-                        // Return mock data based on search query
-                        const mockResults: ObjectPosition[] = [];
-                        
-                        if (mode === 'id') {
-                            const objectId = parseInt(query);
-                            if (!isNaN(objectId)) {
-                                // Generate some random positions for the object ID
-                                const count = Math.min(Math.floor(Math.random() * 10) + 1, 8);
-                                for (let i = 0; i < count; i++) {
-                                    mockResults.push({
-                                        x: Math.floor(Math.random() * 3000) + 1024,
-                                        y: Math.floor(Math.random() * 11000) + 1216,
-                                        z: Math.floor(Math.random() * 4),
-                                        objectId: objectId,
-                                        gameval: `OBJ_${objectId}`
-                                    });
-                                }
-                            }
-                        } else {
-                            // Gameval mode - generate some mock results
-                            const queryLower = query.toLowerCase();
-                            const matches = [
-                                { gameval: 'BANK_BOOTH', id: 10355, count: 5 },
-                                { gameval: 'CHEST', id: 375, count: 8 },
-                                { gameval: 'DOOR', id: 1535, count: 12 },
-                                { gameval: 'TREE', id: 1278, count: 15 },
-                                { gameval: 'ROCK', id: 11161, count: 10 },
-                                { gameval: 'STAIRS', id: 16671, count: 7 },
-                                { gameval: 'LADDER', id: 16680, count: 6 },
-                                { gameval: 'ALTAR', id: 409, count: 4 },
-                                { gameval: 'ANVIL', id: 2097, count: 3 },
-                                { gameval: 'FURNACE', id: 11666, count: 6 },
-                            ].filter(item => item.gameval.toLowerCase().includes(queryLower));
-                            
-                            matches.forEach(match => {
-                                for (let i = 0; i < match.count; i++) {
-                                    mockResults.push({
-                                        x: Math.floor(Math.random() * 3000) + 1024,
-                                        y: Math.floor(Math.random() * 11000) + 1216,
-                                        z: Math.floor(Math.random() * 4),
-                                        objectId: match.id,
-                                        gameval: match.gameval
-                                    });
-                                }
-                            });
-                            
-                            // If no matches, create some generic results
-                            if (mockResults.length === 0) {
-                                for (let i = 0; i < 3; i++) {
-                                    mockResults.push({
-                                        x: Math.floor(Math.random() * 3000) + 1024,
-                                        y: Math.floor(Math.random() * 11000) + 1216,
-                                        z: Math.floor(Math.random() * 4),
-                                        objectId: 1000 + i,
-                                        gameval: query.toUpperCase()
-                                    });
-                                }
-                            }
-                        }
-                        
-                        return mockResults;
-                    } catch (error) {
-                        console.error('Object search error:', error);
-                        return [];
+                onObjectPositionsChange={(positions) => {
+                    setObjectPositions(positions);
+                    // Set flag to fit bounds when new search results arrive
+                    if (positions.length > 0) {
+                        shouldFitBoundsRef.current = true;
                     }
                 }}
+                onObjectCurrentIndexChange={setCurrentObjectIndex}
+                            onObjectSearchQueryChange={setObjectSearchQuery}
+                            objectSearchQuery={objectSearchQuery}
+                            objectPositions={objectPositions}
+                            objectCurrentIndex={currentObjectIndex}
                 collectionControl={collectionControlRef.current}
+                queryResults={queryResults}
+                resultsFormat={resultsFormat}
+                onResultsFormatChange={setResultsFormat}
+                showQueryResults={showResultsInSettings}
+                resultsSource={resultsSource}
+                onCloseQueryResults={() => {
+                    setShowResultsInSettings(false);
+                    setResultsSource(null);
+                }}
+                onResultClick={handleResultSelect}
+                onHighlightIndexChange={(index, result) => {
+                    setHighlightSelectionIndex(index);
+                    updateHighlightMarkers(index);
+                    if (!markAllActive && result) {
+                        markResultOnMap(result, index);
+                    }
+                }}
+                onMarkAll={markAllResults}
+                onUnmarkAll={unmarkAllResults}
+                markAllActive={markAllActive}
+                getResultExtras={getResultExtras}
             >
                 <AreaSelection 
                     collectionControl={collectionControlRef.current}
@@ -481,8 +650,8 @@ const OSRSMap: React.FC = () => {
                         if (mapInstanceRef.current) {
                             const latLng = position.toCentreLatLng(mapInstanceRef.current);
                             mapInstanceRef.current.panTo(latLng);
-                            // Update plane if different
-                            if (position.z !== plane) {
+                                        // Update plane if different (cap at 3)
+                                        if (position.z !== plane && position.z >= 0 && position.z <= 3) {
                                 setPlane(position.z);
                             }
                         }
@@ -496,7 +665,19 @@ const OSRSMap: React.FC = () => {
                 />
             </MapControls>
             <SelectionControls visible={selectedItemType !== null} type={selectedItemType} />
-        </div>
+                    </>
+                )}
+                {!compact && (
+                    <QueryBuilderButton onClick={openBlockEditor} />
+                )}
+            </BaseMap>
+            {!compact && (
+                <>
+                    <CommandPalette />
+                    <BlockEditorComponent />
+                </>
+            )}
+        </>
     );
 };
 

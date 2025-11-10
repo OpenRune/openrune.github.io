@@ -91,9 +91,9 @@ export function MapInfoPanel({
     } else if (type === 'y') {
       setYInput(numValue);
     } else if (type === 'z') {
-      // Z must be 0-4
+      // Z must be 0-3
       const num = parseInt(numValue);
-      if (numValue === '' || (!isNaN(num) && num >= 0 && num <= 4)) {
+      if (numValue === '' || (!isNaN(num) && num >= 0 && num <= 3)) {
         setZInput(numValue);
       }
     } else if (type === 'rx') {
@@ -132,7 +132,7 @@ export function MapInfoPanel({
     const y = parseInt(yInput);
     const z = parseInt(zInput);
 
-    if (!isNaN(x) && !isNaN(y) && !isNaN(z) && z >= 0 && z <= 4) {
+    if (!isNaN(x) && !isNaN(y) && !isNaN(z) && z >= 0 && z <= 3) {
       if (onGoToCoordinates) {
         onGoToCoordinates(x, y, z);
       }
@@ -161,7 +161,7 @@ export function MapInfoPanel({
   };
 
   const handlePlaneUp = () => {
-    if (plane < 4) {
+    if (plane < 3) {
       onPlaneChange(plane + 1);
     }
   };
@@ -320,10 +320,10 @@ export function MapInfoPanel({
                     variant="outline"
                     size="icon"
                     onClick={handlePlaneUp}
-                    disabled={plane === 4}
+                    disabled={plane === 3}
                     className={cn(
                       "h-7 w-7 border-border transition-all",
-                      plane === 4 
+                      plane === 3 
                         ? "bg-black/50 border-border/50 opacity-50 cursor-not-allowed" 
                         : "bg-black/100 hover:bg-gray-800"
                     )}

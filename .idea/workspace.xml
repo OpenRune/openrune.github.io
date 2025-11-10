@@ -4,16 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="51982a52-4621-4b78-827a-2c8ff91c7405" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/globals.css" beforeDir="false" afterPath="$PROJECT_DIR$/app/globals.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/map/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/map/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/AreaItemList.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection/AreaItemList.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection/types.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/OSRSMap.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/OSRSMap.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/controls/CollectionControl.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/map/controls/CollectionControl.ts" afterDir="false" />
-    </list>
+    <list default="true" id="51982a52-4621-4b78-827a-2c8ff91c7405" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -41,10 +32,11 @@
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
     "git-widget-placeholder": "live",
+    "ignore.virus.scanning.warn.message": "true",
     "js.debugger.nextJs.config.created.client": "true",
     "js.debugger.nextJs.config.created.server": "true",
     "junie.onboarding.icon.badge.shown": "true",
-    "last_opened_file_path": "D:/openrune.github.io/components/map",
+    "last_opened_file_path": "D:/openrune.github.io",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -52,7 +44,9 @@
     "nodejs_package_manager_path": "npm",
     "npm.Next.js: server-side.executor": "Run",
     "npm.build.executor": "Run",
+    "npm.lint.executor": "Run",
     "npm.start.executor": "Run",
+    "settings.editor.selected.configurable": "settings.nodejs",
     "to.speed.mode.migration.done": "true",
     "ts.external.directory.path": "D:\\openrune.github.io\\node_modules\\typescript\\lib",
     "vue.rearranger.settings.migration": "true"
@@ -71,7 +65,7 @@
       <recent name="D:\openrune.github.io\components\map" />
     </key>
   </component>
-  <component name="RunManager" selected="npm.Next.js: server-side">
+  <component name="RunManager" selected="npm.build">
     <configuration name="Next.js: debug client-side" type="JavascriptDebugType" uri="http://localhost:3000/">
       <method v="2" />
     </configuration>
@@ -81,7 +75,7 @@
       <scripts>
         <script value="dev" />
       </scripts>
-      <node-interpreter value="project" />
+      <node-interpreter value="$APPLICATION_CONFIG_DIR$/node/versions/24.11.0/node" />
       <envs />
       <method v="2" />
     </configuration>
@@ -91,7 +85,17 @@
       <scripts>
         <script value="build" />
       </scripts>
-      <node-interpreter value="project" />
+      <node-interpreter value="$APPLICATION_CONFIG_DIR$/node/versions/24.11.0/node" />
+      <envs />
+      <method v="2" />
+    </configuration>
+    <configuration name="lint" type="js.build_tools.npm" temporary="true" nameIsGenerated="true">
+      <package-json value="$PROJECT_DIR$/package.json" />
+      <command value="run" />
+      <scripts>
+        <script value="lint" />
+      </scripts>
+      <node-interpreter value="$APPLICATION_CONFIG_DIR$/node/versions/24.10.0/node" />
       <envs />
       <method v="2" />
     </configuration>
@@ -108,6 +112,7 @@
     <recent_temporary>
       <list>
         <item itemvalue="npm.build" />
+        <item itemvalue="npm.lint" />
         <item itemvalue="npm.start" />
       </list>
     </recent_temporary>
@@ -128,6 +133,9 @@
       <updated>1762192818919</updated>
       <workItem from="1762192820368" duration="23217000" />
       <workItem from="1762301296736" duration="14373000" />
+      <workItem from="1762549110332" duration="21194000" />
+      <workItem from="1762705629251" duration="22000" />
+      <workItem from="1762756118101" duration="12688000" />
     </task>
     <servers />
   </component>

@@ -4,7 +4,7 @@ export const MAP_HEIGHT_MAX_ZOOM_PX = 364544;
 export const MAP_WIDTH_MAX_ZOOM_PX = 104448;
 export const RS_TILE_WIDTH_PX = 32;
 export const RS_TILE_HEIGHT_PX = 32; // Width and height in px of an RS tile at max zoom level
-export const RS_OFFSET_X = 1024; // Amount to offset x coordinate to get correct value
+export const RS_OFFSET_X = 1024 - 64 ; // Amount to offset x coordinate to get correct value
 export const RS_OFFSET_Y = 6208; // Amount to offset y coordinate to get correct value
 
 // Leaflet types
@@ -27,6 +27,31 @@ export class Position {
         y = Math.round((y - RS_TILE_HEIGHT_PX) / RS_TILE_HEIGHT_PX) + RS_OFFSET_Y;
         const x = Math.round((point.x - RS_TILE_WIDTH_PX) / RS_TILE_WIDTH_PX) + RS_OFFSET_X;
         return new Position(x, y, z);
+    }
+
+    static fromPacked(packedPosition: number | null | undefined): Position {
+        if (
+            packedPosition === null ||
+            packedPosition === undefined ||
+            packedPosition === -1
+        ) {
+            return new Position(-1, -1, -1);
+        }
+
+        const unsignedPacked = packedPosition >>> 0;
+        const z = (unsignedPacked >>> 28) & 0x3;
+        const x = (unsignedPacked >>> 14) & 0x3fff;
+        const y = unsignedPacked & 0x3fff;
+
+        return new Position(x, y, z);
+    }
+
+    static toPacked(x: number, y: number, z: number): number {
+        const normalizedZ = z & 0x3;
+        const normalizedX = x & 0x3fff;
+        const normalizedY = y & 0x3fff;
+
+        return (normalizedZ << 28) | (normalizedX << 14) | normalizedY;
     }
 
     toLatLng(map: any): any {

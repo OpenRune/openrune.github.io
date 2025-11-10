@@ -158,7 +158,7 @@ export function CacheTypeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [findCacheTypeByPort, convertSseStatusResponse, updateCacheStatus]);
 
-  // Helper function to log active SSE connections
+
   const logActiveConnections = React.useCallback(() => {
     const activeConnections: string[] = [];
     
@@ -174,12 +174,6 @@ export function CacheTypeProvider({ children }: { children: React.ReactNode }) {
       const state = selectedSseConnectionRef.current.readyState();
       const stateText = state === EventSource.CONNECTING ? 'CONNECTING' : state === EventSource.OPEN ? 'OPEN' : 'CLOSED';
       activeConnections.push(`SELECTED (${stateText})`);
-    }
-    
-    if (activeConnections.length > 0) {
-      console.log(`[CacheTypeProvider] 🔌 Active SSE Connections (${activeConnections.length}):`, activeConnections);
-    } else {
-      console.log(`[CacheTypeProvider] 🔌 Active SSE Connections: NONE`);
     }
   }, []);
 

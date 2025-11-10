@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, memo, useTransition } from 'react';
 import type { ReactNode } from 'react';
 import {
   Table,
@@ -33,6 +33,8 @@ import { useSettings } from '@/components/layout/settings-provider';
 import { useCacheType } from '@/components/layout/cache-type-provider';
 import { cn } from '@/lib/utils';
 import { useDownloadManager } from '@/components/download-manager';
+import { GamevalType, ITEMTYPES, NPCTYPES, OBJTYPES, SPRITETYPES, SEQTYPES, SPOTTYPES } from '@/lib/gamevals';
+import { GamevalIdSearch, GamevalSuggestion } from '@/components/search/GamevalIdSearch';
 
 interface InfoResponse {
   totalEntries: number;
@@ -66,6 +68,15 @@ export interface TableColumn {
   render?: (row: { id: string; data: any }) => React.ReactNode;
   className?: string;
 }
+
+const GAMEVAL_TYPE_BY_ENDPOINT: Record<string, GamevalType> = {
+  objects: OBJTYPES,
+  items: ITEMTYPES,
+  npcs: NPCTYPES,
+  sprites: SPRITETYPES,
+  sequences: SEQTYPES,
+  spotanims: SPOTTYPES,
+};
 
 // Helper to strip surrounding quotes
 function stripQuotes(str: string) {
@@ -240,7 +251,8 @@ export function PaginatedTable({
   const { hasActiveDownloads } = useDownloadManager();
   const { selectedCacheType } = useCacheType();
   const prevCacheTypeRef = useRef<string>(selectedCacheType.id);
-  
+  const [isFetching, startTransition] = useTransition();
+
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [gamevalInput, setGamevalInput] = useState('');
@@ -253,10 +265,52 @@ export function PaginatedTable({
     return defaultMode;
   });
   const [infoTabOpen, setInfoTabOpen] = useState(false);
-  
+
   const { tags: gamevalTags, addTags, removeTag, clearTags, toggleExact } = useTags([]);
   const prevSearchModeRef = useRef<string>(searchMode);
+
+  const activeGamevalType = useMemo(() => GAMEVAL_TYPE_BY_ENDPOINT[endpoint], [endpoint]);
   
+  const handleSearchInputChange = useCallback((nextValue: string, modeValue: string) => {
+    if (modeValue === 'gameval') {
+      setGamevalInput(nextValue);
+    } else {
+      setSearchQuery(nextValue);
+    }
+  }, []);
+
+  const handleSearchModeChange = useCallback((nextMode: string) => {
+    if (disabledModes.includes(nextMode) || nextMode === searchMode) {
+      return;
+    }
+    const previousMode = searchMode;
+    setSearchMode(nextMode);
+    setSearchQuery('');
+    setGamevalInput('');
+    if (previousMode === 'gameval') {
+      clearTags();
+    }
+  }, [disabledModes, searchMode, clearTags]);
+
+  const handleSearchEnter = useCallback((currentValue: string, modeValue: string) => {
+    if (modeValue === 'gameval') {
+      const trimmed = currentValue.trim();
+      if (trimmed) {
+        addTags(trimmed);
+        setGamevalInput('');
+      }
+    }
+  }, [addTags]);
+
+  const handleSuggestionSelect = useCallback((suggestion: GamevalSuggestion, modeValue: string) => {
+    if (modeValue === 'gameval') {
+      addTags(suggestion.name);
+      setGamevalInput('');
+      return true;
+    }
+    return false;
+  }, [addTags]);
+
   // Build search query from tags when in gameval mode
   useEffect(() => {
     if (searchMode === 'gameval') {
@@ -285,7 +339,7 @@ export function PaginatedTable({
     }
     // Don't clear searchQuery here - let it persist when switching modes
   }, [searchMode, clearTags]);
-  
+
   // Debounce search query to prevent spamming API calls (reduced to 200ms for snappier feel)
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -350,11 +404,13 @@ export function PaginatedTable({
   }, [itemsPerPage, totalCount]);
 
   // Fetch manifest data for current page
+  const filterStateKey = useMemo(() => JSON.stringify(filterState), [filterState]);
+
   const fetchManifest = useCallback(async (page: number) => {
     if (!info) return;
 
     // Create a unique key for this fetch to prevent duplicates (include cache type to force refresh on change)
-    const fetchKey = `${selectedCacheType.id}-${endpoint}-${page}-${itemsPerPage}-${debouncedSearchQuery}-${JSON.stringify(filterState)}`;
+    const fetchKey = `${selectedCacheType.id}-${endpoint}-${page}-${itemsPerPage}-${debouncedSearchQuery}-${filterStateKey}`;
     if (fetchManifestRef.current === fetchKey) {
       return; // Already fetching or fetched this exact combination
     }
@@ -408,15 +464,19 @@ export function PaginatedTable({
         throw new Error(`Failed to fetch manifest (${response.status}): ${errorText || response.statusText}`);
       }
       const manifestData: ManifestResponse = await response.json();
-      setData(manifestData);
-      setLoading(false);
+      startTransition(() => {
+        setData(manifestData);
+        setLoading(false);
+      });
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to fetch manifest';
-        setError(errorMessage);
-        setLoading(false);
+        startTransition(() => {
+          setError(errorMessage);
+          setLoading(false);
+        });
         fetchManifestRef.current = ''; // Reset on error to allow retry
       }
-  }, [endpoint, info, getPageIdRange, itemsPerPage, debouncedSearchQuery, searchMode, filterState, filters, selectedCacheType.id]);
+  }, [endpoint, info, getPageIdRange, itemsPerPage, debouncedSearchQuery, searchMode, filterState, filters, selectedCacheType.id, filterStateKey, startTransition]);
 
   // Save itemsPerPage to cookie when it changes
   useEffect(() => {
@@ -523,18 +583,22 @@ export function PaginatedTable({
           throw new Error(`Failed to fetch info (${response.status}): ${errorText || response.statusText}`);
         }
         const infoData: InfoResponse = await response.json();
-        setInfo(infoData);
-        setLoading(false);
+        startTransition(() => {
+          setInfo(infoData);
+          setLoading(false);
+        });
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to fetch info';
-        setError(errorMessage);
-        setLoading(false);
+        startTransition(() => {
+          setError(errorMessage);
+          setLoading(false);
+        });
         infoFetchedRef.current = false; // Reset on error so we can retry
       }
     };
     
     fetchInfo();
-  }, [endpoint, info, externalInfo, selectedCacheType.id]); // Include externalInfo and selectedCacheType.id in dependencies
+  }, [endpoint, info, externalInfo, selectedCacheType.id, startTransition]); // Include externalInfo and selectedCacheType.id in dependencies
 
   // Validate and adjust currentPage when totalPages changes (including when filters change)
   useEffect(() => {
@@ -744,74 +808,20 @@ export function PaginatedTable({
           </CardTitle>
         )}
         <div className="flex items-center gap-2">
-          <div className="relative flex items-center flex-1 max-w-xl">
-            {searchMode === 'gameval' ? (
-              <Input
-                id="gameval-input"
-                placeholder={placeholder}
-                value={gamevalInput}
-                onChange={(e) => setGamevalInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    const input = gamevalInput.trim();
-                    if (input) {
-                      addTags(input);
-                      setGamevalInput('');
-                    }
-                  }
-                }}
-                className="pr-20"
-              />
-            ) : (
-              <Input
-                placeholder={placeholder}
-                value={searchQuery}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // In ID mode, only allow numbers, + (after a number), and spaces
-                  if (searchMode === 'id') {
-                    let filtered = value.replace(/[^0-9+\s]/g, '');
-                    // Remove + if it's not preceded by a number
-                    filtered = filtered.replace(/(?<!\d)\+/g, '');
-                    // Remove multiple consecutive + signs
-                    filtered = filtered.replace(/\+\+/g, '+');
-                    setSearchQuery(filtered);
-                  } else {
-                    // For regex and other modes, allow any input
-                    setSearchQuery(value);
-                  }
-                }}
-                className="pr-20"
-              />
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="absolute right-0 top-1/2 -translate-y-1/2 h-8 px-3 min-w-[90px] rounded-l-none flex items-center justify-center border-l"
-                >
-                  {currentMode.label}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="bottom" align="end" className="mt-1">
-                {SEARCH_MODES.map((mode) => (
-                  <DropdownMenuItem
-                    key={mode.value}
-                    disabled={disabledModes.includes(mode.value)}
-                    onClick={() => {
-                      if (!disabledModes.includes(mode.value)) {
-                        setSearchMode(mode.value);
-                        setSearchQuery('');
-                        setGamevalInput('');
-                      }
-                    }}
-                  >
-                    {mode.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <div className="flex-1 max-w-xl">
+            <GamevalIdSearch
+              mode={searchMode}
+              value={searchMode === 'gameval' ? gamevalInput : searchQuery}
+              onValueChange={handleSearchInputChange}
+              onModeChange={handleSearchModeChange}
+              onEnter={handleSearchEnter}
+              onSuggestionSelect={handleSuggestionSelect}
+              modeOptions={SEARCH_MODES}
+              disabledModes={disabledModes}
+              placeholder={placeholder}
+              gamevalType={activeGamevalType}
+              suggestionLimit={10}
+            />
           </div>
           {/* Filters */}
           {filters.length > 0 && (
@@ -1173,4 +1183,5 @@ export function PaginatedTable({
     </Card>
   );
 }
+
 
