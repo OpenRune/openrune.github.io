@@ -232,13 +232,8 @@ export function AppSidebar() {
                     <SidebarMenu>
                         <SidebarMenuItem>
                             <button
-                                onClick={() => {
-                                  if (!isCacheOffline) {
-                                    setCacheTypeModalOpen(true);
-                                  }
-                                }}
-                                disabled={isCacheOffline}
-                                className={`peer/menu-button flex w-full items-center ${sizeConfig.footer.gap} overflow-hidden rounded-md ${sizeConfig.footer.padding} text-left outline-hidden ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-data-[sidebar=menu-action]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! [&>span:last-child]:truncate ${sizeConfig.footer.icon} [&>svg]:shrink-0 ${sizeConfig.footer.height} ${sizeConfig.footer.text} font-medium min-w-8 duration-200 ease-linear border border-sidebar-border bg-sidebar-accent/50 hover:bg-sidebar-accent`}
+                                onClick={() => setCacheTypeModalOpen(true)}
+                                className={`peer/menu-button flex w-full items-center ${sizeConfig.footer.gap} overflow-hidden rounded-md ${sizeConfig.footer.padding} text-left outline-hidden ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground group-has-data-[sidebar=menu-action]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! [&>span:last-child]:truncate ${sizeConfig.footer.icon} [&>svg]:shrink-0 ${sizeConfig.footer.height} ${sizeConfig.footer.text} font-medium min-w-8 duration-200 ease-linear border border-sidebar-border bg-sidebar-accent/50 hover:bg-sidebar-accent`}
                                 aria-label="Cache Type"
                             >
                                 {isMounted && selectedCacheType?.icon ? (
