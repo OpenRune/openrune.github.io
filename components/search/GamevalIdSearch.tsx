@@ -58,6 +58,7 @@ interface GamevalIdSearchProps {
   dropdownClassName?: string;
   disabled?: boolean;
   suggestionLimit?: number;
+  disableSuggestions?: boolean;
   inputProps?: Omit<
     React.ComponentProps<typeof Input>,
     "value" | "onChange" | "onKeyDown" | "placeholder" | "ref" | "disabled"
@@ -82,6 +83,7 @@ export const GamevalIdSearch = forwardRef<HTMLInputElement, GamevalIdSearchProps
       dropdownClassName,
       disabled,
       suggestionLimit = 10,
+      disableSuggestions = false,
       inputProps,
     },
     ref
@@ -114,7 +116,7 @@ export const GamevalIdSearch = forwardRef<HTMLInputElement, GamevalIdSearchProps
 
     const updateSuggestions = useCallback(
       (query: string) => {
-        if (mode !== "gameval" || !query.trim() || !gamevalEntries) {
+        if (mode !== "gameval" || !query.trim() || !gamevalEntries || disableSuggestions) {
           setSuggestions([]);
           setShowSuggestions(false);
           return;
@@ -137,15 +139,15 @@ export const GamevalIdSearch = forwardRef<HTMLInputElement, GamevalIdSearchProps
         setSuggestions(nextSuggestions);
         setShowSuggestions(true);
       },
-      [gamevalEntries, mode, suggestionLimit]
+      [gamevalEntries, mode, suggestionLimit, disableSuggestions]
     );
 
     useEffect(() => {
-      if (mode !== "gameval") {
+      if (mode !== "gameval" || disableSuggestions) {
         setSuggestions([]);
         setShowSuggestions(false);
       }
-    }, [mode]);
+    }, [mode, disableSuggestions]);
 
     useEffect(() => {
       if (mode === "gameval") {
@@ -174,9 +176,10 @@ export const GamevalIdSearch = forwardRef<HTMLInputElement, GamevalIdSearchProps
         let nextValue = event.target.value;
 
         if (mode === "id") {
-          nextValue = nextValue.replace(/[^0-9+\s]/g, "");
+          nextValue = nextValue.replace(/[^0-9+\-\s]/g, "");
           nextValue = nextValue.replace(/(?<!\d)\+/g, "");
           nextValue = nextValue.replace(/\+\+/g, "+");
+          nextValue = nextValue.replace(/--/g, "-");
         }
 
         onValueChange(nextValue, mode);
@@ -190,12 +193,12 @@ export const GamevalIdSearch = forwardRef<HTMLInputElement, GamevalIdSearchProps
     );
 
     const handleFocus = useCallback(() => {
-        if (mode === "gameval") {
+        if (mode === "gameval" && !disableSuggestions) {
           if (suggestions.length > 0 || deferredValue.trim().length > 0) {
             setShowSuggestions(true);
           }
       }
-    }, [mode, suggestions.length, deferredValue]);
+    }, [mode, suggestions.length, deferredValue, disableSuggestions]);
 
     const handleBlur = useCallback(() => {
       window.setTimeout(() => setShowSuggestions(false), 150);
@@ -276,7 +279,7 @@ export const GamevalIdSearch = forwardRef<HTMLInputElement, GamevalIdSearchProps
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        {mode === "gameval" && showSuggestions && (
+        {mode === "gameval" && showSuggestions && !disableSuggestions && (
           <Command
             ref={suggestionsRef}
             className="absolute top-full z-50 mt-1 w-full h-auto max-h-56 overflow-hidden border bg-popover text-popover-foreground shadow-md"

@@ -253,6 +253,29 @@ export function PaginatedTable({
   const prevCacheTypeRef = useRef<string>(selectedCacheType.id);
   const [isFetching, startTransition] = useTransition();
 
+  // Map endpoint to suggestion display setting
+  const disableSuggestions = useMemo(() => {
+    if (!settings.suggestionDisplay) {
+      return false; // Default to showing suggestions if not initialized
+    }
+    const endpointToSettingKey: Record<string, keyof typeof settings.suggestionDisplay> = {
+      'objects': 'objects',
+      'items': 'items',
+      'npcs': 'npcs',
+      'sprites': 'sprites',
+      'sequences': 'sequences',
+      'spotanims': 'spotanims',
+      'textures': 'textures',
+      'overlays': 'underlaysOverlays',
+      'underlays': 'underlaysOverlays',
+    };
+    const settingKey = endpointToSettingKey[endpoint];
+    if (settingKey) {
+      return !settings.suggestionDisplay[settingKey];
+    }
+    return false; // Default to showing suggestions if endpoint not found
+  }, [endpoint, settings.suggestionDisplay]);
+
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [gamevalInput, setGamevalInput] = useState('');
@@ -821,6 +844,7 @@ export function PaginatedTable({
               placeholder={placeholder}
               gamevalType={activeGamevalType}
               suggestionLimit={10}
+              disableSuggestions={disableSuggestions}
             />
           </div>
           {/* Filters */}

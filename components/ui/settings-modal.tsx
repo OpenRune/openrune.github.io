@@ -23,6 +23,17 @@ interface SettingsModalProps {
   onAllowMultipleCollapsiblesOpenChange: (value: boolean) => void;
   navItemSize: 'small' | 'medium' | 'large';
   onNavItemSizeChange: (value: 'small' | 'medium' | 'large') => void;
+  suggestionDisplay: {
+    objects: boolean;
+    items: boolean;
+    npcs: boolean;
+    sprites: boolean;
+    sequences: boolean;
+    spotanims: boolean;
+    textures: boolean;
+    underlaysOverlays: boolean;
+  };
+  onSuggestionDisplayChange: (table: string, value: boolean) => void;
 }
 
 const DEFAULT_THEMES = [
@@ -51,7 +62,9 @@ export default function SettingsModal({
   allowMultipleCollapsiblesOpen,
   onAllowMultipleCollapsiblesOpenChange,
   navItemSize,
-  onNavItemSizeChange
+  onNavItemSizeChange,
+  suggestionDisplay,
+  onSuggestionDisplayChange
 }: SettingsModalProps) {
   const { setTheme, resolvedTheme } = useTheme();
   const { activeTheme, setActiveTheme } = useThemeConfig();
@@ -85,8 +98,9 @@ export default function SettingsModal({
           </DialogTitle>
         </DialogHeader>
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4">
+          <TabsList className="grid w-full grid-cols-3 mb-4">
             <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="suggestion-display">Suggestion Display</TabsTrigger>
             <TabsTrigger value="themes">Themes</TabsTrigger>
           </TabsList>
           
@@ -183,6 +197,83 @@ export default function SettingsModal({
                 >
                   Large
                 </Button>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="suggestion-display" className="space-y-6 mt-4">
+            <div className="space-y-4">
+              <div>
+                <Label className="text-base font-semibold mb-3 block">Table Suggestions</Label>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Control whether suggestions are displayed when searching in each table page.
+                </p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="suggestions-objects">Objects</Label>
+                    <Switch
+                      id="suggestions-objects"
+                      checked={suggestionDisplay.objects}
+                      onCheckedChange={(value) => onSuggestionDisplayChange('objects', value)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="suggestions-items">Items</Label>
+                    <Switch
+                      id="suggestions-items"
+                      checked={suggestionDisplay.items}
+                      onCheckedChange={(value) => onSuggestionDisplayChange('items', value)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="suggestions-npcs">NPCs</Label>
+                    <Switch
+                      id="suggestions-npcs"
+                      checked={suggestionDisplay.npcs}
+                      onCheckedChange={(value) => onSuggestionDisplayChange('npcs', value)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="suggestions-sprites">Sprites</Label>
+                    <Switch
+                      id="suggestions-sprites"
+                      checked={suggestionDisplay.sprites}
+                      onCheckedChange={(value) => onSuggestionDisplayChange('sprites', value)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="suggestions-sequences">Sequences</Label>
+                    <Switch
+                      id="suggestions-sequences"
+                      checked={suggestionDisplay.sequences}
+                      onCheckedChange={(value) => onSuggestionDisplayChange('sequences', value)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="suggestions-spotanims">Spot Animations</Label>
+                    <Switch
+                      id="suggestions-spotanims"
+                      checked={suggestionDisplay.spotanims}
+                      onCheckedChange={(value) => onSuggestionDisplayChange('spotanims', value)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="suggestions-textures">Textures</Label>
+                    <Switch
+                      id="suggestions-textures"
+                      checked={suggestionDisplay.textures}
+                      onCheckedChange={(value) => onSuggestionDisplayChange('textures', value)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="suggestions-underlays-overlays">Underlays/Overlays</Label>
+                    <Switch
+                      id="suggestions-underlays-overlays"
+                      checked={suggestionDisplay.underlaysOverlays}
+                      onCheckedChange={(value) => onSuggestionDisplayChange('underlaysOverlays', value)}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </TabsContent>

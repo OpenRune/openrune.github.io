@@ -7,6 +7,16 @@ interface Settings {
   fullWidthContent: boolean;
   allowMultipleCollapsiblesOpen: boolean;
   navItemSize: 'small' | 'medium' | 'large';
+  suggestionDisplay: {
+    objects: boolean;
+    items: boolean;
+    npcs: boolean;
+    sprites: boolean;
+    sequences: boolean;
+    spotanims: boolean;
+    textures: boolean;
+    underlaysOverlays: boolean;
+  };
 }
 
 interface SettingsContextType {
@@ -22,6 +32,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     fullWidthContent: true,
     allowMultipleCollapsiblesOpen: true,
     navItemSize: 'medium',
+    suggestionDisplay: {
+      objects: true,
+      items: true,
+      npcs: true,
+      sprites: true,
+      sequences: true,
+      spotanims: true,
+      textures: true,
+      underlaysOverlays: true,
+    },
   });
 
   // Load settings from localStorage on mount
@@ -30,7 +50,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     if (savedSettings) {
       try {
         const parsed = JSON.parse(savedSettings);
-        setSettings(prev => ({ ...prev, ...parsed }));
+        // Merge with defaults, ensuring suggestionDisplay is properly initialized
+        setSettings(prev => ({
+          ...prev,
+          ...parsed,
+          suggestionDisplay: {
+            ...prev.suggestionDisplay,
+            ...(parsed.suggestionDisplay || {}),
+          },
+        }));
       } catch (error) {
         console.error('Failed to parse saved settings:', error);
       }
@@ -43,7 +71,20 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, [settings]);
 
   const updateSettings = (newSettings: Partial<Settings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
+    setSettings(prev => {
+      // Handle nested suggestionDisplay updates
+      if (newSettings.suggestionDisplay && prev.suggestionDisplay) {
+        return {
+          ...prev,
+          ...newSettings,
+          suggestionDisplay: {
+            ...prev.suggestionDisplay,
+            ...newSettings.suggestionDisplay,
+          },
+        };
+      }
+      return { ...prev, ...newSettings };
+    });
   };
 
   return (
