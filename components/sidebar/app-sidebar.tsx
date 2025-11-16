@@ -317,6 +317,24 @@ export function AppSidebar() {
                 onNavItemSizeChange={(value) => 
                     updateSettings({ navItemSize: value })
                 }
+                suggestionDisplay={settings.suggestionDisplay}
+                onSuggestionDisplayChange={(table, value) => 
+                    updateSettings({ 
+                        suggestionDisplay: { 
+                            ...(settings.suggestionDisplay || {
+                                objects: true,
+                                items: true,
+                                npcs: true,
+                                sprites: true,
+                                sequences: true,
+                                spotanims: true,
+                                textures: true,
+                                underlaysOverlays: true,
+                            }), 
+                            [table]: value 
+                        } 
+                    })
+                }
             />
             <CacheTypeModal
                 isOpen={cacheTypeModalOpen}
