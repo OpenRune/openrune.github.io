@@ -12,6 +12,7 @@ import { AreaSelection } from './AreaSelection';
 import { Position } from '@/lib/map/model/Position';
 import { CollectionControl } from '@/lib/map/controls/CollectionControl';
 import { QueryResultsPanel, QueryResultsFormat } from './QueryResultsModal';
+import { DraggableQueryResultsPanel } from './DraggableQueryResultsPanel';
 
 interface MapControlsProps {
   className?: string;
@@ -67,6 +68,7 @@ export function MapControls({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [importMode, setImportMode] = useState(false);
+  const [isPanelDocked, setIsPanelDocked] = useState(true);
 
   const handleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -89,7 +91,23 @@ export function MapControls({
 
   useEffect(() => {
     if (showQueryResults) {
-      setSettingsOpen(true);
+      // Load dock state from localStorage
+      if (typeof window !== 'undefined') {
+        try {
+          const saved = localStorage.getItem('query_results_panel_state');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            setIsPanelDocked(parsed.isDocked ?? true); // Default to docked
+          } else {
+            setIsPanelDocked(true); // Default to docked
+          }
+        } catch (error) {
+          console.error('Failed to load panel dock state:', error);
+          setIsPanelDocked(true); // Default to docked
+        }
+      } else {
+        setIsPanelDocked(true); // Default to docked
+      }
       setImportMode(false);
     }
   }, [showQueryResults]);
@@ -97,77 +115,71 @@ export function MapControls({
   if (combined) {
     // Combined layout for main map page
     return (
-      <div className={cn("absolute top-4 right-4 z-[1000]", className)}>
-        <Card className="p-2 relative">
-          <div className="flex items-center gap-2">
-            {/* Settings Button */}
-            <Button
-              variant="outline"
-              size="default"
+      <>
+        {/* Draggable Query Results Panel - Always render as floating window */}
+        {showQueryResults && (
+          <DraggableQueryResultsPanel
+            results={queryResults}
+            format={resultsFormat}
+            onFormatChange={onResultsFormatChange}
+            onResultClick={onResultClick}
+            variant={resultsSource === 'highlight' ? 'highlight' : 'display'}
+            onHighlightIndexChange={onHighlightIndexChange}
+            onMarkAll={onMarkAll}
+            onUnmarkAll={onUnmarkAll}
+            markAllActive={markAllActive}
+            onClosePanel={onCloseQueryResults}
+            forceDocked={isPanelDocked}
+            settingsPanelOpen={settingsOpen}
+            onUndock={() => {
+              setIsPanelDocked(false)
+            }}
+            onDock={() => {
+              setIsPanelDocked(true)
+            }}
+            getResultExtras={getResultExtras}
+          />
+        )}
+        <div className={cn("absolute top-4 right-4 z-[1000]", className)}>
+          <Card className="p-2 relative">
+            <div className="flex items-center gap-2">
+              {/* Settings Button */}
+              <Button
+                variant="outline"
+                size="default"
               onClick={() => {
-                if (showQueryResults) {
-                  setSettingsOpen(true)
-                  return
-                }
                 setSettingsOpen(!settingsOpen)
               }}
-              className={cn(
-                "h-9 px-3 border-border hover:bg-gray-800 text-white",
-                settingsOpen 
-                  ? "bg-gray-800" 
-                  : "bg-black"
-              )}
-              aria-pressed={settingsOpen}
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
-            </Button>
+                className={cn(
+                  "h-9 px-3 border-border hover:bg-gray-800 text-white",
+                  settingsOpen 
+                    ? "bg-gray-800" 
+                    : "bg-black"
+                )}
+                aria-pressed={settingsOpen}
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </Button>
 
-            {/* Fullscreen Button */}
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleFullscreen}
-              className="h-9 w-9 bg-black border-border hover:bg-gray-800 text-white"
-              aria-label="Toggle fullscreen"
-            >
-              <Maximize2 className="h-4 w-4" />
-            </Button>
-          </div>
+              {/* Fullscreen Button */}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleFullscreen}
+                className="h-9 w-9 bg-black border-border hover:bg-gray-800 text-white"
+                aria-label="Toggle fullscreen"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </Button>
+            </div>
 
-          {/* Settings Dropdown Card */}
-          {settingsOpen && (
-            <div className="absolute top-full right-0 mt-2 z-[1001]">
-              <Card className="w-80 h-[70vh] shadow-xl border animate-in fade-in-0 slide-in-from-top-2 duration-200 flex flex-col">
-                <CardContent className="px-4 pt-0 pb-4 flex-1 flex flex-col overflow-hidden">
-                  {showQueryResults ? (
-                    <div className="flex flex-col flex-1 overflow-hidden">
-                      <QueryResultsPanel
-                        results={queryResults}
-                        format={resultsFormat}
-                        onFormatChange={onResultsFormatChange}
-                        onResultClick={onResultClick}
-                        variant={resultsSource === 'highlight' ? 'highlight' : 'display'}
-                        onHighlightIndexChange={onHighlightIndexChange}
-                        onMarkAll={onMarkAll}
-                        onUnmarkAll={onUnmarkAll}
-                        markAllActive={markAllActive}
-                        onClosePanel={onCloseQueryResults}
-                        getResultExtras={getResultExtras}
-                      />
-                      <div className="pt-3">
-                        <Button
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => {
-                            onCloseQueryResults?.();
-                          }}
-                        >
-                          Return to Settings
-                        </Button>
-                      </div>
-                    </div>
-                  ) : importMode ? (
+            {/* Settings Dropdown Card */}
+            {settingsOpen && (
+              <div className="absolute top-full right-0 mt-2 z-[1001]">
+                <Card className="w-80 h-[70vh] shadow-xl border animate-in fade-in-0 slide-in-from-top-2 duration-200 flex flex-col">
+                  <CardContent className="px-4 pt-0 pb-4 flex-1 flex flex-col overflow-hidden">
+                    {importMode ? (
                     <Tabs defaultValue="normal" className="flex flex-col flex-1 overflow-hidden" key="import-tabs">
                       <TabsList className="grid w-full grid-cols-2 mb-4">
                         <TabsTrigger value="normal">Normal</TabsTrigger>
@@ -260,12 +272,40 @@ export function MapControls({
           )}
         </Card>
       </div>
+      </>
     );
   }
 
   // Separate layout for other pages
   return (
     <>
+      {/* Draggable Query Results Panel - Always render, shows as floating when undocked */}
+      {showQueryResults && (
+        <DraggableQueryResultsPanel
+          results={queryResults}
+          format={resultsFormat}
+          onFormatChange={onResultsFormatChange}
+          onResultClick={onResultClick}
+          variant={resultsSource === 'highlight' ? 'highlight' : 'display'}
+          onHighlightIndexChange={onHighlightIndexChange}
+          onMarkAll={onMarkAll}
+          onUnmarkAll={onUnmarkAll}
+          markAllActive={markAllActive}
+          onClosePanel={onCloseQueryResults}
+          forceDocked={isPanelDocked}
+          onUndock={() => {
+            // Close settings panel when undocking
+            setIsPanelDocked(false)
+            setSettingsOpen(false)
+          }}
+          onDock={() => {
+            // Open settings panel when docking
+            setIsPanelDocked(true)
+            setSettingsOpen(true)
+          }}
+          getResultExtras={getResultExtras}
+        />
+      )}
       {/* Fullscreen Button - Always visible */}
       <div className={cn("absolute top-4 right-4 z-[1000]", className)}>
         <Card className="p-2">
@@ -288,13 +328,9 @@ export function MapControls({
           <Button
             variant="outline"
             size="default"
-            onClick={() => {
-              if (showQueryResults) {
-                setSettingsOpen(true)
-                return
-              }
-              setSettingsOpen(!settingsOpen)
-            }}
+              onClick={() => {
+                setSettingsOpen(!settingsOpen)
+              }}
             className={cn(
               "h-9 px-3 border-border hover:bg-gray-800 text-white",
               settingsOpen 
@@ -310,11 +346,11 @@ export function MapControls({
           {/* Settings Dropdown Card */}
           {settingsOpen && (
             <div className="absolute top-full right-0 mt-2 z-[1001]">
-              <Card className="w-80 h-[70vh] shadow-xl border animate-in fade-in-0 slide-in-from-top-2 duration-200 flex flex-col">
+              <Card className={cn("h-[70vh] shadow-xl border animate-in fade-in-0 slide-in-from-top-2 duration-200 flex flex-col", showQueryResults && isPanelDocked ? "w-[500px]" : "w-80")}>
                 <CardContent className="px-4 pt-0 pb-4 flex-1 flex flex-col overflow-hidden">
-                  {showQueryResults ? (
+                  {showQueryResults && isPanelDocked ? (
                     <div className="flex flex-col flex-1 overflow-hidden">
-                      <QueryResultsPanel
+                      <DraggableQueryResultsPanel
                         results={queryResults}
                         format={resultsFormat}
                         onFormatChange={onResultsFormatChange}
@@ -325,19 +361,18 @@ export function MapControls({
                         onUnmarkAll={onUnmarkAll}
                         markAllActive={markAllActive}
                         onClosePanel={onCloseQueryResults}
+                        onUndock={() => {
+                          // Close settings panel when undocking
+                          setIsPanelDocked(false)
+                          setSettingsOpen(false)
+                        }}
+                        onDock={() => {
+                          // Open settings panel when docking
+                          setIsPanelDocked(true)
+                          setSettingsOpen(true)
+                        }}
                         getResultExtras={getResultExtras}
                       />
-                      <div className="pt-3">
-                        <Button
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => {
-                            onCloseQueryResults?.();
-                          }}
-                        >
-                          Return to Settings
-                        </Button>
-                      </div>
                     </div>
                   ) : importMode ? (
                     <Tabs defaultValue="normal" className="flex flex-col flex-1 overflow-hidden" key="import-tabs">

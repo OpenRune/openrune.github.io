@@ -17,7 +17,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { IconAdjustmentsHorizontal, IconArrowsSort, IconMessageCircle2, IconUser } from "@tabler/icons-react";
+import { IconAdjustmentsHorizontal, IconArrowsSort, IconMessageCircle2, IconUser, IconX } from "@tabler/icons-react";
 import { GamevalIdSearch } from "@/components/search/GamevalIdSearch";
 import { GamevalType } from "@/lib/gamevals/types";
 import { cn } from "@/lib/utils";
@@ -75,9 +75,22 @@ export const DialogueNodeBase = memo(function DialogueNodeBase({
       <div className="flex items-center justify-between gap-2 pb-2 text-sm font-semibold">
         <div className="flex items-center gap-2" style={{ color: accent }}>
           {isNpc ? <IconMessageCircle2 size={16} /> : <IconUser size={16} />}
-          <span>{isNpc ? data.npcLabel || "NPC" : "Player"}</span>
+          <span>{isNpc ? (data.npcId || data.title || data.npcGamevalName || "NPC") : (data.title || "Player")}</span>
         </div>
         <div className="flex items-center gap-1">
+          {data.groupId && data.onRemoveFromGroup && (
+            <button
+              type="button"
+              className="h-6 w-6 rounded-md border border-border text-muted-foreground transition hover:bg-destructive hover:text-destructive-foreground flex items-center justify-center"
+              title="Remove from group"
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onRemoveFromGroup?.();
+              }}
+            >
+              <IconX size={12} />
+            </button>
+          )}
           <button
             type="button"
             className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition hover:bg-muted"
@@ -121,7 +134,7 @@ export const DialogueNodeBase = memo(function DialogueNodeBase({
         </div>
       </div>
       <div className="mb-2 space-y-1 text-xs text-muted-foreground">
-        {data.expression && (
+        {data.expression && data.expression !== DIALOGUE_EXPRESSIONS.find((e) => e.label === 'HAPPY')?.value && (
           <p>
             Expression:{" "}
             {DIALOGUE_EXPRESSIONS.find((expr) => expr.value === data.expression)?.label ??
@@ -210,6 +223,18 @@ export const DialogueNodeBase = memo(function DialogueNodeBase({
               </ScrollArea>
             </div>
 
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase text-muted-foreground">
+                Title
+              </p>
+              <input
+                type="text"
+                value={data.title ?? ""}
+                onChange={(e) => data.onChange?.("title", e.target.value)}
+                className="w-full rounded-md border border-border bg-muted/30 px-3 py-1.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                placeholder={isNpc ? "NPC title (optional)" : "Player title (optional)"}
+              />
+            </div>
             {isNpc && (
               <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase text-muted-foreground">

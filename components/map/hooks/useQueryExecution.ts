@@ -193,8 +193,19 @@ export function useQueryExecution({
         let overlayTileLookup: TileLookup | null = null;
         let underlayTileLookup: TileLookup | null = null;
         
-        // Check if we have a region input
-        const regionInput = inputs.find(i => i.category === 'region');
+        // Check if we have region inputs (support multiple regions)
+        // Extract all region IDs from region input blocks (which now have regionIds array)
+        const regionInputs = inputs.filter(i => i.category === 'region');
+        const allRegionIds: number[] = [];
+        regionInputs.forEach(input => {
+          if (Array.isArray(input.data.regionIds)) {
+            input.data.regionIds.forEach((id: any) => {
+              if (typeof id === 'number' && !Number.isNaN(id)) {
+                allRegionIds.push(id);
+              }
+            });
+          }
+        });
         const overlayFilter = filters.find(f => f.category === 'overlay');
         const underlayFilter = filters.find(f => f.category === 'underlay');
         const objectTypeFilter = filters.find(f => f.category === 'object_type');
@@ -202,75 +213,106 @@ export function useQueryExecution({
         const orientationFilter = filters.find(f => f.category === 'orientation');
         const dynamicFilter = filters.find(f => f.category === 'dynamic');
         
-        // Always require a region input to query
-        if (!regionInput || regionInput.data.regionId === undefined) {
-            toast.error('Please add a "Select Region" block to query');
+        // Always require at least one region ID to query
+        if (allRegionIds.length === 0) {
+            toast.error('Please add at least one region ID to query');
             return;
         }
 
-        const regionId = regionInput.data.regionId;
-        const region = new Region(regionId);
-        const regionBasePos = region.toPosition();
-        const regionBaseX = regionBasePos.x;
-        const regionBaseY = regionBasePos.y;
+        // Cap at 5 regions maximum
+        if (allRegionIds.length > 5) {
+            toast.error('Maximum of 5 regions allowed. Please remove some regions.');
+            return;
+        }
 
-        // Query region data
-        try {
-            const response = await fetch(`/api/map/regions/${regionId}`);
-            if (!response.ok) {
-                toast.error(`Failed to query region: ${response.statusText}`);
-                return;
-            }
-            
-            regionData = await response.json();
-            overlayTileLookup = buildTileLookup(regionData.overlayIds, regionBaseX, regionBaseY);
-            underlayTileLookup = buildTileLookup(regionData.underlayIds, regionBaseX, regionBaseY);
-            
-            // Convert positions (Location objects) to query results
-            if (regionData.positions && Array.isArray(regionData.positions)) {
-                queryResults = regionData.positions
-                    .map((loc: any) => {
-                        const position = resolveLocationPosition(loc);
-                        if (!position) {
-                            return null;
-                        }
+        // Query all regions and combine results (each region gets its own API request)
+        const allRegionResults: any[] = [];
+        const allOverlayLookups: Map<string, TileLookup> = new Map();
+        const allUnderlayLookups: Map<string, TileLookup> = new Map();
+        
+        // Process each region with a separate API request
+        for (const regionId of allRegionIds) {
+            const region = new Region(regionId);
+            const regionBasePos = region.toPosition();
+            const regionBaseX = regionBasePos.x;
+            const regionBaseY = regionBasePos.y;
 
-                        const objectId = parseInteger(loc.id);
-                        const orientation = parseInteger(loc.orientation) ?? 0;
-                        const typeEnum = parseInteger(loc.type) ?? 0;
-
-                        if (objectId === null) {
-                            console.warn('Skipping location with invalid object id:', loc);
-                            return null;
-                        }
-
-                        return {
-                            x: position.x,
-                            y: position.y,
-                            z: position.z,
-                            objectId,
-                            orientation,
-                            type: typeEnum, // Object type enum (0-22)
-                            isDynamic: Boolean(loc.isDynamic),
-                        };
-                    })
-                    .filter((result: any) => result !== null);
+            // Query region data
+            try {
+                const response = await fetch(`/api/map/regions/${regionId}`);
+                if (!response.ok) {
+                    toast.error(`Failed to query region ${regionId}: ${response.statusText}`);
+                    continue;
+                }
                 
-                console.log('Query results parsed:', {
-                    total: queryResults.length,
-                    sample: queryResults.slice(0, 5),
-                    planes: [...new Set(queryResults.map(r => r.z))].sort(),
-                    overlayLookupTiles: overlayTileLookup?.size ?? 0,
-                    underlayLookupTiles: underlayTileLookup?.size ?? 0,
-                });
-            } else {
-                console.warn('Region data does not contain positions array:', regionData);
+                const currentRegionData = await response.json();
+                const currentOverlayLookup = buildTileLookup(currentRegionData.overlayIds, regionBaseX, regionBaseY);
+                const currentUnderlayLookup = buildTileLookup(currentRegionData.underlayIds, regionBaseX, regionBaseY);
+                
+                // Store lookups by region ID for later use (only if not null)
+                if (currentOverlayLookup) {
+                    allOverlayLookups.set(regionId.toString(), currentOverlayLookup);
+                }
+                if (currentUnderlayLookup) {
+                    allUnderlayLookups.set(regionId.toString(), currentUnderlayLookup);
+                }
+                
+                // Use first region's data for overlay/underlay filtering (or combine logic)
+                if (!regionData) {
+                    regionData = currentRegionData;
+                    overlayTileLookup = currentOverlayLookup;
+                    underlayTileLookup = currentUnderlayLookup;
+                }
+                
+                // Convert positions (Location objects) to query results
+                if (currentRegionData.positions && Array.isArray(currentRegionData.positions)) {
+                    const regionResults = currentRegionData.positions
+                        .map((loc: any) => {
+                            const position = resolveLocationPosition(loc);
+                            if (!position) {
+                                return null;
+                            }
+
+                            const objectId = parseInteger(loc.id);
+                            const orientation = parseInteger(loc.orientation) ?? 0;
+                            const typeEnum = parseInteger(loc.type) ?? 0;
+
+                            if (objectId === null) {
+                                console.warn('Skipping location with invalid object id:', loc);
+                                return null;
+                            }
+
+                            return {
+                                x: position.x,
+                                y: position.y,
+                                z: position.z,
+                                objectId,
+                                orientation,
+                                type: typeEnum, // Object type enum (0-22)
+                                isDynamic: Boolean(loc.isDynamic),
+                                regionId: regionId, // Track which region this came from
+                            };
+                        })
+                        .filter((result: any) => result !== null);
+                    
+                    allRegionResults.push(...regionResults);
+                }
+            } catch (error) {
+                console.error(`Error querying region ${regionId}:`, error);
+                toast.error(`Error querying region ${regionId}`);
             }
-        } catch (error) {
-            console.error('Error querying region:', error);
-            toast.error('Error querying region');
-            return;
         }
+        
+        // Combine all results
+        queryResults = allRegionResults;
+        
+        console.log('Query results parsed:', {
+            total: queryResults.length,
+            sample: queryResults.slice(0, 5),
+            planes: [...new Set(queryResults.map(r => r.z))].sort(),
+            overlayLookupTiles: overlayTileLookup?.size ?? 0,
+            underlayLookupTiles: underlayTileLookup?.size ?? 0,
+        });
 
         // Apply additional filters
         let filteredResults = queryResults;

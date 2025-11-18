@@ -7,20 +7,44 @@ export interface OptionEntry {
   title: string;
 }
 
+export type ActionType = 'remove_item' | 'add_item' | 'remove_equipment' | 'add_equipment';
+
+export interface DialogueAction {
+  id: string;
+  type: ActionType;
+  itemName: string; // Gameval name
+  amount: number;
+  containerType?: 'inventory' | 'equipment';
+}
+
+export interface ActionNodeData {
+  id: string;
+  actionType: ActionType;
+  itemName: string;
+  amount: number;
+  containerType: 'inventory' | 'equipment';
+  handleOrientation?: 'horizontal' | 'vertical';
+  onChange?: (key: 'actionType' | 'itemName' | 'amount' | 'containerType' | 'handleOrientation', value: any) => void;
+}
+
 export interface DialogueNodeData {
   id: string;
   speaker: DialogueSpeaker;
   text: string;
   expression?: string;
   npcId?: string;
-  npcLabel?: string;
+  title?: string; // Title for NPC nodes
+  npcGamevalName?: string; // NPC name from gameval (for display only, not saved to XML)
   options?: OptionEntry[];
+  actions?: DialogueAction[];
   handleOrientation?: 'horizontal' | 'vertical';
   order: number;
+  groupId?: string; // ID of the group this node belongs to
   onChange?: (
-    key: 'text' | 'speaker' | 'expression' | 'npcId' | 'handleOrientation' | 'options',
+    key: 'text' | 'speaker' | 'expression' | 'npcId' | 'title' | 'handleOrientation' | 'options' | 'actions' | 'groupId',
     value: any
   ) => void;
+  onRemoveFromGroup?: () => void; // Callback to remove node from its group
 }
 
 export interface NpcMetaNodeData {
@@ -29,6 +53,33 @@ export interface NpcMetaNodeData {
   onGamevalModeChange?: (mode: string) => void;
   onGamevalValueChange?: (value: string, mode: string) => void;
   onSuggestionSelect?: (suggestion: GamevalSuggestion, mode: string) => void;
+}
+
+export interface GroupNodeData {
+  id: string;
+  groupName: string;
+  childNodeIds: string[];
+  actions?: DialogueAction[];
+  handleOrientation?: 'horizontal' | 'vertical';
+  onChange?: (key: 'groupName' | 'childNodeIds' | 'handleOrientation' | 'actions', value: any) => void;
+  onAddChild?: (nodeId: string) => void;
+  onRemoveChild?: (nodeId: string) => void;
+  getAllNodes?: () => Array<{ id: string; type: string; label?: string }>;
+}
+
+export interface ContainerItem {
+  id: string;
+  itemName: string; // Gameval name
+  amount: number;
+}
+
+export interface ContainerNodeData {
+  id: string;
+  containerType: 'inventory' | 'equipment';
+  items: ContainerItem[]; // Items to check for
+  actions?: DialogueAction[];
+  handleOrientation?: 'horizontal' | 'vertical';
+  onChange?: (key: 'containerType' | 'items' | 'handleOrientation' | 'actions', value: any) => void;
 }
 
 export const DIALOGUE_EXPRESSIONS = [

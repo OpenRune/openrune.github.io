@@ -6,15 +6,28 @@
   <component name="ChangeListManager">
     <list default="true" id="51982a52-4621-4b78-827a-2c8ff91c7405" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/sequences/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/sequences/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/spotanims/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/spotanims/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/alter/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/alter/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/globals.css" beforeDir="false" afterPath="$PROJECT_DIR$/app/globals.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/alter/nodes/DialogueNodeBase.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/alter/nodes/DialogueNodeBase.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/alter/nodes/NpcDialogueNode.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/alter/nodes/NpcDialogueNode.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/alter/nodes/NpcMetaNode.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/alter/nodes/NpcMetaNode.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/alter/nodes/OptionNode.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/alter/nodes/OptionNode.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/alter/nodes/PlayerDialogueNode.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/alter/nodes/PlayerDialogueNode.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/alter/nodes/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/alter/nodes/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/alter/nodes/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/alter/nodes/types.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/layout/settings-provider.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/layout/settings-provider.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/importParsers.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection/importParsers.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/MapControls.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/MapControls.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/NodeEditor.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/NodeEditor.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/OSRSMap.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/OSRSMap.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/QueryResultsModal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/QueryResultsModal.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/hooks/useQueryExecution.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/hooks/useQueryExecution.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/search/GamevalIdSearch.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/search/GamevalIdSearch.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/sidebar/app-sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/sidebar/app-sidebar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ui/context-menu.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/context-menu.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/ui/paginated-table.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/paginated-table.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/ui/settings-modal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/settings-modal.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/gamevals/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/gamevals/index.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/gamevals/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/gamevals/types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -33,36 +46,36 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "JavaScript Debug.Next.js: debug client-side.executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1": "true",
-    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "live",
-    "ignore.virus.scanning.warn.message": "true",
-    "js.debugger.nextJs.config.created.client": "true",
-    "js.debugger.nextJs.config.created.server": "true",
-    "junie.onboarding.icon.badge.shown": "true",
-    "last_opened_file_path": "D:/openrune.github.io/app/spotanims",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "npm.Next.js: server-side.executor": "Run",
-    "npm.build.executor": "Run",
-    "npm.lint.executor": "Run",
-    "npm.start.executor": "Run",
-    "settings.editor.selected.configurable": "settings.nodejs",
-    "to.speed.mode.migration.done": "true",
-    "ts.external.directory.path": "D:\\openrune.github.io\\node_modules\\typescript\\lib",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;JavaScript Debug.Next.js: debug client-side.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1&quot;: &quot;true&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;dia&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;js.debugger.nextJs.config.created.client&quot;: &quot;true&quot;,
+    &quot;js.debugger.nextJs.config.created.server&quot;: &quot;true&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/openrune.github.io/app/spotanims&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;npm.Next.js: server-side.executor&quot;: &quot;Run&quot;,
+    &quot;npm.build.executor&quot;: &quot;Run&quot;,
+    &quot;npm.lint.executor&quot;: &quot;Run&quot;,
+    &quot;npm.start.executor&quot;: &quot;Run&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;settings.nodejs&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;D:\\openrune.github.io\\node_modules\\typescript\\lib&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\openrune.github.io\app\spotanims" />
@@ -77,7 +90,7 @@
       <recent name="D:\openrune.github.io\components\map" />
     </key>
   </component>
-  <component name="RunManager" selected="npm.Next.js: server-side">
+  <component name="RunManager" selected="npm.build">
     <configuration name="Next.js: debug client-side" type="JavascriptDebugType" uri="http://localhost:3000/">
       <method v="2" />
     </configuration>
@@ -148,6 +161,8 @@
       <workItem from="1762549110332" duration="21194000" />
       <workItem from="1762705629251" duration="22000" />
       <workItem from="1762756118101" duration="12688000" />
+      <workItem from="1763494306134" duration="121000" />
+      <workItem from="1763495802435" duration="2550000" />
     </task>
     <servers />
   </component>

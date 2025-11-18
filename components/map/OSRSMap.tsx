@@ -86,7 +86,24 @@ const OSRSMap: React.FC<OSRSMapProps> = ({ initialObjectId, compact = false }) =
     const [currentObjectIndex, setCurrentObjectIndex] = useState<number>(-1);
     const [objectSearchQuery, setObjectSearchQuery] = useState<string>('');
     const [queryResults, setQueryResults] = useState<any[]>([]);
-    const [resultsFormat, setResultsFormat] = useState<'table' | 'json' | 'list'>('table');
+    // Load saved format from localStorage
+    const loadSavedFormat = (): 'table' | 'json' | 'list' => {
+        if (typeof window === 'undefined') return 'table'
+        try {
+            const saved = localStorage.getItem('query_results_panel_state')
+            if (saved) {
+                const parsed = JSON.parse(saved)
+                if (parsed.format && ['table', 'json', 'list'].includes(parsed.format)) {
+                    return parsed.format
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load saved format:', error)
+        }
+        return 'table'
+    }
+
+    const [resultsFormat, setResultsFormat] = useState<'table' | 'json' | 'list'>(loadSavedFormat());
     const [showResultsInSettings, setShowResultsInSettings] = useState<boolean>(false);
     const [resultsSource, setResultsSource] = useState<'display' | 'highlight' | null>(null);
     const [highlightSelectionIndex, setHighlightSelectionIndex] = useState<number>(0);
@@ -321,13 +338,6 @@ const OSRSMap: React.FC<OSRSMapProps> = ({ initialObjectId, compact = false }) =
             setBlockEditorOpen(true);
         }
     }, [showResultsInSettings, resultsSource, setBlockEditorOpen]);
-
-    useEffect(() => {
-        if (!isBlockEditorOpen && resultsSource !== 'highlight') {
-            setShowResultsInSettings(false);
-            setResultsSource(null);
-        }
-    }, [isBlockEditorOpen, resultsSource]);
 
     // Initialize controls when map is ready
     const handleMapReady = useCallback((map: BaseMapInstance) => {

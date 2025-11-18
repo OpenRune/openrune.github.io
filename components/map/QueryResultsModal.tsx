@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import {
     Card,
     CardContent,
@@ -56,7 +56,7 @@ const OBJECT_TYPES: Record<number, string> = {
 export type QueryResultsFormat = "table" | "json" | "list"
 export type QueryResultsVariant = "display" | "highlight"
 
-interface QueryResultsPanelProps {
+export interface QueryResultsPanelProps {
     results: any[]
     format: QueryResultsFormat
     onFormatChange?: (format: QueryResultsFormat) => void
@@ -68,6 +68,7 @@ interface QueryResultsPanelProps {
     onClosePanel?: () => void
     markAllActive?: boolean
     getResultExtras?: (result: any) => { name?: string; imageUrl?: string } | null
+    hideTitle?: boolean
 }
 
 export function QueryResultsPanel({
@@ -82,12 +83,40 @@ export function QueryResultsPanel({
     onClosePanel,
     markAllActive = false,
     getResultExtras,
+    hideTitle = false,
 }: QueryResultsPanelProps) {
     const [currentIndex, setCurrentIndex] = useState(0)
+    const scrollAreaRef = useRef<HTMLDivElement>(null)
+    const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
 
     useEffect(() => {
         setCurrentIndex(0)
     }, [results])
+
+    // Scroll to active item when currentIndex changes
+    useEffect(() => {
+        if (variant === 'highlight' && itemRefs.current[currentIndex]) {
+            const itemElement = itemRefs.current[currentIndex]
+            if (itemElement && scrollAreaRef.current) {
+                const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
+                if (scrollContainer) {
+                    const containerRect = scrollContainer.getBoundingClientRect()
+                    const itemRect = itemElement.getBoundingClientRect()
+                    const scrollTop = scrollContainer.scrollTop
+                    const itemTop = itemRect.top - containerRect.top + scrollTop
+                    const itemBottom = itemTop + itemRect.height
+                    const containerHeight = scrollContainer.clientHeight
+                    
+                    // Scroll if item is not fully visible
+                    if (itemTop < scrollTop) {
+                        scrollContainer.scrollTo({ top: itemTop - 8, behavior: 'smooth' })
+                    } else if (itemBottom > scrollTop + containerHeight) {
+                        scrollContainer.scrollTo({ top: itemBottom - containerHeight + 8, behavior: 'smooth' })
+                    }
+                }
+            }
+        }
+    }, [currentIndex, variant])
 
     const handleFormatChange = (value: string) => {
         if (!onFormatChange) return
@@ -138,10 +167,10 @@ export function QueryResultsPanel({
                             <span className="font-mono">X: {result.x}</span>
                             <span className="font-mono">Y: {result.y}</span>
                             <span className="font-mono">Z: {result.z}</span>
-                            <span className="font-mono">ID: {result.objectId}</span>
-                            {resolveName(result) && (
-                                <span className="font-mono">Gameval: {resolveName(result)}</span>
-                            )}
+                            <span className="font-mono">
+                                ID: {result.objectId}
+                                {resolveName(result) && ` (${resolveName(result)})`}
+                            </span>
                             <span>Type: {typeName}</span>
                             {result.orientation !== undefined && (
                                 <span className="font-mono">Orientation: {result.orientation}</span>
@@ -185,7 +214,9 @@ export function QueryResultsPanel({
                                     <TableCell className="font-mono">{result.x}</TableCell>
                                     <TableCell className="font-mono">{result.y}</TableCell>
                                     <TableCell className="font-mono">{result.z}</TableCell>
-                                    <TableCell className="font-mono">{result.objectId}</TableCell>
+                                <TableCell className="font-mono">
+                                    {result.objectId}
+                                </TableCell>
                                     <TableCell className="font-mono">
                                         {resolveName(result) ?? "—"}
                                     </TableCell>
@@ -236,6 +267,9 @@ export function QueryResultsPanel({
                     return (
                         <button
                             key={index}
+                            ref={(el) => {
+                                itemRefs.current[index] = el
+                            }}
                             onClick={() => selectHighlightIndex(index)}
                             className={cn(
                                 "w-full rounded-md border px-3 py-2 text-left text-sm transition-colors",
@@ -253,12 +287,10 @@ export function QueryResultsPanel({
                                 />
                                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs max-w-full overflow-hidden">
                                     <span className="font-mono">#{index + 1}</span>
-                                    <span className="font-mono">ID: {result.objectId}</span>
-                                    {(extras?.name || result.gamevalName) && (
-                                        <span className="font-mono truncate max-w-[12rem]">
-                                            {extras?.name ?? result.gamevalName}
-                                        </span>
-                                    )}
+                                    <span className="font-mono">
+                                        ID: {result.objectId}
+                                        {resolveName(result) && ` (${resolveName(result)})`}
+                                    </span>
                                     <span className="font-mono">({result.x}, {result.y}, {result.z})</span>
                                 </div>
                             </div>
@@ -321,14 +353,6 @@ export function QueryResultsPanel({
             </Button>
 
 
-            <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={onClosePanel}
-            >
-                Back to Settings
-            </Button>
         </div>
     )
 
@@ -358,13 +382,14 @@ export function QueryResultsPanel({
 
     return (
         <div className="flex flex-col h-full gap-3" data-query-results-panel>
-            <div className="flex flex-col gap-2">
-                <div className="flex flex-col gap-1">
-                    <h3 className="text-base font-semibold">Query Results ({results.length})</h3>
-                    <p className="text-xs text-muted-foreground">
-                        Click any row to focus the object on the map.
-                    </p>
-                </div>
+            {!hideTitle && (
+                <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-1">
+                        <h3 className="text-base font-semibold">Query Results ({results.length})</h3>
+                        <p className="text-xs text-muted-foreground">
+                            Click any row to focus the object on the map.
+                        </p>
+                    </div>
                 {variant === "display" && (
                     <>
                         <div className="flex items-center justify-between gap-2">
@@ -383,21 +408,24 @@ export function QueryResultsPanel({
                         <Separator />
                     </>
                 )}
-                {variant === 'highlight' && results[currentIndex] && (() => {
-                    const extras = getResultExtras?.(results[currentIndex]);
-                    if (!extras) return null;
+                {variant === 'highlight' && results.length > 0 && currentIndex >= 0 && results[currentIndex] && (() => {
                     const result = results[currentIndex];
+                    const extras = getResultExtras?.(result);
+                    const objectName = extras?.name ?? resolveName(result) ?? `Object ${result.objectId}`;
+                    const imageUrl = extras?.imageUrl ?? (result.objectId !== undefined 
+                        ? `https://chisel.weirdgloop.org/static/img/osrs-object/${result.objectId}_orient${result.orientation ?? 1}.png`
+                        : undefined);
                     return (
                         <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground">
                             <span className="text-sm font-semibold text-foreground">
-                                {extras.name ?? `Object ${result.objectId}`}
+                                {objectName}
                             </span>
-                            {extras.imageUrl && (
+                            {imageUrl && (
                                 <div className="mt-1 flex justify-center">
                                     <img
-                                        src={extras.imageUrl}
-                                        alt={extras.name ?? `Object ${result.objectId}`}
-                                        className="max-h-28 max-w-full object-contain"
+                                        src={imageUrl}
+                                        alt={objectName}
+                                        className="max-h-32 max-w-full object-contain border rounded"
                                         onError={(event) => {
                                             (event.target as HTMLImageElement).style.display = 'none'
                                         }}
@@ -407,9 +435,10 @@ export function QueryResultsPanel({
                         </div>
                     )
                 })()}
-            </div>
+                </div>
+            )}
             <div className="flex-1 min-h-0">
-                <ScrollArea className="h-full">
+                <ScrollArea ref={scrollAreaRef} className="h-full">
                     <div className="pr-2 pb-2">
                         {renderContent()}
                     </div>
@@ -424,4 +453,5 @@ export function QueryResultsPanel({
         </div>
     )
 }
+
 

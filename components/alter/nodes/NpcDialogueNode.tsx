@@ -11,3 +11,4 @@ export const NpcDialogueNode = memo(function NpcDialogueNode(
   return <DialogueNodeBase {...props} variant="npc" />;
 });
 
+

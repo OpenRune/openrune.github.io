@@ -17,7 +17,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { IconAdjustmentsHorizontal, IconArrowsSort, IconListDetails } from "@tabler/icons-react";
+import { IconAdjustmentsHorizontal, IconArrowsSort, IconListDetails, IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { DialogueNodeData, HANDLE_SIZE_STYLE, OptionEntry } from "./types";
 
@@ -56,6 +56,19 @@ export const OptionNode = memo(function OptionNode({ data, selected }: NodeProps
           <span>{data.text?.trim() || "Options"}</span>
         </div>
         <div className="flex items-center gap-1">
+          {data.groupId && data.onRemoveFromGroup && (
+            <button
+              type="button"
+              className="h-6 w-6 rounded-md border border-border text-muted-foreground transition hover:bg-destructive hover:text-destructive-foreground flex items-center justify-center"
+              title="Remove from group"
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onRemoveFromGroup?.();
+              }}
+            >
+              <IconX size={12} />
+            </button>
+          )}
           <button
             type="button"
             className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition hover:bg-muted"
