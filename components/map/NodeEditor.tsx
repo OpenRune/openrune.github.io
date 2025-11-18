@@ -63,7 +63,7 @@ export interface InputBlock extends Block {
   type: 'input';
   category: 'region';
   data: {
-    regionId?: number;
+    regionIds?: number[]; // Changed to array to support multiple regions
   };
 }
 
@@ -442,7 +442,7 @@ const InputNode = memo(function InputNode({ data, selected }: { data: any; selec
   return (
     <div
       className={cn(
-        "px-3.5 py-2.5 shadow-md rounded-lg border-2 min-w-[180px] bg-background border-solid",
+        "px-3.5 py-2.5 shadow-md rounded-lg border-2 min-w-[180px] bg-background border-solid relative",
         selected && "ring-2 ring-primary ring-offset-1"
       )}
       style={{ borderColor: color, backgroundColor: 'var(--background)' }}
@@ -455,20 +455,66 @@ const InputNode = memo(function InputNode({ data, selected }: { data: any; selec
       </div>
       <div className="space-y-2">
         {data.category === 'region' && (
-          <div>
-            <label className="text-xs text-muted-foreground">Region ID</label>
-            <Input
-              type="number"
-              placeholder="Enter region ID"
-              value={data.regionId || ''}
-              onChange={(e) => data.onChange?.('regionId', parseInt(e.target.value) || undefined)}
-              className="h-8 mt-1 text-sm"
-              style={{ color: 'white' }}
-            />
+          <div className="space-y-2">
+            <label className="text-xs text-muted-foreground">Region IDs</label>
+            <div className="space-y-2">
+              {(data.regionIds || [undefined]).map((regionId: number | undefined, index: number) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Enter region ID"
+                    value={regionId || ''}
+                    onChange={(e) => {
+                      const newRegionIds = [...(data.regionIds || [undefined])];
+                      const value = parseInt(e.target.value);
+                      newRegionIds[index] = isNaN(value) ? undefined : value;
+                      // Filter out undefined values but keep at least one empty slot
+                      const filtered = newRegionIds.filter((id): id is number => id !== undefined);
+                      data.onChange?.('regionIds', filtered.length > 0 ? filtered : [undefined]);
+                    }}
+                    className="h-8 flex-1 text-sm"
+                    style={{ color: 'white' }}
+                  />
+                  {(data.regionIds || [undefined]).length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        const newRegionIds = [...(data.regionIds || [undefined])];
+                        newRegionIds.splice(index, 1);
+                        // Ensure at least one empty slot remains
+                        data.onChange?.('regionIds', newRegionIds.length > 0 ? newRegionIds : [undefined]);
+                      }}
+                      className="h-8 w-8 flex-shrink-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const currentIds = data.regionIds || [undefined];
+                  if (currentIds.length < 5) {
+                    const newRegionIds = [...currentIds, undefined];
+                    data.onChange?.('regionIds', newRegionIds);
+                  }
+                }}
+                disabled={(data.regionIds || [undefined]).length >= 5}
+                className="w-full h-7 text-xs"
+                style={{ color: 'white' }}
+              >
+                + Add Region {(data.regionIds || [undefined]).length >= 5 && '(Max 5)'}
+              </Button>
+            </div>
           </div>
         )}
       </div>
-      <Handle type="source" position={Position.Right} className="!bg-green-500 !w-3.5 !h-3.5" />
+      <Handle type="source" position={Position.Right} className="!bg-green-500 !w-3.5 !h-3.5 !right-[-7px] !top-1/2 !-translate-y-1/2" />
     </div>
   );
 });
@@ -529,20 +575,34 @@ const nodeTypes: NodeTypes = {
   output: OutputNode,
 };
 
+const STORAGE_KEY_AUTOSAVES = 'block_editor_autosaves'
+
+interface BlockAutosave {
+  timestamp: number
+  data: string // JSON stringified nodes and edges
+  sessionId: string
+}
+
 function NodeEditorInner({ open, onOpenChange, onExecute, mapInstance }: NodeEditorProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [autosaves, setAutosaves] = useState<BlockAutosave[]>([]);
+  const [autosaveCountdown, setAutosaveCountdown] = useState(60);
+  const sessionIdRef = useRef<string>(`session_${Date.now()}`);
+  const lastAutosaveDataRef = useRef<string>('');
+  const initializedRef = useRef<boolean>(false);
 
-  const regionInputNode = useMemo(
-    () => nodes.find((n) => n.type === 'input' && n.data.category === 'region'),
+  const regionInputNodes = useMemo(
+    () => nodes.filter((n) => n.type === 'input' && n.data.category === 'region'),
     [nodes]
   );
   const outputNodes = useMemo(() => nodes.filter((n) => n.type === 'output'), [nodes]);
 
   const reachableFromRegion = useMemo(() => {
-    if (!regionInputNode) {
+    if (regionInputNodes.length === 0) {
       return new Set<string>();
     }
 
@@ -555,7 +615,7 @@ function NodeEditorInner({ open, onOpenChange, onExecute, mapInstance }: NodeEdi
     });
 
     const visited = new Set<string>();
-    const queue: string[] = [regionInputNode.id];
+    const queue: string[] = regionInputNodes.map(n => n.id);
 
     while (queue.length > 0) {
       const current = queue.shift()!;
@@ -572,28 +632,31 @@ function NodeEditorInner({ open, onOpenChange, onExecute, mapInstance }: NodeEdi
     }
 
     return visited;
-  }, [regionInputNode, edges]);
+  }, [regionInputNodes, edges]);
 
   const hasOutputNode = outputNodes.length > 0;
   const hasValidConnection = useMemo(() => {
-    if (!regionInputNode || outputNodes.length === 0) {
+    if (regionInputNodes.length === 0 || outputNodes.length === 0) {
       return false;
     }
     return outputNodes.some((node) => reachableFromRegion.has(node.id));
-  }, [regionInputNode, outputNodes, reachableFromRegion]);
+  }, [regionInputNodes, outputNodes, reachableFromRegion]);
 
   // Initialize with a region input node when editor opens
   useEffect(() => {
     if (open) {
+      if (!initializedRef.current) {
+        initializedRef.current = true;
+      }
       const nodeId = `input_region_${Date.now()}`;
       const initialNode: ReactFlowNode = {
         id: nodeId,
         type: 'input',
         position: { x: 250, y: 200 },
-        deletable: false, // Region input node cannot be deleted
+        deletable: false, // Region input node cannot be deleted (must have at least one)
         data: {
           category: 'region',
-          regionId: undefined,
+          regionIds: [undefined],
           onChange: (key: string, value: any) => {
             setNodes((nds) =>
               nds.map((node) => {
@@ -612,6 +675,7 @@ function NodeEditorInner({ open, onOpenChange, onExecute, mapInstance }: NodeEdi
       setNodes([initialNode]);
       setEdges([]);
       setSelectedNode(null);
+      lastAutosaveDataRef.current = ''; // Reset autosave ref
     } else {
       setNodes([]);
       setEdges([]);
@@ -628,15 +692,8 @@ function NodeEditorInner({ open, onOpenChange, onExecute, mapInstance }: NodeEdi
 
   // Add node from palette
   const addNode = useCallback(
-    (type: BlockType, category: string) => {
+    (type: BlockType, category: string, position?: { x: number; y: number }) => {
       setNodes((nds) => {
-        if (type === 'input' && category === 'region') {
-          const hasRegionNode = nds.some((n) => n.type === 'input' && n.data.category === 'region');
-          if (hasRegionNode) {
-            return nds;
-          }
-        }
-
         const nodeDef = NODE_CATEGORIES[type]?.find((c) => c.id === category);
         if (!nodeDef) return nds;
 
@@ -644,7 +701,7 @@ function NodeEditorInner({ open, onOpenChange, onExecute, mapInstance }: NodeEdi
         const newNode: ReactFlowNode = {
           id: nodeId,
           type,
-          position: { x: Math.random() * 600 + 300, y: Math.random() * 600 + 200 },
+          position: position || { x: Math.random() * 600 + 300, y: Math.random() * 600 + 200 },
           data: {
             category,
             mode: 'include',
@@ -656,7 +713,9 @@ function NodeEditorInner({ open, onOpenChange, onExecute, mapInstance }: NodeEdi
             ...(category === 'dynamic' && { dynamicState: 'dynamic' }),
             ...(category === 'overlay' && { overlayId: undefined }),
             ...(category === 'underlay' && { underlayId: undefined }),
-            ...(category === 'region' && { regionId: undefined }),
+            ...(category === 'region' && { 
+              regionIds: [undefined],
+            }),
             ...(category === 'display' && { format: 'list' }),
             onChange: (key: string, value: any) => {
               setNodes((inner) =>
@@ -693,11 +752,183 @@ function NodeEditorInner({ open, onOpenChange, onExecute, mapInstance }: NodeEdi
     });
   }, [nodes]);
 
-  // Execute query
-  const hasRegionId =
-    !!regionInputNode &&
-    typeof regionInputNode.data.regionId === 'number' &&
-    !Number.isNaN(regionInputNode.data.regionId);
+  // Serialize nodes and edges to JSON string
+  const serializeBlockState = useCallback((): string => {
+    const state = {
+      nodes: nodes.map((node) => {
+        const { onChange: _onChange, ...restData } = node.data;
+        return {
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          data: { ...restData },
+        };
+      }),
+      edges: edges,
+    };
+    return JSON.stringify(state);
+  }, [nodes, edges]);
+
+  // Load autosaves from localStorage on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_AUTOSAVES);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Filter out autosaves from the current session (to avoid duplicates)
+        const filtered = parsed.filter((a: BlockAutosave) => a.sessionId !== sessionIdRef.current);
+        setAutosaves(filtered);
+      }
+    } catch (error) {
+      console.error('Failed to load auto-saves:', error);
+    }
+  }, []);
+
+  // Countdown timer for auto-save
+  useEffect(() => {
+    if (!open || !initializedRef.current) return;
+    
+    const countdownInterval = setInterval(() => {
+      setAutosaveCountdown((prev) => {
+        if (prev <= 1) {
+          return 60; // Reset to 60 seconds when it reaches 0
+        }
+        return prev - 1;
+      });
+    }, 1000); // Update every second
+
+    return () => clearInterval(countdownInterval);
+  }, [open, nodes.length, edges.length]);
+
+  // Auto-save to localStorage every minute
+  useEffect(() => {
+    if (!open || !initializedRef.current) return;
+    
+    const autoSaveInterval = setInterval(() => {
+      try {
+        // Never save if there's only the region input node with no regionIds
+        const regionNode = nodes.find((n) => n.type === 'input' && n.data.category === 'region');
+        const hasValidRegionIds = regionNode && Array.isArray(regionNode.data.regionIds) && 
+          regionNode.data.regionIds.some((id: any) => typeof id === 'number' && !Number.isNaN(id));
+        const hasValidNodes = nodes.length > 1 || hasValidRegionIds;
+        
+        if (!hasValidNodes) {
+          // Reset countdown but don't save
+          setAutosaveCountdown(60);
+          return;
+        }
+        
+        const dataString = serializeBlockState();
+        
+        // Check if data has changed from last auto-save
+        const hasChanged = dataString !== lastAutosaveDataRef.current;
+        
+        // Only auto-save if something has changed
+        if (!hasChanged) {
+          // Reset countdown but don't save
+          setAutosaveCountdown(60);
+          return;
+        }
+        
+        setAutosaveStatus('saving');
+        if (typeof window !== 'undefined' && dataString) {
+          const timestamp = Date.now();
+          const newAutosave: BlockAutosave = { timestamp, data: dataString, sessionId: sessionIdRef.current };
+          
+          // Get existing autosaves from localStorage
+          const saved = localStorage.getItem(STORAGE_KEY_AUTOSAVES);
+          const existing = saved ? JSON.parse(saved) : [];
+          
+          // Remove any existing autosave from this session and add the new one
+          const filtered = existing.filter((a: BlockAutosave) => a.sessionId !== sessionIdRef.current);
+          const updated = [newAutosave, ...filtered].slice(0, 10); // Keep last 10
+          
+          localStorage.setItem(STORAGE_KEY_AUTOSAVES, JSON.stringify(updated));
+          setAutosaves(updated);
+          lastAutosaveDataRef.current = dataString;
+          setAutosaveStatus('saved');
+          setAutosaveCountdown(60); // Reset countdown
+          // Reset to idle after 2 seconds
+          setTimeout(() => setAutosaveStatus('idle'), 2000);
+        } else {
+          setAutosaveStatus('idle');
+        }
+      } catch (error) {
+        console.error('Failed to auto-save:', error);
+        setAutosaveStatus('idle');
+      }
+    }, 60000); // Every 60 seconds (1 minute)
+
+    return () => clearInterval(autoSaveInterval);
+  }, [open, serializeBlockState, nodes, edges]);
+
+  // Load autosave
+  const handleLoadAutosave = useCallback((dataString: string) => {
+    try {
+      const state = JSON.parse(dataString);
+      if (state.nodes && state.edges) {
+        // Reconstruct nodes with onChange handlers
+        const reconstructedNodes = state.nodes.map((node: any) => {
+          const nodeId = node.id;
+          const category = node.data.category;
+          
+          // Recreate onChange handler based on node type
+          const onChange = (key: string, value: any) => {
+            setNodes((nds) =>
+              nds.map((n) => {
+                if (n.id === nodeId) {
+                  return {
+                    ...n,
+                    data: { ...n.data, [key]: value },
+                  };
+                }
+                return n;
+              })
+            );
+          };
+          
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              onChange,
+            },
+            deletable: node.type === 'input' && node.data.category === 'region' 
+              ? (state.nodes.filter((n: ReactFlowNode) => n.type === 'input' && n.data.category === 'region').length > 1)
+              : true,
+          };
+        });
+        
+        setNodes(reconstructedNodes);
+        setEdges(state.edges);
+        lastAutosaveDataRef.current = dataString;
+        setAutosaveStatus('saved');
+        setTimeout(() => setAutosaveStatus('idle'), 2000);
+      }
+    } catch (error) {
+      console.error('Failed to load autosave:', error);
+    }
+  }, [setNodes, setEdges]);
+
+  const handleLoadAutosaveFromList = useCallback((dataString: string) => {
+    handleLoadAutosave(dataString);
+  }, [handleLoadAutosave]);
+
+  const handleClearAutosaves = useCallback(() => {
+    if (window.confirm('Are you sure you want to clear all auto-saves? This cannot be undone.')) {
+      localStorage.removeItem(STORAGE_KEY_AUTOSAVES);
+      setAutosaves([]);
+      lastAutosaveDataRef.current = '';
+    }
+  }, []);
+
+  // Execute query - check if at least one region has an ID
+  const hasRegionId = regionInputNodes.some(
+    (node) =>
+      Array.isArray(node.data.regionIds) &&
+      node.data.regionIds.some((id: any) => typeof id === 'number' && !Number.isNaN(id))
+  );
 
   const handleExecute = useCallback(() => {
     if (!hasOutputNode) {
@@ -706,18 +937,14 @@ function NodeEditorInner({ open, onOpenChange, onExecute, mapInstance }: NodeEdi
     if (!hasValidConnection) {
       return;
     }
-    if (
-      !regionInputNode ||
-      typeof regionInputNode.data.regionId !== 'number' ||
-      Number.isNaN(regionInputNode.data.regionId)
-    ) {
+    if (!hasRegionId) {
       return;
     }
     const blocks = convertNodesToBlocks();
     if (onExecute) {
       onExecute(blocks);
     }
-  }, [hasOutputNode, hasValidConnection, regionInputNode, convertNodesToBlocks, onExecute]);
+  }, [hasOutputNode, hasValidConnection, regionInputNodes, convertNodesToBlocks, onExecute]);
 
   // Clear all nodes and reinitialize with region input
   const handleClear = useCallback(() => {
@@ -734,10 +961,10 @@ function NodeEditorInner({ open, onOpenChange, onExecute, mapInstance }: NodeEdi
       id: nodeId,
       type: 'input',
       position: { x: 250, y: 200 },
-      deletable: false, // Region input node cannot be deleted
+      deletable: false, // Region input node cannot be deleted (must have at least one)
       data: {
         category: 'region',
-        regionId: undefined,
+        regionIds: [undefined],
         onChange: (key: string, value: any) => {
           setNodes((nds) =>
             nds.map((node) => {
@@ -773,10 +1000,15 @@ function NodeEditorInner({ open, onOpenChange, onExecute, mapInstance }: NodeEdi
       }
 
       if (e.key === 'Delete' && selectedNode) {
-        // Prevent deleting region input nodes
+        // Prevent deleting region input nodes if it's the last one
         const nodeToDelete = nodes.find((n) => n.id === selectedNode);
         if (nodeToDelete && nodeToDelete.type === 'input' && nodeToDelete.data.category === 'region') {
-          return; // Don't allow deleting region input node
+          const remainingRegionNodes = nodes.filter(
+            (n) => n.type === 'input' && n.data.category === 'region' && n.id !== selectedNode
+          );
+          if (remainingRegionNodes.length === 0) {
+            return; // Don't allow deleting the last region input node
+          }
         }
         setNodes((nds) => nds.filter((n) => n.id !== selectedNode));
         setEdges((eds) => eds.filter((e) => e.source !== selectedNode && e.target !== selectedNode));
@@ -827,7 +1059,91 @@ function NodeEditorInner({ open, onOpenChange, onExecute, mapInstance }: NodeEdi
         onInteractOutside={(event) => event.preventDefault()}
       >
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <DialogTitle>Region Query Builder</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Region Query Builder</DialogTitle>
+            <div className="flex items-center gap-4">
+              {/* Auto-save status */}
+              <div className="text-xs text-muted-foreground">
+                {autosaveStatus === 'saving' && (
+                  <span className="flex items-center gap-1">
+                    <span className="animate-pulse">●</span> Saving...
+                  </span>
+                )}
+                {autosaveStatus === 'saved' && (
+                  <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                    <span>✓</span> Saved
+                  </span>
+                )}
+                {autosaveStatus === 'idle' && open && initializedRef.current && (
+                  <div className="flex items-center gap-2">
+                    <span>Next auto-save in {autosaveCountdown}s</span>
+                    <div className="w-16 bg-muted rounded-full h-1.5">
+                      <div
+                        className="bg-primary h-1.5 rounded-full transition-all duration-1000"
+                        style={{ width: `${((60 - autosaveCountdown) / 60) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Auto-saves button */}
+              {autosaves.length > 0 && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="text-xs">
+                      Auto-saves ({autosaves.length})
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80" align="end">
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm">Auto-saves</h4>
+                      <ScrollArea className="max-h-[300px]">
+                        <div className="space-y-2">
+                          {autosaves.map((autosave, idx) => (
+                            <div
+                              key={autosave.timestamp}
+                              className="flex items-center justify-between p-2 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                              onClick={() => handleLoadAutosaveFromList(autosave.data)}
+                            >
+                              <div className="flex-1">
+                                <p className="text-xs font-medium">
+                                  {autosave.sessionId === sessionIdRef.current ? 'Current Session' : `Session ${autosaves.length - idx}`}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(autosave.timestamp).toLocaleString()}
+                                </p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleLoadAutosaveFromList(autosave.data);
+                                }}
+                              >
+                                Load
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                      <div className="flex justify-end pt-2 border-t">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs text-destructive hover:text-destructive"
+                          onClick={handleClearAutosaves}
+                        >
+                          Clear All
+                        </Button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+          </div>
         </DialogHeader>
 
         <div className="flex flex-1 overflow-hidden">
@@ -948,7 +1264,7 @@ function NodeEditorInner({ open, onOpenChange, onExecute, mapInstance }: NodeEdi
           <div className="flex-1 relative">
             <ReactFlow
               nodes={nodes.map(node => {
-                // Prevent deletion of region input nodes
+                // Prevent deletion of region input node (must have at least one)
                 if (node.type === 'input' && node.data.category === 'region') {
                   return { ...node, deletable: false };
                 }
