@@ -6,15 +6,26 @@
   <component name="ChangeListManager">
     <list default="true" id="51982a52-4621-4b78-827a-2c8ff91c7405" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/sequences/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/sequences/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/spotanims/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/spotanims/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/api-docs/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/api-docs/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/globals.css" beforeDir="false" afterPath="$PROJECT_DIR$/app/globals.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/objects/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/objects/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/layout/cache-status-wrapper.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/layout/cache-status-wrapper.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/layout/settings-provider.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/layout/settings-provider.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/ImportView.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection/ImportView.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/importParsers.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection/importParsers.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/BaseMap.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/BaseMap.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/OSRSMap.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/OSRSMap.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/ObjectFinder.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/ObjectFinder.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/hooks/useObjectMarkers.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/hooks/useObjectMarkers.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/search/GamevalIdSearch.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/search/GamevalIdSearch.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/sidebar/app-sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/sidebar/app-sidebar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ui/RSColorBox.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/RSColorBox.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/ui/paginated-table.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/paginated-table.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/ui/settings-modal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/settings-modal.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/gamevals/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/gamevals/index.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/gamevals/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/gamevals/types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ui/update-modal.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/gamevals/GamevalProvider.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/lib/gamevals/GamevalProvider.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/map/model/Position.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/map/model/Position.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -42,7 +53,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "live",
+    "git-widget-placeholder": "main",
     "ignore.virus.scanning.warn.message": "true",
     "js.debugger.nextJs.config.created.client": "true",
     "js.debugger.nextJs.config.created.server": "true",

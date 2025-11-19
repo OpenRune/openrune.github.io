@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { IconSettings, IconPackage, IconCode } from "@tabler/icons-react";
+import { IconSettings, IconPackage, IconCode, IconCoffee } from "@tabler/icons-react";
 import SettingsModal from "@/components/ui/settings-modal";
 import CacheTypeModal from "@/components/ui/cache-type-modal";
 import { useSettings } from "@/components/layout/settings-provider";
@@ -174,21 +174,23 @@ export function AppSidebar() {
                                     </button>
                                 </CollapsibleTrigger>
                                 <CollapsibleContent className="pl-4">
-                                    {children.map((child) => {
-                                        const childDisabled = isCacheOffline && child.path !== "/" && !child.usableOffline;
-                                        return (
-                                            <SidebarMenuItem key={child.label}>
-                                                <Link
-                                                    href={child.path}
-                                                    className={`peer/menu-button flex w-full items-center ${sizeConfig.sub.gap} overflow-hidden rounded-md ${sizeConfig.sub.padding} text-left outline-hidden ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-data-[sidebar=menu-action]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! [&>span:last-child]:truncate ${sizeConfig.sub.icon} [&>svg]:shrink-0 ${sizeConfig.sub.height} ${sizeConfig.sub.text} font-medium min-w-8 duration-200 ease-linear ${childDisabled ? "pointer-events-none opacity-50" : ""}`}
-                                                    aria-label={child.label}
-                                                >
-                                                    {child.icon}
-                                                    <span className="ml-1">{child.label}</span>
-                                                </Link>
-                                            </SidebarMenuItem>
-                                        );
-                                    })}
+                                    <SidebarMenu>
+                                        {children.map((child) => {
+                                            const childDisabled = isCacheOffline && child.path !== "/" && !child.usableOffline;
+                                            return (
+                                                <SidebarMenuItem key={child.label}>
+                                                    <Link
+                                                        href={child.path}
+                                                        className={`peer/menu-button flex w-full items-center ${sizeConfig.sub.gap} overflow-hidden rounded-md ${sizeConfig.sub.padding} text-left outline-hidden ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-data-[sidebar=menu-action]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! [&>span:last-child]:truncate ${sizeConfig.sub.icon} [&>svg]:shrink-0 ${sizeConfig.sub.height} ${sizeConfig.sub.text} font-medium min-w-8 duration-200 ease-linear ${childDisabled ? "pointer-events-none opacity-50" : ""}`}
+                                                        aria-label={child.label}
+                                                    >
+                                                        {child.icon}
+                                                        <span className="ml-1">{child.label}</span>
+                                                    </Link>
+                                                </SidebarMenuItem>
+                                            );
+                                        })}
+                                    </SidebarMenu>
                                 </CollapsibleContent>
                             </SidebarMenuItem>
                         </Collapsible>
@@ -292,6 +294,18 @@ export function AppSidebar() {
                                 <IconSettings size={settings.navItemSize === 'small' ? 14 : settings.navItemSize === 'medium' ? 17 : 18} />
                                 <span className={`ml-1 ${sizeConfig.footer.text}`}>{open && isMounted ? "Settings" : ""}</span>
                             </button>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <Link
+                                href="https://buymeacoffee.com/openrune"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`peer/menu-button flex w-full items-center ${sizeConfig.footer.gap} overflow-hidden rounded-md ${sizeConfig.footer.padding} text-left outline-hidden ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-data-[sidebar=menu-action]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! [&>span:last-child]:truncate ${sizeConfig.footer.icon} [&>svg]:shrink-0 ${sizeConfig.footer.height} ${sizeConfig.footer.text} font-medium min-w-8 duration-200 ease-linear`}
+                                aria-label="Buy Me a Coffee"
+                            >
+                                <IconCoffee size={settings.navItemSize === 'small' ? 14 : settings.navItemSize === 'medium' ? 17 : 18} />
+                                <span className={`ml-1 ${sizeConfig.footer.text}`}>{open && isMounted ? "Buy Me a Coffee" : ""}</span>
+                            </Link>
                         </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarFooter>

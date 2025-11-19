@@ -38,6 +38,7 @@ export function useObjectMarkers({
         const map = mapInstanceRef.current;
         const markerGroup = objectMarkersRef.current;
         const bounds = map.getBounds();
+        if (!bounds) return; // Map not fully initialized yet
         
         // Clear existing markers from map (but keep references) only when not in highlight mode
         if (!shouldFitBoundsRef.current) {

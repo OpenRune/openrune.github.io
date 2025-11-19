@@ -144,45 +144,24 @@ export function GamevalProvider({ children }: { children: React.ReactNode }) {
     // Lookup gameval name by ID
     const lookupGameval = useCallback((type: GamevalType, id: number): string | undefined => {
         const reverseData = gamevalReverseData.get(type);
-        if (!reverseData) {
-            // Auto-load if not loaded yet
-            loadGamevalType(type).catch(console.error);
-            return undefined;
-        }
-
-        return reverseData[id];
-    }, [gamevalReverseData, loadGamevalType]);
+        return reverseData?.[id];
+    }, [gamevalReverseData]);
 
     // Lookup gameval ID by name
     const lookupGamevalByName = useCallback((type: GamevalType, name: string): number | undefined => {
         const data = gamevalData.get(type);
-        if (!data) {
-            // Auto-load if not loaded yet
-            loadGamevalType(type).catch(console.error);
-            return undefined;
-        }
-
-        return data[name];
-    }, [gamevalData, loadGamevalType]);
+        return data?.[name];
+    }, [gamevalData]);
 
     // Get all gameval data for a type
     const getGamevalData = useCallback((type: GamevalType): GamevalData | undefined => {
-        const data = gamevalData.get(type);
-        if (!data && !loadedTypes.has(type)) {
-            // Auto-load if not loaded yet
-            loadGamevalType(type).catch(console.error);
-        }
-        return data;
-    }, [gamevalData, loadedTypes, loadGamevalType]);
+        return gamevalData.get(type);
+    }, [gamevalData]);
 
     // Get precomputed entries for a type
     const getGamevalEntries = useCallback((type: GamevalType): GamevalEntry[] | undefined => {
-        const entries = gamevalEntries.get(type);
-        if (!entries && !loadedTypes.has(type)) {
-            loadGamevalType(type).catch(console.error);
-        }
-        return entries;
-    }, [gamevalEntries, loadedTypes, loadGamevalType]);
+        return gamevalEntries.get(type);
+    }, [gamevalEntries]);
 
     // Check if a type is currently loading
     const isLoading = useCallback((type: GamevalType): boolean => {

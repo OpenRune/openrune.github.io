@@ -107,7 +107,7 @@ export default function SettingsModal({
           <TabsContent value="general" className="space-y-6 mt-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label htmlFor="dark-light-mode">Dark / Light Mode</Label>
+                <Label>Dark / Light Mode</Label>
                 <p className="text-sm text-muted-foreground">
                   Toggle between dark and light color schemes
                 </p>
@@ -118,6 +118,7 @@ export default function SettingsModal({
                   size="icon"
                   onClick={handleThemeToggle}
                   className="h-10 w-10"
+                  aria-label="Toggle dark/light mode"
                 >
                   {resolvedTheme === 'dark' ? (
                     <IconSun className="h-5 w-5" />
@@ -170,16 +171,17 @@ export default function SettingsModal({
             
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label htmlFor="nav-item-size">Navigation item size</Label>
+                <Label>Navigation item size</Label>
                 <p className="text-sm text-muted-foreground">
                   Control the size of sidebar navigation items
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" role="group" aria-label="Navigation item size">
                 <Button
                   variant={navItemSize === 'small' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => onNavItemSizeChange('small')}
+                  aria-pressed={navItemSize === 'small'}
                 >
                   Small
                 </Button>
@@ -187,6 +189,7 @@ export default function SettingsModal({
                   variant={navItemSize === 'medium' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => onNavItemSizeChange('medium')}
+                  aria-pressed={navItemSize === 'medium'}
                 >
                   Medium
                 </Button>
@@ -194,6 +197,7 @@ export default function SettingsModal({
                   variant={navItemSize === 'large' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => onNavItemSizeChange('large')}
+                  aria-pressed={navItemSize === 'large'}
                 >
                   Large
                 </Button>

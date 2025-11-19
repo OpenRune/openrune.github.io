@@ -569,7 +569,9 @@ const OSRSMap: React.FC<OSRSMapProps> = ({ initialObjectId, compact = false }) =
                     if (regionBaseCoordinatesControlRef.current && mapInstanceRef.current) {
                         const map = mapInstanceRef.current;
                         // Get current position to determine which region we're in
-                        const currentCenter = map.getBounds().getCenter();
+                        const bounds = map.getBounds();
+                        if (!bounds) return; // Map not fully initialized yet
+                        const currentCenter = bounds.getCenter();
                         const currentPos = Position.fromLatLng(map, currentCenter, map.plane);
                         const currentRegion = Region.fromPosition(currentPos);
                         const regionBasePos = currentRegion.toPosition();
