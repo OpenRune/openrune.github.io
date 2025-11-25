@@ -71,8 +71,8 @@ export function ImportView({
             <div className="space-y-4 flex-1 min-h-0 overflow-y-auto">
                 {importFormat === 'normal' && (
                     <div className="space-y-2">
-                        <Label htmlFor="import-type">Type</Label>
-                        <div className="flex gap-2">
+                        <Label>Type</Label>
+                        <div className="flex gap-2" role="group" aria-label="Import type">
                             <Button
                                 type="button"
                                 variant="outline"

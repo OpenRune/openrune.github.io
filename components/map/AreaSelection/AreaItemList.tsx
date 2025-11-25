@@ -21,10 +21,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Square, Trash2, Eye, EyeOff, Download, Pencil } from 'lucide-react';
+import { Square, Trash2, Eye, EyeOff, Download, Pencil, Minimize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SelectionItem, ExportFormat } from './types';
-import { formatArea, formatPoly } from './utils';
+import { formatArea, formatPoly, formatPath } from './utils';
 
 interface AreaItemListProps {
     items: SelectionItem[];
@@ -35,6 +35,7 @@ interface AreaItemListProps {
     onToggleHide: (item: SelectionItem, e?: React.MouseEvent) => void;
     onExport: (item: SelectionItem, format: ExportFormat, e?: React.MouseEvent) => void;
     onRename: (itemId: string, name: string) => void;
+    onSimplify?: (item: SelectionItem, e?: React.MouseEvent) => void;
     itemNames: Map<string, string>;
 }
 
@@ -47,6 +48,7 @@ export function AreaItemList({
     onToggleHide,
     onExport,
     onRename,
+    onSimplify,
     itemNames
 }: AreaItemListProps) {
     const [renameDialogOpen, setRenameDialogOpen] = useState(false);
@@ -77,7 +79,14 @@ export function AreaItemList({
     };
 
     const getDisplayText = (item: SelectionItem): string => {
-        const defaultText = item.type === 'area' ? formatArea(item) : formatPoly(item);
+        let defaultText: string;
+        if (item.type === 'area') {
+            defaultText = formatArea(item);
+        } else if (item.type === 'path') {
+            defaultText = formatPath(item);
+        } else {
+            defaultText = formatPoly(item);
+        }
         const customName = itemNames.get(item.id);
         if (customName) {
             return `${customName} - ${defaultText}`;
@@ -88,7 +97,7 @@ export function AreaItemList({
     if (items.length === 0) {
         return (
             <div className="text-center text-sm text-muted-foreground py-8">
-                No areas or polygons selected
+                No areas, polygons, or paths selected
             </div>
         );
     }
@@ -125,6 +134,13 @@ export function AreaItemList({
                                                         <span className="font-sans">{itemNames.get(item.id)} - </span>
                                                     )}
                                                     <span className="font-mono">{formatArea(item)}</span>
+                                                </>
+                                            ) : item.type === 'path' ? (
+                                                <>
+                                                    {itemNames.get(item.id) && (
+                                                        <span>{itemNames.get(item.id)} - </span>
+                                                    )}
+                                                    <span>{formatPath(item)}</span>
                                                 </>
                                             ) : (
                                                 <>
@@ -171,6 +187,14 @@ export function AreaItemList({
                                 <Pencil className="h-4 w-4 mr-2" />
                                 Rename
                             </ContextMenuItem>
+                            {item.type === 'path' && onSimplify && (
+                                <ContextMenuItem 
+                                    onClick={(e) => onSimplify(item, e)}
+                                >
+                                    <Minimize2 className="h-4 w-4 mr-2" />
+                                    Simplify
+                                </ContextMenuItem>
+                            )}
                             <ContextMenuSeparator />
                             <ContextMenuSub>
                                 <ContextMenuSubTrigger>
@@ -200,9 +224,9 @@ export function AreaItemList({
             <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Rename {renameItem?.type === 'area' ? 'Area' : 'Polygon'}</DialogTitle>
+                        <DialogTitle>Rename {renameItem?.type === 'area' ? 'Area' : renameItem?.type === 'path' ? 'Path' : 'Polygon'}</DialogTitle>
                         <DialogDescription>
-                            Enter a custom name for this {renameItem?.type === 'area' ? 'area' : 'polygon'}. This name is only saved for this session.
+                            Enter a custom name for this {renameItem?.type === 'area' ? 'area' : renameItem?.type === 'path' ? 'path' : 'polygon'}. This name is only saved for this session.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
@@ -213,6 +237,8 @@ export function AreaItemList({
                                 renameItem 
                                     ? (renameItem.type === 'area' 
                                         ? formatArea(renameItem) 
+                                        : renameItem.type === 'path'
+                                        ? formatPath(renameItem)
                                         : formatPoly(renameItem))
                                     : 'Enter name...'
                             }

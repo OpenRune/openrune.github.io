@@ -1,6 +1,7 @@
 import { useRef, useCallback, useEffect } from 'react';
 import type { BaseMapInstance } from '../BaseMap';
 import { GridControl } from '@/lib/map/controls/GridControl';
+import { TileGridControl } from '@/lib/map/controls/TileGridControl';
 import { RegionLabelsControl } from '@/lib/map/controls/RegionLabelsCanvas';
 import { PlaneControl } from '@/lib/map/controls/PlaneControl';
 import { CoordinatesControl } from '@/lib/map/controls/CoordinatesControl';
@@ -11,6 +12,7 @@ import { CollectionControl } from '@/lib/map/controls/CollectionControl';
 interface UseMapControlsProps {
     compact: boolean;
     showRegionGrid: boolean;
+    showTileGrid: boolean;
     showLabels: boolean;
     setZoom: (zoom: number) => void;
 }
@@ -18,10 +20,12 @@ interface UseMapControlsProps {
 export function useMapControls({
     compact,
     showRegionGrid,
+    showTileGrid,
     showLabels,
     setZoom,
 }: UseMapControlsProps) {
     const gridControlRef = useRef<GridControl | null>(null);
+    const tileGridControlRef = useRef<TileGridControl | null>(null);
     const labelsControlRef = useRef<RegionLabelsControl | null>(null);
     const planeControlRef = useRef<PlaneControl | null>(null);
     const coordinatesControlRef = useRef<CoordinatesControl | null>(null);
@@ -40,6 +44,11 @@ export function useMapControls({
             const gridControl = new GridControl({ position: 'bottomleft' });
             gridControl.addTo(map);
             gridControlRef.current = gridControl;
+
+            // Add TileGridControl plugin
+            const tileGridControl = new TileGridControl({ position: 'bottomleft' });
+            tileGridControl.addTo(map);
+            tileGridControlRef.current = tileGridControl;
 
             const planeControl = new PlaneControl({ position: 'bottomleft' });
             planeControl.addTo(map);
@@ -91,6 +100,16 @@ export function useMapControls({
     }, [showRegionGrid]);
 
     useEffect(() => {
+        if (!tileGridControlRef.current) return;
+        const control = tileGridControlRef.current;
+        const isEnabled = control.isEnabled();
+        
+        if (showTileGrid !== isEnabled) {
+            control.setEnabled(showTileGrid);
+        }
+    }, [showTileGrid]);
+
+    useEffect(() => {
         if (!labelsControlRef.current) return;
         const control = labelsControlRef.current;
         const isVisible = control.isVisible();
@@ -108,6 +127,9 @@ export function useMapControls({
 
             if (gridControlRef.current) {
                 map.removeControl(gridControlRef.current);
+            }
+            if (tileGridControlRef.current) {
+                map.removeControl(tileGridControlRef.current);
             }
             if (labelsControlRef.current) {
                 map.removeControl(labelsControlRef.current);
@@ -132,6 +154,7 @@ export function useMapControls({
 
     return {
         gridControlRef,
+        tileGridControlRef,
         labelsControlRef,
         planeControlRef,
         coordinatesControlRef,

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Upload, Square, X, Download } from 'lucide-react';
+import { Upload, Square, X, Download, Route, Minimize2, Code } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Position } from '@/lib/map/model/Position';
 import { toast } from 'sonner';
@@ -35,6 +35,7 @@ export function AreaSelection({
     const [localImportFormat, setLocalImportFormat] = useState<'normal' | '117hd'>('normal');
     const importFormat = propImportFormat ?? localImportFormat;
     const [itemNames, setItemNames] = useState<Map<string, string>>(new Map());
+    const [isLocalhost, setIsLocalhost] = useState(false);
 
     const {
         items,
@@ -82,6 +83,15 @@ export function AreaSelection({
         setShowImportView(importMode);
     }, [importMode]);
 
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            setIsLocalhost(
+                window.location.hostname === 'localhost' ||
+                window.location.hostname === '127.0.0.1'
+            );
+        }
+    }, []);
+
     const handleClear = () => {
         if (collectionControl) {
             collectionControl.clearAll();
@@ -111,6 +121,13 @@ export function AreaSelection({
             }
         } else if (item.type === 'poly') {
             collectionControl.clearPolyArea();
+            setHiddenItems(prev => {
+                const next = new Set(prev);
+                next.delete(item.id);
+                return next;
+            });
+        } else if (item.type === 'path') {
+            collectionControl.clearPath();
             setHiddenItems(prev => {
                 const next = new Set(prev);
                 next.delete(item.id);
@@ -227,6 +244,8 @@ export function AreaSelection({
                 }
             } else if (item.type === 'poly') {
                 collectionControl.highlightPolyArea(true);
+            } else if (item.type === 'path') {
+                // Paths don't have highlighting yet
             }
         }
         
@@ -238,7 +257,7 @@ export function AreaSelection({
                 const centerY = Math.floor((item.bounds.minY + item.bounds.maxY) / 2);
                 const plane = 'plane' in item && typeof item.plane === 'number' ? item.plane : 0;
                 position = new Position(centerX, centerY, plane);
-            } else if (item.type === 'poly' && item.points.length > 0) {
+            } else if ((item.type === 'poly' || item.type === 'path') && item.points.length > 0) {
                 let sumX = 0;
                 let sumY = 0;
                 item.points.forEach(point => {
@@ -271,8 +290,8 @@ export function AreaSelection({
         }
     };
 
-    const handleToolToggle = () => {
-        const newTool = selectedTool === 'area' ? null : 'area';
+    const handleToolToggle = (tool: 'area' | 'path') => {
+        const newTool = selectedTool === tool ? null : tool;
         setSelectedTool(newTool);
         
         if (typeof window !== 'undefined') {
@@ -298,7 +317,7 @@ export function AreaSelection({
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={handleToolToggle}
+                                onClick={() => handleToolToggle('area')}
                                 className={cn(
                                     "h-7 px-3 text-xs flex items-center gap-1 relative",
                                     selectedTool === 'area' && "bg-gray-700 border-gray-600 shadow-inner"
@@ -313,6 +332,107 @@ export function AreaSelection({
                                 )} />
                                 Area
                             </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleToolToggle('path')}
+                                className={cn(
+                                    "h-7 px-3 text-xs flex items-center gap-1 relative",
+                                    selectedTool === 'path' && "bg-gray-700 border-gray-600 shadow-inner"
+                                )}
+                            >
+                                {selectedTool === 'path' && (
+                                    <div className="absolute inset-0 bg-green-500/30 rounded-md pointer-events-none" />
+                                )}
+                                <Route className={cn(
+                                    "h-3 w-3 relative z-10",
+                                    selectedTool === 'path' ? "opacity-100" : "opacity-70"
+                                )} />
+                                Path
+                            </Button>
+                            {selectedTool === 'path' && isLocalhost && (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 px-2 text-xs"
+                                        >
+                                            <Code className="h-3 w-3 mr-1" />
+                                            Dev
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem
+                                            onClick={() => {
+                                                if (collectionControl) {
+                                                    // Test polygon points
+                                                    const testPoints = [
+                                                        { x: 3064, y: 3520, z: 0 },
+                                                        { x: 3094, y: 3520, z: 0 },
+                                                        { x: 3105, y: 3511, z: 0 },
+                                                        { x: 3106, y: 3507, z: 0 },
+                                                        { x: 3099, y: 3502, z: 0 },
+                                                        { x: 3090, y: 3500, z: 0 },
+                                                        { x: 3084, y: 3500, z: 0 },
+                                                        { x: 3080, y: 3502, z: 0 },
+                                                        { x: 3075, y: 3504, z: 0 },
+                                                        { x: 3073, y: 3505, z: 0 },
+                                                        { x: 3071, y: 3510, z: 0 },
+                                                        { x: 3073, y: 3513, z: 0 },
+                                                        { x: 3068, y: 3511, z: 0 },
+                                                        { x: 3064, y: 3512, z: 0 },
+                                                        { x: 3063, y: 3514, z: 0 },
+                                                        { x: 3061, y: 3516, z: 0 },
+                                                        { x: 3058, y: 3519, z: 0 },
+                                                        { x: 3062, y: 3520, z: 0 },
+                                                        { x: 3064, y: 3520, z: 0 }
+                                                    ];
+                                                    collectionControl.importPathFromPoints(testPoints);
+                                                    toast.success('Test path loaded');
+                                                }
+                                            }}
+                                        >
+                                            Test
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            onClick={() => {
+                                                if (collectionControl) {
+                                                    // Expected tiles from Java getAllContainedCoords()
+                                                    const expectedTiles = [
+                                                        { x: 3085, y: 3500 }, { x: 3086, y: 3500 }, { x: 3087, y: 3500 }, { x: 3088, y: 3500 }, { x: 3089, y: 3500 },
+                                                        { x: 3083, y: 3501 }, { x: 3084, y: 3501 }, { x: 3085, y: 3501 }, { x: 3086, y: 3501 }, { x: 3087, y: 3501 }, { x: 3088, y: 3501 }, { x: 3089, y: 3501 }, { x: 3090, y: 3501 }, { x: 3091, y: 3501 }, { x: 3092, y: 3501 }, { x: 3093, y: 3501 }, { x: 3094, y: 3501 },
+                                                        { x: 3081, y: 3502 }, { x: 3082, y: 3502 }, { x: 3083, y: 3502 }, { x: 3084, y: 3502 }, { x: 3085, y: 3502 }, { x: 3086, y: 3502 }, { x: 3087, y: 3502 }, { x: 3088, y: 3502 }, { x: 3089, y: 3502 }, { x: 3090, y: 3502 }, { x: 3091, y: 3502 }, { x: 3092, y: 3502 }, { x: 3093, y: 3502 }, { x: 3094, y: 3502 }, { x: 3095, y: 3502 }, { x: 3096, y: 3502 }, { x: 3097, y: 3502 }, { x: 3098, y: 3502 },
+                                                        { x: 3078, y: 3503 }, { x: 3079, y: 3503 }, { x: 3080, y: 3503 }, { x: 3081, y: 3503 }, { x: 3082, y: 3503 }, { x: 3083, y: 3503 }, { x: 3084, y: 3503 }, { x: 3085, y: 3503 }, { x: 3086, y: 3503 }, { x: 3087, y: 3503 }, { x: 3088, y: 3503 }, { x: 3089, y: 3503 }, { x: 3090, y: 3503 }, { x: 3091, y: 3503 }, { x: 3092, y: 3503 }, { x: 3093, y: 3503 }, { x: 3094, y: 3503 }, { x: 3095, y: 3503 }, { x: 3096, y: 3503 }, { x: 3097, y: 3503 }, { x: 3098, y: 3503 }, { x: 3099, y: 3503 }, { x: 3100, y: 3503 },
+                                                        { x: 3076, y: 3504 }, { x: 3077, y: 3504 }, { x: 3078, y: 3504 }, { x: 3079, y: 3504 }, { x: 3080, y: 3504 }, { x: 3081, y: 3504 }, { x: 3082, y: 3504 }, { x: 3083, y: 3504 }, { x: 3084, y: 3504 }, { x: 3085, y: 3504 }, { x: 3086, y: 3504 }, { x: 3087, y: 3504 }, { x: 3088, y: 3504 }, { x: 3089, y: 3504 }, { x: 3090, y: 3504 }, { x: 3091, y: 3504 }, { x: 3092, y: 3504 }, { x: 3093, y: 3504 }, { x: 3094, y: 3504 }, { x: 3095, y: 3504 }, { x: 3096, y: 3504 }, { x: 3097, y: 3504 }, { x: 3098, y: 3504 }, { x: 3099, y: 3504 }, { x: 3100, y: 3504 }, { x: 3101, y: 3504 },
+                                                        { x: 3074, y: 3505 }, { x: 3075, y: 3505 }, { x: 3076, y: 3505 }, { x: 3077, y: 3505 }, { x: 3078, y: 3505 }, { x: 3079, y: 3505 }, { x: 3080, y: 3505 }, { x: 3081, y: 3505 }, { x: 3082, y: 3505 }, { x: 3083, y: 3505 }, { x: 3084, y: 3505 }, { x: 3085, y: 3505 }, { x: 3086, y: 3505 }, { x: 3087, y: 3505 }, { x: 3088, y: 3505 }, { x: 3089, y: 3505 }, { x: 3090, y: 3505 }, { x: 3091, y: 3505 }, { x: 3092, y: 3505 }, { x: 3093, y: 3505 }, { x: 3094, y: 3505 }, { x: 3095, y: 3505 }, { x: 3096, y: 3505 }, { x: 3097, y: 3505 }, { x: 3098, y: 3505 }, { x: 3099, y: 3505 }, { x: 3100, y: 3505 }, { x: 3101, y: 3505 }, { x: 3102, y: 3505 }, { x: 3103, y: 3505 },
+                                                        { x: 3073, y: 3506 }, { x: 3074, y: 3506 }, { x: 3075, y: 3506 }, { x: 3076, y: 3506 }, { x: 3077, y: 3506 }, { x: 3078, y: 3506 }, { x: 3079, y: 3506 }, { x: 3080, y: 3506 }, { x: 3081, y: 3506 }, { x: 3082, y: 3506 }, { x: 3083, y: 3506 }, { x: 3084, y: 3506 }, { x: 3085, y: 3506 }, { x: 3086, y: 3506 }, { x: 3087, y: 3506 }, { x: 3088, y: 3506 }, { x: 3089, y: 3506 }, { x: 3090, y: 3506 }, { x: 3091, y: 3506 }, { x: 3092, y: 3506 }, { x: 3093, y: 3506 }, { x: 3094, y: 3506 }, { x: 3095, y: 3506 }, { x: 3096, y: 3506 }, { x: 3097, y: 3506 }, { x: 3098, y: 3506 }, { x: 3099, y: 3506 }, { x: 3100, y: 3506 }, { x: 3101, y: 3506 }, { x: 3102, y: 3506 }, { x: 3103, y: 3506 }, { x: 3104, y: 3506 },
+                                                        { x: 3073, y: 3507 }, { x: 3074, y: 3507 }, { x: 3075, y: 3507 }, { x: 3076, y: 3507 }, { x: 3077, y: 3507 }, { x: 3078, y: 3507 }, { x: 3079, y: 3507 }, { x: 3080, y: 3507 }, { x: 3081, y: 3507 }, { x: 3082, y: 3507 }, { x: 3083, y: 3507 }, { x: 3084, y: 3507 }, { x: 3085, y: 3507 }, { x: 3086, y: 3507 }, { x: 3087, y: 3507 }, { x: 3088, y: 3507 }, { x: 3089, y: 3507 }, { x: 3090, y: 3507 }, { x: 3091, y: 3507 }, { x: 3092, y: 3507 }, { x: 3093, y: 3507 }, { x: 3094, y: 3507 }, { x: 3095, y: 3507 }, { x: 3096, y: 3507 }, { x: 3097, y: 3507 }, { x: 3098, y: 3507 }, { x: 3099, y: 3507 }, { x: 3100, y: 3507 }, { x: 3101, y: 3507 }, { x: 3102, y: 3507 }, { x: 3103, y: 3507 }, { x: 3104, y: 3507 }, { x: 3105, y: 3507 },
+                                                        { x: 3072, y: 3508 }, { x: 3073, y: 3508 }, { x: 3074, y: 3508 }, { x: 3075, y: 3508 }, { x: 3076, y: 3508 }, { x: 3077, y: 3508 }, { x: 3078, y: 3508 }, { x: 3079, y: 3508 }, { x: 3080, y: 3508 }, { x: 3081, y: 3508 }, { x: 3082, y: 3508 }, { x: 3083, y: 3508 }, { x: 3084, y: 3508 }, { x: 3085, y: 3508 }, { x: 3086, y: 3508 }, { x: 3087, y: 3508 }, { x: 3088, y: 3508 }, { x: 3089, y: 3508 }, { x: 3090, y: 3508 }, { x: 3091, y: 3508 }, { x: 3092, y: 3508 }, { x: 3093, y: 3508 }, { x: 3094, y: 3508 }, { x: 3095, y: 3508 }, { x: 3096, y: 3508 }, { x: 3097, y: 3508 }, { x: 3098, y: 3508 }, { x: 3099, y: 3508 }, { x: 3100, y: 3508 }, { x: 3101, y: 3508 }, { x: 3102, y: 3508 }, { x: 3103, y: 3508 }, { x: 3104, y: 3508 }, { x: 3105, y: 3508 },
+                                                        { x: 3072, y: 3509 }, { x: 3073, y: 3509 }, { x: 3074, y: 3509 }, { x: 3075, y: 3509 }, { x: 3076, y: 3509 }, { x: 3077, y: 3509 }, { x: 3078, y: 3509 }, { x: 3079, y: 3509 }, { x: 3080, y: 3509 }, { x: 3081, y: 3509 }, { x: 3082, y: 3509 }, { x: 3083, y: 3509 }, { x: 3084, y: 3509 }, { x: 3085, y: 3509 }, { x: 3086, y: 3509 }, { x: 3087, y: 3509 }, { x: 3088, y: 3509 }, { x: 3089, y: 3509 }, { x: 3090, y: 3509 }, { x: 3091, y: 3509 }, { x: 3092, y: 3509 }, { x: 3093, y: 3509 }, { x: 3094, y: 3509 }, { x: 3095, y: 3509 }, { x: 3096, y: 3509 }, { x: 3097, y: 3509 }, { x: 3098, y: 3509 }, { x: 3099, y: 3509 }, { x: 3100, y: 3509 }, { x: 3101, y: 3509 }, { x: 3102, y: 3509 }, { x: 3103, y: 3509 }, { x: 3104, y: 3509 }, { x: 3105, y: 3509 },
+                                                        { x: 3072, y: 3510 }, { x: 3073, y: 3510 }, { x: 3074, y: 3510 }, { x: 3075, y: 3510 }, { x: 3076, y: 3510 }, { x: 3077, y: 3510 }, { x: 3078, y: 3510 }, { x: 3079, y: 3510 }, { x: 3080, y: 3510 }, { x: 3081, y: 3510 }, { x: 3082, y: 3510 }, { x: 3083, y: 3510 }, { x: 3084, y: 3510 }, { x: 3085, y: 3510 }, { x: 3086, y: 3510 }, { x: 3087, y: 3510 }, { x: 3088, y: 3510 }, { x: 3089, y: 3510 }, { x: 3090, y: 3510 }, { x: 3091, y: 3510 }, { x: 3092, y: 3510 }, { x: 3093, y: 3510 }, { x: 3094, y: 3510 }, { x: 3095, y: 3510 }, { x: 3096, y: 3510 }, { x: 3097, y: 3510 }, { x: 3098, y: 3510 }, { x: 3099, y: 3510 }, { x: 3100, y: 3510 }, { x: 3101, y: 3510 }, { x: 3102, y: 3510 }, { x: 3103, y: 3510 }, { x: 3104, y: 3510 }, { x: 3105, y: 3510 },
+                                                        { x: 3068, y: 3511 }, { x: 3072, y: 3511 }, { x: 3073, y: 3511 }, { x: 3074, y: 3511 }, { x: 3075, y: 3511 }, { x: 3076, y: 3511 }, { x: 3077, y: 3511 }, { x: 3078, y: 3511 }, { x: 3079, y: 3511 }, { x: 3080, y: 3511 }, { x: 3081, y: 3511 }, { x: 3082, y: 3511 }, { x: 3083, y: 3511 }, { x: 3084, y: 3511 }, { x: 3085, y: 3511 }, { x: 3086, y: 3511 }, { x: 3087, y: 3511 }, { x: 3088, y: 3511 }, { x: 3089, y: 3511 }, { x: 3090, y: 3511 }, { x: 3091, y: 3511 }, { x: 3092, y: 3511 }, { x: 3093, y: 3511 }, { x: 3094, y: 3511 }, { x: 3095, y: 3511 }, { x: 3096, y: 3511 }, { x: 3097, y: 3511 }, { x: 3098, y: 3511 }, { x: 3099, y: 3511 }, { x: 3100, y: 3511 }, { x: 3101, y: 3511 }, { x: 3102, y: 3511 }, { x: 3103, y: 3511 }, { x: 3104, y: 3511 },
+                                                        { x: 3065, y: 3512 }, { x: 3066, y: 3512 }, { x: 3067, y: 3512 }, { x: 3068, y: 3512 }, { x: 3069, y: 3512 }, { x: 3070, y: 3512 }, { x: 3073, y: 3512 }, { x: 3074, y: 3512 }, { x: 3075, y: 3512 }, { x: 3076, y: 3512 }, { x: 3077, y: 3512 }, { x: 3078, y: 3512 }, { x: 3079, y: 3512 }, { x: 3080, y: 3512 }, { x: 3081, y: 3512 }, { x: 3082, y: 3512 }, { x: 3083, y: 3512 }, { x: 3084, y: 3512 }, { x: 3085, y: 3512 }, { x: 3086, y: 3512 }, { x: 3087, y: 3512 }, { x: 3088, y: 3512 }, { x: 3089, y: 3512 }, { x: 3090, y: 3512 }, { x: 3091, y: 3512 }, { x: 3092, y: 3512 }, { x: 3093, y: 3512 }, { x: 3094, y: 3512 }, { x: 3095, y: 3512 }, { x: 3096, y: 3512 }, { x: 3097, y: 3512 }, { x: 3098, y: 3512 }, { x: 3099, y: 3512 }, { x: 3100, y: 3512 }, { x: 3101, y: 3512 }, { x: 3102, y: 3512 }, { x: 3103, y: 3512 },
+                                                        { x: 3064, y: 3513 }, { x: 3065, y: 3513 }, { x: 3066, y: 3513 }, { x: 3067, y: 3513 }, { x: 3068, y: 3513 }, { x: 3069, y: 3513 }, { x: 3070, y: 3513 }, { x: 3071, y: 3513 }, { x: 3072, y: 3513 }, { x: 3073, y: 3513 }, { x: 3074, y: 3513 }, { x: 3075, y: 3513 }, { x: 3076, y: 3513 }, { x: 3077, y: 3513 }, { x: 3078, y: 3513 }, { x: 3079, y: 3513 }, { x: 3080, y: 3513 }, { x: 3081, y: 3513 }, { x: 3082, y: 3513 }, { x: 3083, y: 3513 }, { x: 3084, y: 3513 }, { x: 3085, y: 3513 }, { x: 3086, y: 3513 }, { x: 3087, y: 3513 }, { x: 3088, y: 3513 }, { x: 3089, y: 3513 }, { x: 3090, y: 3513 }, { x: 3091, y: 3513 }, { x: 3092, y: 3513 }, { x: 3093, y: 3513 }, { x: 3094, y: 3513 }, { x: 3095, y: 3513 }, { x: 3096, y: 3513 }, { x: 3097, y: 3513 }, { x: 3098, y: 3513 }, { x: 3099, y: 3513 }, { x: 3100, y: 3513 }, { x: 3101, y: 3513 }, { x: 3102, y: 3513 },
+                                                        { x: 3064, y: 3514 }, { x: 3065, y: 3514 }, { x: 3066, y: 3514 }, { x: 3067, y: 3514 }, { x: 3068, y: 3514 }, { x: 3069, y: 3514 }, { x: 3070, y: 3514 }, { x: 3071, y: 3514 }, { x: 3072, y: 3514 }, { x: 3073, y: 3514 }, { x: 3074, y: 3514 }, { x: 3075, y: 3514 }, { x: 3076, y: 3514 }, { x: 3077, y: 3514 }, { x: 3078, y: 3514 }, { x: 3079, y: 3514 }, { x: 3080, y: 3514 }, { x: 3081, y: 3514 }, { x: 3082, y: 3514 }, { x: 3083, y: 3514 }, { x: 3084, y: 3514 }, { x: 3085, y: 3514 }, { x: 3086, y: 3514 }, { x: 3087, y: 3514 }, { x: 3088, y: 3514 }, { x: 3089, y: 3514 }, { x: 3090, y: 3514 }, { x: 3091, y: 3514 }, { x: 3092, y: 3514 }, { x: 3093, y: 3514 }, { x: 3094, y: 3514 }, { x: 3095, y: 3514 }, { x: 3096, y: 3514 }, { x: 3097, y: 3514 }, { x: 3098, y: 3514 }, { x: 3099, y: 3514 }, { x: 3100, y: 3514 }, { x: 3101, y: 3514 },
+                                                        { x: 3063, y: 3515 }, { x: 3064, y: 3515 }, { x: 3065, y: 3515 }, { x: 3066, y: 3515 }, { x: 3067, y: 3515 }, { x: 3068, y: 3515 }, { x: 3069, y: 3515 }, { x: 3070, y: 3515 }, { x: 3071, y: 3515 }, { x: 3072, y: 3515 }, { x: 3073, y: 3515 }, { x: 3074, y: 3515 }, { x: 3075, y: 3515 }, { x: 3076, y: 3515 }, { x: 3077, y: 3515 }, { x: 3078, y: 3515 }, { x: 3079, y: 3515 }, { x: 3080, y: 3515 }, { x: 3081, y: 3515 }, { x: 3082, y: 3515 }, { x: 3083, y: 3515 }, { x: 3084, y: 3515 }, { x: 3085, y: 3515 }, { x: 3086, y: 3515 }, { x: 3087, y: 3515 }, { x: 3088, y: 3515 }, { x: 3089, y: 3515 }, { x: 3090, y: 3515 }, { x: 3091, y: 3515 }, { x: 3092, y: 3515 }, { x: 3093, y: 3515 }, { x: 3094, y: 3515 }, { x: 3095, y: 3515 }, { x: 3096, y: 3515 }, { x: 3097, y: 3515 }, { x: 3098, y: 3515 }, { x: 3099, y: 3515 }, { x: 3100, y: 3515 },
+                                                        { x: 3062, y: 3516 }, { x: 3063, y: 3516 }, { x: 3064, y: 3516 }, { x: 3065, y: 3516 }, { x: 3066, y: 3516 }, { x: 3067, y: 3516 }, { x: 3068, y: 3516 }, { x: 3069, y: 3516 }, { x: 3070, y: 3516 }, { x: 3071, y: 3516 }, { x: 3072, y: 3516 }, { x: 3073, y: 3516 }, { x: 3074, y: 3516 }, { x: 3075, y: 3516 }, { x: 3076, y: 3516 }, { x: 3077, y: 3516 }, { x: 3078, y: 3516 }, { x: 3079, y: 3516 }, { x: 3080, y: 3516 }, { x: 3081, y: 3516 }, { x: 3082, y: 3516 }, { x: 3083, y: 3516 }, { x: 3084, y: 3516 }, { x: 3085, y: 3516 }, { x: 3086, y: 3516 }, { x: 3087, y: 3516 }, { x: 3088, y: 3516 }, { x: 3089, y: 3516 }, { x: 3090, y: 3516 }, { x: 3091, y: 3516 }, { x: 3092, y: 3516 }, { x: 3093, y: 3516 }, { x: 3094, y: 3516 }, { x: 3095, y: 3516 }, { x: 3096, y: 3516 }, { x: 3097, y: 3516 }, { x: 3098, y: 3516 },
+                                                        { x: 3061, y: 3517 }, { x: 3062, y: 3517 }, { x: 3063, y: 3517 }, { x: 3064, y: 3517 }, { x: 3065, y: 3517 }, { x: 3066, y: 3517 }, { x: 3067, y: 3517 }, { x: 3068, y: 3517 }, { x: 3069, y: 3517 }, { x: 3070, y: 3517 }, { x: 3071, y: 3517 }, { x: 3072, y: 3517 }, { x: 3073, y: 3517 }, { x: 3074, y: 3517 }, { x: 3075, y: 3517 }, { x: 3076, y: 3517 }, { x: 3077, y: 3517 }, { x: 3078, y: 3517 }, { x: 3079, y: 3517 }, { x: 3080, y: 3517 }, { x: 3081, y: 3517 }, { x: 3082, y: 3517 }, { x: 3083, y: 3517 }, { x: 3084, y: 3517 }, { x: 3085, y: 3517 }, { x: 3086, y: 3517 }, { x: 3087, y: 3517 }, { x: 3088, y: 3517 }, { x: 3089, y: 3517 }, { x: 3090, y: 3517 }, { x: 3091, y: 3517 }, { x: 3092, y: 3517 }, { x: 3093, y: 3517 }, { x: 3094, y: 3517 }, { x: 3095, y: 3517 }, { x: 3096, y: 3517 }, { x: 3097, y: 3517 },
+                                                        { x: 3060, y: 3518 }, { x: 3061, y: 3518 }, { x: 3062, y: 3518 }, { x: 3063, y: 3518 }, { x: 3064, y: 3518 }, { x: 3065, y: 3518 }, { x: 3066, y: 3518 }, { x: 3067, y: 3518 }, { x: 3068, y: 3518 }, { x: 3069, y: 3518 }, { x: 3070, y: 3518 }, { x: 3071, y: 3518 }, { x: 3072, y: 3518 }, { x: 3073, y: 3518 }, { x: 3074, y: 3518 }, { x: 3075, y: 3518 }, { x: 3076, y: 3518 }, { x: 3077, y: 3518 }, { x: 3078, y: 3518 }, { x: 3079, y: 3518 }, { x: 3080, y: 3518 }, { x: 3081, y: 3518 }, { x: 3082, y: 3518 }, { x: 3083, y: 3518 }, { x: 3084, y: 3518 }, { x: 3085, y: 3518 }, { x: 3086, y: 3518 }, { x: 3087, y: 3518 }, { x: 3088, y: 3518 }, { x: 3089, y: 3518 }, { x: 3090, y: 3518 }, { x: 3091, y: 3518 }, { x: 3092, y: 3518 }, { x: 3093, y: 3518 }, { x: 3094, y: 3518 }, { x: 3095, y: 3518 }, { x: 3096, y: 3518 },
+                                                        { x: 3059, y: 3519 }, { x: 3060, y: 3519 }, { x: 3061, y: 3519 }, { x: 3062, y: 3519 }, { x: 3063, y: 3519 }, { x: 3064, y: 3519 }, { x: 3065, y: 3519 }, { x: 3066, y: 3519 }, { x: 3067, y: 3519 }, { x: 3068, y: 3519 }, { x: 3069, y: 3519 }, { x: 3070, y: 3519 }, { x: 3071, y: 3519 }, { x: 3072, y: 3519 }, { x: 3073, y: 3519 }, { x: 3074, y: 3519 }, { x: 3075, y: 3519 }, { x: 3076, y: 3519 }, { x: 3077, y: 3519 }, { x: 3078, y: 3519 }, { x: 3079, y: 3519 }, { x: 3080, y: 3519 }, { x: 3081, y: 3519 }, { x: 3082, y: 3519 }, { x: 3083, y: 3519 }, { x: 3084, y: 3519 }, { x: 3085, y: 3519 }, { x: 3086, y: 3519 }, { x: 3087, y: 3519 }, { x: 3088, y: 3519 }, { x: 3089, y: 3519 }, { x: 3090, y: 3519 }, { x: 3091, y: 3519 }, { x: 3092, y: 3519 }, { x: 3093, y: 3519 }, { x: 3094, y: 3519 }, { x: 3095, y: 3519 }
+                                                    ];
+                                                    collectionControl.highlightPathVerificationTiles(expectedTiles);
+                                                    toast.success('Verification tiles highlighted in red');
+                                                }
+                                            }}
+                                        >
+                                            Verify
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            )}
                         </div>
                     </div>
 
@@ -326,6 +446,18 @@ export function AreaSelection({
                             onToggleHide={handleToggleHide}
                             onExport={handleExport}
                             onRename={handleRename}
+                            onSimplify={(item) => {
+                                if (collectionControl && item.type === 'path') {
+                                    const beforeCount = collectionControl.getPath().length;
+                                    collectionControl.simplifyPath();
+                                    const afterCount = collectionControl.getPath().length;
+                                    if (beforeCount > afterCount) {
+                                        toast.success(`Simplified path: ${beforeCount} → ${afterCount} points`);
+                                    } else {
+                                        toast.info('No simplification possible');
+                                    }
+                                }
+                            }}
                             itemNames={itemNames}
                         />
                     </ScrollArea>

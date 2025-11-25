@@ -6,6 +6,7 @@ import { Position } from '../model/Position';
 import { Area } from '../model/Area';
 import { Areas } from '../model/Areas';
 import { PolyArea } from '../model/PolyArea';
+import { Path } from '../model/Path';
 
 import { HD117AreasConverter } from '../converters/117hd/HD117AreasConverter';
 import { RuneLitePathConverter } from '../converters/runelite/RuneLitePathConverter';
@@ -39,7 +40,8 @@ export class CollectionControl extends L.Control {
     private _map!: L.Map;
     private _areas!: Areas;
     private _polyArea!: PolyArea;
-    private _currentDrawable?: Areas | PolyArea;
+    private _path!: Path;
+    private _currentDrawable?: Areas | PolyArea | Path;
     private _currentConverter?: 'areas_converter' | 'polyarea_converter';
     private _drawnMouseArea?: L.Layer;
     private _firstSelectedAreaPosition?: Position;
@@ -61,6 +63,7 @@ export class CollectionControl extends L.Control {
 
         this._areas = new Areas(leafletMap);
         this._polyArea = new PolyArea(leafletMap);
+        this._path = new Path(leafletMap);
         
         // Initialize mouse area drawing handler with requestAnimationFrame for smooth updates
         this._drawMouseAreaThrottled = (e: L.LeafletMouseEvent) => {
@@ -124,6 +127,7 @@ export class CollectionControl extends L.Control {
 
         // Attach map event handlers for drawing functionality
         this._map.on('click', this._addPosition, this);
+        this._map.on('contextmenu', this._addPositionRightClick, this);
         this._map.on('mousemove', this._drawMouseAreaThrottled, this);
         
         // Attach viewport change handlers for culling
@@ -143,6 +147,7 @@ export class CollectionControl extends L.Control {
     onRemove(): void {
         // Clean up event handlers and cancel pending updates
         this._map.off('click', this._addPosition, this);
+        this._map.off('contextmenu', this._addPositionRightClick, this);
         this._map.off('mousemove', this._drawMouseAreaThrottled, this);
         this._map.off('moveend', this._updateViewportVisibility, this);
         this._map.off('zoomend', this._updateViewportVisibility, this);
@@ -175,9 +180,26 @@ export class CollectionControl extends L.Control {
                 this._areas.add(new Area(this._firstSelectedAreaPosition, pos));
                 this._firstSelectedAreaPosition = undefined;
             }
+        } else if (this._currentDrawable instanceof Path) {
+            // For paths, just add the point directly
+            this._currentDrawable.add(pos);
         } else {
             this._currentDrawable.add(pos);
         }
+    }
+
+    private _addPositionRightClick(e: L.LeafletMouseEvent) {
+        // Prevent default context menu
+        if (e.originalEvent) {
+            e.originalEvent.preventDefault();
+        }
+        
+        // Only add points for Path tool on right-click
+        if (!this._editing || !this._currentDrawable) return;
+        if (!(this._currentDrawable instanceof Path)) return;
+        
+        const pos = Position.fromLatLng(this._map, e.latlng, (this._map as any).plane);
+        this._currentDrawable.add(pos);
     }
 
     // Check if a position is within or near a selected area
@@ -297,7 +319,7 @@ export class CollectionControl extends L.Control {
         }, 150); // Update every 150ms during movement
     };
 
-    private _toggleCollectionMode(drawable?: Areas | PolyArea, converter?: keyof ConverterSet) {
+    private _toggleCollectionMode(drawable?: Areas | PolyArea | Path, converter?: keyof ConverterSet) {
         if (!drawable || this._currentDrawable === drawable) {
             this._editing = false;
             if (this._drawnMouseArea) {
@@ -323,8 +345,10 @@ export class CollectionControl extends L.Control {
         this._currentDrawable = drawable;
         this._map.addLayer(this._currentDrawable.featureGroup);
         
-        // Update viewport visibility after adding drawable
-        this._updateViewportVisibility();
+        // Update viewport visibility after adding drawable (only for Areas and PolyArea)
+        if (drawable instanceof Areas || drawable instanceof PolyArea) {
+            this._updateViewportVisibility();
+        }
     }
 
 
@@ -338,11 +362,21 @@ export class CollectionControl extends L.Control {
         return this._polyArea.positions;
     }
 
-    setToolMode(mode: 'area' | 'poly' | null) {
+    getPath(): Position[] {
+        return this._path.positions;
+    }
+
+    simplifyPath(): void {
+        this._path.simplify();
+    }
+
+    setToolMode(mode: 'area' | 'poly' | 'path' | null) {
         if (mode === 'area') {
             this._toggleCollectionMode(this._areas, 'areas_converter');
         } else if (mode === 'poly') {
             this._toggleCollectionMode(this._polyArea, 'polyarea_converter');
+        } else if (mode === 'path') {
+            this._toggleCollectionMode(this._path, undefined);
         } else {
             this._toggleCollectionMode(undefined, undefined);
         }
@@ -356,9 +390,14 @@ export class CollectionControl extends L.Control {
         this._polyArea.removeAll();
     }
 
+    clearPath() {
+        this._path.removeAll();
+    }
+
     clearAll() {
         this._areas.removeAll();
         this._polyArea.removeAll();
+        this._path.removeAll();
     }
 
     importFromText(text: string, type: 'area' | 'poly') {
@@ -429,13 +468,62 @@ export class CollectionControl extends L.Control {
         this._updateViewportVisibility();
     }
 
+    // Import path from raw coordinates (x,y,z format, one per line)
+    importPathFromRaw(text: string) {
+        const lines = text.trim().split('\n').filter(line => line.trim());
+        this._path.removeAll();
+        
+        for (const line of lines) {
+            const parts = line.trim().split(',').map(p => p.trim());
+            if (parts.length >= 2) {
+                const x = parseInt(parts[0], 10);
+                const y = parseInt(parts[1], 10);
+                const z = parts.length >= 3 ? parseInt(parts[2], 10) : 0;
+                if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
+                    this._path.add(new Position(x, y, z));
+                }
+            }
+        }
+        
+        // Ensure path featureGroup is added to map
+        if (!this._map.hasLayer(this._path.featureGroup)) {
+            this._map.addLayer(this._path.featureGroup);
+        }
+    }
+
+    // Import path from array of coordinates
+    importPathFromPoints(points: Array<{ x: number; y: number; z?: number }>) {
+        this._path.removeAll();
+        
+        for (const point of points) {
+            const z = point.z !== undefined ? point.z : 0;
+            this._path.add(new Position(point.x, point.y, z));
+        }
+        
+        // Ensure path featureGroup is added to map
+        if (!this._map.hasLayer(this._path.featureGroup)) {
+            this._map.addLayer(this._path.featureGroup);
+        }
+    }
+
+    // Highlight verification tiles in red
+    highlightPathVerificationTiles(coords: Array<{ x: number; y: number; z?: number }>) {
+        this._path.highlightVerificationTiles(coords);
+    }
+
+    // Clear verification tiles
+    clearPathVerificationTiles() {
+        this._path.clearVerificationTiles();
+    }
+
     isEditing(): boolean {
         return this._editing;
     }
 
-    getCurrentTool(): 'area' | 'poly' | null {
+    getCurrentTool(): 'area' | 'poly' | 'path' | null {
         if (this._currentDrawable === this._areas) return 'area';
         if (this._currentDrawable === this._polyArea) return 'poly';
+        if (this._currentDrawable === this._path) return 'path';
         return null;
     }
 
@@ -606,6 +694,43 @@ export class CollectionControl extends L.Control {
     isPolyAreaVisible(): boolean {
         if (!this._polyArea.polygon) return false;
         return this._polyArea.featureGroup.hasLayer(this._polyArea.polygon);
+    }
+
+    // Export path in different formats (matches Java Polygon format)
+    exportPath(format: 'json' | 'java' | 'array' | 'raw'): string {
+        if (this._path.positions.length === 0) return '';
+        
+        const positions = this._path.positions;
+        
+        switch (format) {
+            case 'json':
+                // JSON format matching Java Polygon adapter
+                const points = positions.map(pos => 
+                    pos.z > 0 ? [pos.x, pos.y, pos.z] : [pos.x, pos.y]
+                );
+                return JSON.stringify(points, null, 2);
+            case 'java':
+                // Java format: new Polygon(new int[][] { {x1, y1, z1}, {x2, y2, z2}, ... })
+                const javaPoints = positions.map(pos => 
+                    pos.z > 0 ? `{${pos.x}, ${pos.y}, ${pos.z}}` : `{${pos.x}, ${pos.y}}`
+                ).join(',\n    ');
+                return `new Polygon(new int[][] {\n    ${javaPoints}\n})`;
+            case 'array':
+                return positions.map(pos => 
+                    pos.z > 0 ? `[${pos.x}, ${pos.y}, ${pos.z}]` : `[${pos.x}, ${pos.y}]`
+                ).join(',\n');
+            case 'raw':
+                return positions.map(pos => 
+                    pos.z > 0 ? `${pos.x},${pos.y},${pos.z}` : `${pos.x},${pos.y}`
+                ).join('\n');
+            default:
+                return '';
+        }
+    }
+
+    // Remove last point from path
+    removeLastPathPoint() {
+        this._path.removeLast();
     }
 
     // Highlight a specific area by index
@@ -812,6 +937,8 @@ export class CollectionControl extends L.Control {
         let isDragging = false;
         let startLatLng: L.LatLng | null = null;
         let startAreaPositions: { start: Position; end: Position } | null = null;
+        let pendingDragUpdate: number | null = null;
+        let lastMouseEvent: L.LeafletMouseEvent | null = null;
 
         rectangle.on('mousedown', (e: L.LeafletMouseEvent) => {
             // Don't start drag if clicking on resize handles
@@ -829,10 +956,10 @@ export class CollectionControl extends L.Control {
             L.DomUtil.addClass(this._map.getContainer(), 'leaflet-dragging');
         });
 
-        const handleMouseMove = (e: L.LeafletMouseEvent) => {
-            if (!isDragging || !startLatLng || !startAreaPositions) return;
+        const performDragUpdate = () => {
+            if (!isDragging || !startLatLng || !startAreaPositions || !lastMouseEvent) return;
             
-            const currentLatLng = e.latlng;
+            const currentLatLng = lastMouseEvent.latlng;
             const startPos = Position.fromLatLng(this._map, startLatLng, (this._map as any).plane);
             const currentPos = Position.fromLatLng(this._map, currentLatLng, (this._map as any).plane);
             
@@ -853,9 +980,6 @@ export class CollectionControl extends L.Control {
             );
             
             // Update rectangle bounds
-            const newStartLatLng = area.startPosition.toLatLng(this._map);
-            const newEndLatLng = area.endPosition.toLatLng(this._map);
-            
             let startX = area.startPosition.x;
             let startY = area.startPosition.y;
             let endX = area.endPosition.x;
@@ -882,15 +1006,44 @@ export class CollectionControl extends L.Control {
                 )
             );
             
-            // Update resize handles
-            this._updateResizeHandlePositions();
+            pendingDragUpdate = null;
+        };
+
+        const handleMouseMove = (e: L.LeafletMouseEvent) => {
+            if (!isDragging || !startLatLng || !startAreaPositions) return;
+            
+            // Store latest mouse event
+            lastMouseEvent = e;
+            
+            // Cancel any pending update
+            if (pendingDragUpdate !== null) {
+                cancelAnimationFrame(pendingDragUpdate);
+            }
+            
+            // Schedule update on next animation frame
+            pendingDragUpdate = requestAnimationFrame(performDragUpdate);
         };
 
         const handleMouseUp = () => {
             if (isDragging) {
+                // Cancel any pending animation frame
+                if (pendingDragUpdate !== null) {
+                    cancelAnimationFrame(pendingDragUpdate);
+                    pendingDragUpdate = null;
+                }
+                
+                // Perform final update synchronously
+                if (lastMouseEvent) {
+                    performDragUpdate();
+                }
+                
+                // Update resize handles once after drag completes
+                this._updateResizeHandlePositions();
+                
                 isDragging = false;
                 startLatLng = null;
                 startAreaPositions = null;
+                lastMouseEvent = null;
                 L.DomUtil.removeClass(this._map.getContainer(), 'leaflet-dragging');
             }
         };
@@ -905,6 +1058,11 @@ export class CollectionControl extends L.Control {
         let isDragging = false;
         let startLatLng: L.LatLng | null = null;
         let startPositions: Position[] | null = null;
+        let pendingDragUpdate: number | null = null;
+        let lastMouseEvent: L.LeafletMouseEvent | null = null;
+        // Cache maxZoom and transform offset
+        const maxZoom = this._map.getMaxZoom();
+        const transformOffset = { x: -16, y: 16 };
 
         polygon.on('mousedown', (e: L.LeafletMouseEvent) => {
             // Don't start drag if clicking on resize handles
@@ -920,10 +1078,10 @@ export class CollectionControl extends L.Control {
             L.DomUtil.addClass(this._map.getContainer(), 'leaflet-dragging');
         });
 
-        const handleMouseMove = (e: L.LeafletMouseEvent) => {
-            if (!isDragging || !startLatLng || !startPositions) return;
+        const performDragUpdate = () => {
+            if (!isDragging || !startLatLng || !startPositions || !lastMouseEvent) return;
             
-            const currentLatLng = e.latlng;
+            const currentLatLng = lastMouseEvent.latlng;
             const startPos = Position.fromLatLng(this._map, startLatLng, (this._map as any).plane);
             const currentPos = Position.fromLatLng(this._map, currentLatLng, (this._map as any).plane);
             
@@ -935,28 +1093,57 @@ export class CollectionControl extends L.Control {
                 new Position(pos.x + dx, pos.y + dy, pos.z)
             );
             
-            // Update polygon on map
-            const maxZoom = this._map.getMaxZoom();
+            // Update polygon on map - optimized transformation
             const latLngs = this._polyArea.positions.map(pos => pos.toCentreLatLng(this._map));
             
+            // Apply transform offset in batch
             for (let i = 0; i < latLngs.length; i++) {
                 const point = this._map.project(latLngs[i], maxZoom);
-                point.x -= 16;
-                point.y += 16;
+                point.x += transformOffset.x;
+                point.y += transformOffset.y;
                 latLngs[i] = this._map.unproject(point, maxZoom);
             }
             
             polygon.setLatLngs([latLngs]);
             
-            // Update resize handles
-            this._updateResizeHandlePositions();
+            pendingDragUpdate = null;
+        };
+
+        const handleMouseMove = (e: L.LeafletMouseEvent) => {
+            if (!isDragging || !startLatLng || !startPositions) return;
+            
+            // Store latest mouse event
+            lastMouseEvent = e;
+            
+            // Cancel any pending update
+            if (pendingDragUpdate !== null) {
+                cancelAnimationFrame(pendingDragUpdate);
+            }
+            
+            // Schedule update on next animation frame
+            pendingDragUpdate = requestAnimationFrame(performDragUpdate);
         };
 
         const handleMouseUp = () => {
             if (isDragging) {
+                // Cancel any pending animation frame
+                if (pendingDragUpdate !== null) {
+                    cancelAnimationFrame(pendingDragUpdate);
+                    pendingDragUpdate = null;
+                }
+                
+                // Perform final update synchronously
+                if (lastMouseEvent) {
+                    performDragUpdate();
+                }
+                
+                // Update resize handles once after drag completes
+                this._updateResizeHandlePositions();
+                
                 isDragging = false;
                 startLatLng = null;
                 startPositions = null;
+                lastMouseEvent = null;
                 L.DomUtil.removeClass(this._map.getContainer(), 'leaflet-dragging');
             }
         };
@@ -972,56 +1159,250 @@ export class CollectionControl extends L.Control {
         
         const rectangle = this._areas.rectangles[index];
         const bounds = rectangle.getBounds();
+        const area = this._areas.areas[index];
         
-        // Create 4 corner handles with appropriate resize cursors
-        const corners = [
-            { latLng: bounds.getNorthWest(), cursor: 'nw-resize' }, // Top-left (NW)
-            { latLng: bounds.getNorthEast(), cursor: 'ne-resize' }, // Top-right (NE)
-            { latLng: bounds.getSouthEast(), cursor: 'se-resize' }, // Bottom-right (SE)
-            { latLng: bounds.getSouthWest(), cursor: 'sw-resize' }  // Bottom-left (SW)
+        // Calculate area bounds to ensure handles are inside
+        const minX = Math.min(area.startPosition.x, area.endPosition.x);
+        const maxX = Math.max(area.startPosition.x, area.endPosition.x);
+        const minY = Math.min(area.startPosition.y, area.endPosition.y);
+        const maxY = Math.max(area.startPosition.y, area.endPosition.y);
+        
+        // Create 4 corner handles for diagonal resizing
+        const cornerPositions = [
+            { x: minX, y: maxY, latLng: bounds.getNorthWest(), cursor: 'nw-resize', type: 'corner', index: 0 }, // NW
+            { x: maxX, y: maxY, latLng: bounds.getNorthEast(), cursor: 'ne-resize', type: 'corner', index: 1 }, // NE
+            { x: maxX, y: minY, latLng: bounds.getSouthEast(), cursor: 'se-resize', type: 'corner', index: 2 }, // SE
+            { x: minX, y: minY, latLng: bounds.getSouthWest(), cursor: 'sw-resize', type: 'corner', index: 3 }  // SW
         ];
         
-        corners.forEach((corner, cornerIndex) => {
-            const handle = L.marker(corner.latLng, {
-                icon: L.divIcon({
-                    className: 'resize-handle',
-                    html: `<div style="width: 16px; height: 16px; background: #ff9500; border: 3px solid white; border-radius: 50%; cursor: ${corner.cursor}; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>`,
-                    iconSize: [16, 16],
-                    iconAnchor: [8, 8]
-                }),
-                draggable: true,
-                zIndexOffset: 1000
+        // Create 4 side handles for horizontal/vertical resizing
+        const centerX = Math.floor((minX + maxX) / 2);
+        const centerY = Math.floor((minY + maxY) / 2);
+        // Calculate side positions as LatLng from bounds
+        const northLatLng = L.latLng(bounds.getNorth(), bounds.getCenter().lng);
+        const eastLatLng = L.latLng(bounds.getCenter().lat, bounds.getEast());
+        const southLatLng = L.latLng(bounds.getSouth(), bounds.getCenter().lng);
+        const westLatLng = L.latLng(bounds.getCenter().lat, bounds.getWest());
+        const sidePositions = [
+            { x: centerX, y: maxY, latLng: northLatLng, cursor: 'n-resize', type: 'side', index: 4 }, // Top (N)
+            { x: maxX, y: centerY, latLng: eastLatLng, cursor: 'e-resize', type: 'side', index: 5 }, // Right (E)
+            { x: centerX, y: minY, latLng: southLatLng, cursor: 's-resize', type: 'side', index: 6 }, // Bottom (S)
+            { x: minX, y: centerY, latLng: westLatLng, cursor: 'w-resize', type: 'side', index: 7 }  // Left (W)
+        ];
+        
+        // Combine all handles
+        const allHandles = [...cornerPositions, ...sidePositions];
+        
+        allHandles.forEach((handleData) => {
+            const handleIndex = handleData.index;
+            const isCorner = handleData.type === 'corner';
+            // Create tile-sized rectangle handle at position inside the area
+            const handlePos = new Position(handleData.x, handleData.y, area.startPosition.z);
+            const handleRect = handlePos.toLeaflet(this._map);
+            handleRect.setStyle({
+                color: "#ffffff", // White border
+                fillColor: "#ff9500", // Orange fill
+                fillOpacity: 1.0, // No transparency
+                weight: 2,
+                opacity: 1.0,
+                interactive: false // Rectangle is visual only, marker handles dragging
             });
             
+            // Get the center of the rectangle handle for the marker position
+            const handleRectBounds = handleRect.getBounds();
+            const handleCenterLatLng = handleRectBounds.getCenter();
+            
+            // Create marker wrapper for drag functionality - use fixed size icon
+            // Make the icon visible and cover a good area for interaction
+            const handle = L.marker(handleCenterLatLng, {
+                icon: L.divIcon({
+                    className: 'resize-handle',
+                    html: `<div style="width: 40px; height: 40px; cursor: ${handleData.cursor}; background: rgba(255, 149, 0, 0.5); pointer-events: all; border: 2px solid white; border-radius: 2px;"></div>`,
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 20]
+                }),
+                draggable: true,
+                zIndexOffset: 1000,
+                opacity: 1.0,
+                interactive: true
+            });
+            
+            // Prevent map dragging when interacting with handle
+            handle.on('mousedown', (e: L.LeafletMouseEvent) => {
+                if (e.originalEvent) {
+                    L.DomEvent.stopPropagation(e.originalEvent);
+                }
+            });
+            
+            handle.on('click', (e: L.LeafletMouseEvent) => {
+                if (e.originalEvent) {
+                    L.DomEvent.stopPropagation(e.originalEvent);
+                }
+            });
+            
+            // Store reference to rectangle
+            (handle as any).handleRect = handleRect;
+            (handle as any).handleIndex = handleIndex;
+            (handle as any).isCorner = isCorner;
+            
             // Store reference to the fixed corner LatLng - will be set on dragstart
-            // Using LatLng directly avoids conversion issues that cause jumping
             let fixedCornerLatLng: L.LatLng | null = null;
+            let dragStartPos: Position | null = null;
             
             handle.on('dragstart', () => {
-                // Get the exact current bounds from the rectangle at the moment drag starts
-                const currentBounds = rectangle.getBounds();
+                // Store the starting position
+                const marker = handle;
+                const startLatLng = marker.getLatLng();
+                dragStartPos = Position.fromLatLng(this._map, startLatLng, (this._map as any).plane);
                 
-                // Get all corners as LatLngs (no conversion - these are the exact visual positions)
-                const cornerLatLngs = [
-                    currentBounds.getNorthWest(), // 0: NW
-                    currentBounds.getNorthEast(), // 1: NE
-                    currentBounds.getSouthEast(), // 2: SE
-                    currentBounds.getSouthWest()  // 3: SW
-                ];
+                // Get the fixed corner position from the area model
+                const area = this._areas.areas[index];
+                const minX = Math.min(area.startPosition.x, area.endPosition.x);
+                const maxX = Math.max(area.startPosition.x, area.endPosition.x);
+                const minY = Math.min(area.startPosition.y, area.endPosition.y);
+                const maxY = Math.max(area.startPosition.y, area.endPosition.y);
+                const centerX = Math.floor((minX + maxX) / 2);
+                const centerY = Math.floor((minY + maxY) / 2);
                 
-                // Opposite corner mapping: 0=NW->SE, 1=NE->SW, 2=SE->NW, 3=SW->NE
-                const oppositeCorners = [cornerLatLngs[2], cornerLatLngs[3], cornerLatLngs[0], cornerLatLngs[1]];
-                fixedCornerLatLng = oppositeCorners[cornerIndex];
+                // Calculate opposite corner/edge based on handle type and position
+                let oppositeX: number, oppositeY: number;
+                
+                if (isCorner) {
+                    // Corner handles: opposite corner stays fixed
+                    if (handleIndex === 0) { // NW -> SE
+                        oppositeX = maxX;
+                        oppositeY = minY;
+                    } else if (handleIndex === 1) { // NE -> SW
+                        oppositeX = minX;
+                        oppositeY = minY;
+                    } else if (handleIndex === 2) { // SE -> NW
+                        oppositeX = minX;
+                        oppositeY = maxY;
+                    } else { // SW -> NE
+                        oppositeX = maxX;
+                        oppositeY = maxY;
+                    }
+                } else {
+                    // Side handles: opposite side stays fixed
+                    if (handleIndex === 4) { // Top (N) -> Bottom (S) fixed
+                        oppositeX = centerX;
+                        oppositeY = minY;
+                    } else if (handleIndex === 5) { // Right (E) -> Left (W) fixed
+                        oppositeX = minX;
+                        oppositeY = centerY;
+                    } else if (handleIndex === 6) { // Bottom (S) -> Top (N) fixed
+                        oppositeX = centerX;
+                        oppositeY = maxY;
+                    } else { // Left (W) -> Right (E) fixed
+                        oppositeX = maxX;
+                        oppositeY = centerY;
+                    }
+                }
+                
+                // Store original bounds for anchoring
+                (handle as any).originalMinX = minX;
+                (handle as any).originalMaxX = maxX;
+                (handle as any).originalMinY = minY;
+                (handle as any).originalMaxY = maxY;
+                (handle as any).originalOppositeX = oppositeX;
+                (handle as any).originalOppositeY = oppositeY;
+                
+                // Convert opposite corner to LatLng for fixed reference
+                const oppositePos = new Position(oppositeX, oppositeY, area.startPosition.z);
+                fixedCornerLatLng = oppositePos.toLatLng(this._map);
+                
+                // Store the original handle position
+                const originalHandlePos = new Position(handleData.x, handleData.y, area.startPosition.z);
+                (handle as any).originalHandlePos = originalHandlePos;
+                (handle as any).handleData = handleData; // Store handleData for reference
             });
             
             // Throttled drag handler for better performance
             const dragHandler = throttle((e: L.LeafletEvent) => {
-                if (!fixedCornerLatLng) return;
+                if (!fixedCornerLatLng || !dragStartPos) return;
                 
                 const marker = e.target as L.Marker;
                 const newLatLng = marker.getLatLng();
-                // Update area with the fixed corner LatLng from dragstart
-                this._updateAreaFromCorner(index, cornerIndex, newLatLng, fixedCornerLatLng, false);
+                let newPos = Position.fromLatLng(this._map, newLatLng, (this._map as any).plane);
+                
+                // Constrain movement based on handle type
+                if (isCorner) {
+                    // Corner handles: allow both axes (diagonal only)
+                    // No constraint needed - both X and Y can change
+                } else {
+                    // Side handles: lock to single axis
+                    if (handleIndex === 4 || handleIndex === 6) {
+                        // Top/Bottom handles: only Y changes (vertical resize)
+                        newPos = new Position(dragStartPos.x, newPos.y, dragStartPos.z);
+                    } else {
+                        // Left/Right handles: only X changes (horizontal resize)
+                        newPos = new Position(newPos.x, dragStartPos.y, dragStartPos.z);
+                    }
+                }
+                
+                // Convert constrained position back to LatLng for handle rectangle
+                const constrainedLatLng = newPos.toLatLng(this._map);
+                
+                // Update handle rectangle position to the tile at newPos
+                const newHandleRect = newPos.toLeaflet(this._map);
+                newHandleRect.setStyle({
+                    color: "#ffffff",
+                    fillColor: "#ff9500",
+                    fillOpacity: 1.0,
+                    weight: 2,
+                    opacity: 1.0,
+                    interactive: false
+                });
+                this._map.removeLayer((marker as any).handleRect);
+                (marker as any).handleRect = newHandleRect;
+                this._map.addLayer(newHandleRect);
+                
+                // Update marker position to center of new rectangle
+                const newHandleBounds = newHandleRect.getBounds();
+                marker.setLatLng(newHandleBounds.getCenter());
+                
+                // Calculate the actual corner/edge LatLng based on handle type and position
+                let cornerLatLng: L.LatLng;
+                const handleIdx = (marker as any).handleIndex;
+                const isCornerHandle = (marker as any).isCorner;
+                
+                if (isCornerHandle) {
+                    // Corner handles: use the corner of the tile
+                    if (handleIdx === 0) { // NW
+                        cornerLatLng = newHandleBounds.getNorthWest();
+                    } else if (handleIdx === 1) { // NE
+                        cornerLatLng = newHandleBounds.getNorthEast();
+                    } else if (handleIdx === 2) { // SE
+                        cornerLatLng = newHandleBounds.getSouthEast();
+                    } else { // SW
+                        cornerLatLng = newHandleBounds.getSouthWest();
+                    }
+                } else {
+                    // Side handles: use the edge position (create LatLng from bounds values)
+                    const center = newHandleBounds.getCenter();
+                    if (handleIdx === 4) { // Top (N)
+                        cornerLatLng = L.latLng(newHandleBounds.getNorth(), center.lng);
+                    } else if (handleIdx === 5) { // Right (E)
+                        cornerLatLng = L.latLng(center.lat, newHandleBounds.getEast());
+                    } else if (handleIdx === 6) { // Bottom (S)
+                        cornerLatLng = L.latLng(newHandleBounds.getSouth(), center.lng);
+                    } else { // Left (W)
+                        cornerLatLng = L.latLng(center.lat, newHandleBounds.getWest());
+                    }
+                }
+                
+                // Get original bounds from dragstart
+                const originalBounds = {
+                    minX: (marker as any).originalMinX,
+                    maxX: (marker as any).originalMaxX,
+                    minY: (marker as any).originalMinY,
+                    maxY: (marker as any).originalMaxY,
+                    oppositeX: (marker as any).originalOppositeX,
+                    oppositeY: (marker as any).originalOppositeY
+                };
+                
+                // Update area - fixedCornerLatLng never changes, only the dragged corner/edge moves
+                this._updateAreaFromCorner(index, handleIdx, cornerLatLng, fixedCornerLatLng, false, originalBounds);
             }, 16); // ~60fps
             
             handle.on('drag', dragHandler);
@@ -1030,6 +1411,8 @@ export class CollectionControl extends L.Control {
                 this._updateResizeHandlePositions();
             });
             
+            // Add rectangle to map
+            handleRect.addTo(this._map);
             handle.addTo(this._map);
             this._resizeHandles.push(handle);
         });
@@ -1038,7 +1421,36 @@ export class CollectionControl extends L.Control {
     // Update resize handle positions to match current rectangle/polygon bounds
     private _updateResizeHandlePositions() {
         if (this._selectedAreaIndex !== null) {
-            // Clear and recreate handles for area
+            // First, ensure the rectangle visual matches the area model
+            const area = this._areas.areas[this._selectedAreaIndex];
+            const rectangle = this._areas.rectangles[this._selectedAreaIndex];
+            
+            // Update rectangle bounds to match area
+            const newStartPos = new Position(area.startPosition.x, area.startPosition.y, area.startPosition.z);
+            const newEndPos = new Position(area.endPosition.x, area.endPosition.y, area.endPosition.z);
+            
+            let adjustedStartPos = new Position(newStartPos.x, newStartPos.y, newStartPos.z);
+            let adjustedEndPos = new Position(newEndPos.x, newEndPos.y, newEndPos.z);
+            
+            if (adjustedEndPos.x >= adjustedStartPos.x) {
+                adjustedEndPos.x += 1;
+            } else {
+                adjustedStartPos.x += 1;
+            }
+            if (adjustedEndPos.y >= adjustedStartPos.y) {
+                adjustedEndPos.y += 1;
+            } else {
+                adjustedStartPos.y += 1;
+            }
+            
+            rectangle.setBounds(
+                L.latLngBounds(
+                    adjustedStartPos.toLatLng(this._map),
+                    adjustedEndPos.toLatLng(this._map)
+                )
+            );
+            
+            // Now clear and recreate handles for area
             const shouldHaveCenterHandle = this._centerDragHandle !== null;
             this._clearResizeHandles();
             this._addResizeHandlesForArea(this._selectedAreaIndex);
@@ -1101,45 +1513,72 @@ export class CollectionControl extends L.Control {
 
     // Update area when a corner is dragged - opposite corner stays fixed
     // Optimized with direct bounds calculation and minimal conversions
-    private _updateAreaFromCorner(areaIndex: number, cornerIndex: number, newLatLng: L.LatLng, fixedCornerLatLng: L.LatLng, skipHandleUpdate: boolean = false) {
+    private _updateAreaFromCorner(areaIndex: number, cornerIndex: number, newLatLng: L.LatLng, fixedCornerLatLng: L.LatLng, skipHandleUpdate: boolean = false, originalBounds?: { minX: number; maxX: number; minY: number; maxY: number; oppositeX: number; oppositeY: number }) {
         if (areaIndex < 0 || areaIndex >= this._areas.areas.length) return;
         
         const area = this._areas.areas[areaIndex];
         const rectangle = this._areas.rectangles[areaIndex];
         
-        // Calculate new bounds directly from LatLng (no conversion until needed)
-        const minLat = Math.min(newLatLng.lat, fixedCornerLatLng.lat);
-        const maxLat = Math.max(newLatLng.lat, fixedCornerLatLng.lat);
-        const minLng = Math.min(newLatLng.lng, fixedCornerLatLng.lng);
-        const maxLng = Math.max(newLatLng.lng, fixedCornerLatLng.lng);
-        
-        // Create bounds directly - more efficient than converting Position first
-        const newBounds = L.latLngBounds([minLat, minLng], [maxLat, maxLng]);
-        rectangle.setBounds(newBounds);
-        
-        // Convert to Position only once, after bounds are set
+        // Convert to Position
         const newPos = Position.fromLatLng(this._map, newLatLng, (this._map as any).plane);
         const fixedCornerPos = Position.fromLatLng(this._map, fixedCornerLatLng, (this._map as any).plane);
         
         // Calculate game coordinates for area model
-        let finalMinX = Math.min(newPos.x, fixedCornerPos.x);
-        let finalMaxX = Math.max(newPos.x, fixedCornerPos.x);
-        let finalMinY = Math.min(newPos.y, fixedCornerPos.y);
-        let finalMaxY = Math.max(newPos.y, fixedCornerPos.y);
+        // Handle both corner handles (0-3) and side handles (4-7)
+        let finalMinX: number, finalMaxX: number, finalMinY: number, finalMaxY: number;
+        
+        if (originalBounds) {
+            if (cornerIndex < 4) {
+                // Corner handles: use opposite corner
+                finalMinX = Math.min(newPos.x, originalBounds.oppositeX);
+                finalMaxX = Math.max(newPos.x, originalBounds.oppositeX);
+                finalMinY = Math.min(newPos.y, originalBounds.oppositeY);
+                finalMaxY = Math.max(newPos.y, originalBounds.oppositeY);
+            } else {
+                // Side handles: only change one axis, keep others from original bounds
+                if (cornerIndex === 4) { // Top (N) - only change maxY
+                    finalMinX = originalBounds.minX;
+                    finalMaxX = originalBounds.maxX;
+                    finalMinY = originalBounds.minY;
+                    finalMaxY = newPos.y;
+                } else if (cornerIndex === 5) { // Right (E) - only change maxX
+                    finalMinX = originalBounds.minX;
+                    finalMaxX = newPos.x;
+                    finalMinY = originalBounds.minY;
+                    finalMaxY = originalBounds.maxY;
+                } else if (cornerIndex === 6) { // Bottom (S) - only change minY
+                    finalMinX = originalBounds.minX;
+                    finalMaxX = originalBounds.maxX;
+                    finalMinY = newPos.y;
+                    finalMaxY = originalBounds.maxY;
+                } else { // Left (W) - only change minX
+                    finalMinX = newPos.x;
+                    finalMaxX = originalBounds.maxX;
+                    finalMinY = originalBounds.minY;
+                    finalMaxY = originalBounds.maxY;
+                }
+            }
+        } else {
+            // Fallback: use fixedCornerPos directly (shouldn't happen, but safety)
+            finalMinX = Math.min(newPos.x, fixedCornerPos.x);
+            finalMaxX = Math.max(newPos.x, fixedCornerPos.x);
+            finalMinY = Math.min(newPos.y, fixedCornerPos.y);
+            finalMaxY = Math.max(newPos.y, fixedCornerPos.y);
+        }
         
         // Ensure minimum size (at least 1x1)
         if (finalMaxX - finalMinX < 1) {
-            if (cornerIndex === 0 || cornerIndex === 3) {
-                finalMinX = fixedCornerPos.x - 1;
+            if (cornerIndex === 0 || cornerIndex === 3 || cornerIndex === 7) {
+                finalMinX = originalBounds ? originalBounds.minX - 1 : fixedCornerPos.x - 1;
             } else {
-                finalMaxX = fixedCornerPos.x + 1;
+                finalMaxX = originalBounds ? originalBounds.maxX + 1 : fixedCornerPos.x + 1;
             }
         }
         if (finalMaxY - finalMinY < 1) {
-            if (cornerIndex === 0 || cornerIndex === 1) {
-                finalMinY = fixedCornerPos.y - 1;
+            if (cornerIndex === 0 || cornerIndex === 1 || cornerIndex === 4) {
+                finalMinY = originalBounds ? originalBounds.minY - 1 : fixedCornerPos.y - 1;
             } else {
-                finalMaxY = fixedCornerPos.y + 1;
+                finalMaxY = originalBounds ? originalBounds.maxY + 1 : fixedCornerPos.y + 1;
             }
         }
         
@@ -1152,19 +1591,53 @@ export class CollectionControl extends L.Control {
         }
         
         // Update other handles in real-time (optimized: only update positions, don't recreate)
-        if (!skipHandleUpdate && this._resizeHandles.length >= 4) {
-            // Cache corner calculations
-            const corners = [
-                newBounds.getNorthWest(),
-                newBounds.getNorthEast(),
-                newBounds.getSouthEast(),
-                newBounds.getSouthWest()
+        if (!skipHandleUpdate && this._resizeHandles.length >= 8) {
+            // Get updated area bounds to calculate correct handle positions
+            const area = this._areas.areas[areaIndex];
+            const minX = Math.min(area.startPosition.x, area.endPosition.x);
+            const maxX = Math.max(area.startPosition.x, area.endPosition.x);
+            const minY = Math.min(area.startPosition.y, area.endPosition.y);
+            const maxY = Math.max(area.startPosition.y, area.endPosition.y);
+            const centerX = Math.floor((minX + maxX) / 2);
+            const centerY = Math.floor((minY + maxY) / 2);
+            
+            // Calculate all handle positions (corners + sides)
+            const handlePositions = [
+                { x: minX, y: maxY }, // 0: Top-left (NW)
+                { x: maxX, y: maxY }, // 1: Top-right (NE)
+                { x: maxX, y: minY }, // 2: Bottom-right (SE)
+                { x: minX, y: minY }, // 3: Bottom-left (SW)
+                { x: centerX, y: maxY }, // 4: Top (N)
+                { x: maxX, y: centerY }, // 5: Right (E)
+                { x: centerX, y: minY }, // 6: Bottom (S)
+                { x: minX, y: centerY }  // 7: Left (W)
             ];
             
             // Batch handle updates
             this._resizeHandles.forEach((handle, idx) => {
-                if (idx !== cornerIndex && idx < corners.length) {
-                    handle.setLatLng(corners[idx]);
+                if (idx !== cornerIndex && idx < handlePositions.length) {
+                    const handlePosData = handlePositions[idx];
+                    const handlePos = new Position(handlePosData.x, handlePosData.y, area.startPosition.z);
+                    
+                    // Update handle rectangle position
+                    if ((handle as any).handleRect) {
+                        const newHandleRect = handlePos.toLeaflet(this._map);
+                        newHandleRect.setStyle({
+                            color: "#ffffff",
+                            fillColor: "#ff9500",
+                            fillOpacity: 1.0,
+                            weight: 2,
+                            opacity: 1.0,
+                            interactive: false
+                        });
+                        this._map.removeLayer((handle as any).handleRect);
+                        (handle as any).handleRect = newHandleRect;
+                        this._map.addLayer(newHandleRect);
+                    }
+                    
+                    // Update marker position to center of new rectangle
+                    const newHandleBounds = (handle as any).handleRect.getBounds();
+                    handle.setLatLng(newHandleBounds.getCenter());
                 }
             });
         }
@@ -1208,6 +1681,10 @@ export class CollectionControl extends L.Control {
     // Clear all resize handles
     private _clearResizeHandles() {
         this._resizeHandles.forEach(handle => {
+            // Remove rectangle if it exists
+            if ((handle as any).handleRect) {
+                this._map.removeLayer((handle as any).handleRect);
+            }
             this._map.removeLayer(handle);
         });
         this._resizeHandles = [];

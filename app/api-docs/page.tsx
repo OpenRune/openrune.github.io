@@ -144,10 +144,11 @@ export default function ApiDocsPage() {
     
     if (isDataType) {
       const currentValue = value || 'web';
+      const inputId = `${endpoint.path}-${param.name}`;
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 w-24 text-xs flex items-center justify-between">
+            <Button id={inputId} variant="outline" size="sm" className="h-8 w-24 text-xs flex items-center justify-between">
               <span className="capitalize">{currentValue}</span>
               <IconChevronDown className="h-3 w-3 ml-1 opacity-50" />
             </Button>
@@ -172,6 +173,7 @@ export default function ApiDocsPage() {
     
     if (isSearchMode) {
       const currentValue = value || '';
+      const inputId = `${endpoint.path}-${param.name}`;
       const searchModeLabels: Record<string, string> = {
         'ID': 'ID',
         'GAMEVAL': 'Gameval',
@@ -181,7 +183,7 @@ export default function ApiDocsPage() {
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 w-28 text-xs flex items-center justify-between">
+            <Button id={inputId} variant="outline" size="sm" className="h-8 w-28 text-xs flex items-center justify-between">
               <span>{currentValue ? searchModeLabels[currentValue] || currentValue : 'Select...'}</span>
               <IconChevronDown className="h-3 w-3 ml-1 opacity-50" />
             </Button>
@@ -217,12 +219,13 @@ export default function ApiDocsPage() {
     }
 
     if (isBoolean) {
+      const inputId = `${endpoint.path}-${param.name}`;
       return (
         <Select
           value={value}
           onValueChange={(newValue) => updateParamValue(endpoint, param.name, newValue)}
         >
-          <SelectTrigger className="h-8 w-24 text-xs">
+          <SelectTrigger id={inputId} className="h-8 w-24 text-xs">
             <SelectValue placeholder="Select..." />
           </SelectTrigger>
           <SelectContent>
@@ -235,6 +238,7 @@ export default function ApiDocsPage() {
 
     return (
       <Input
+        id={`${endpoint.path}-${param.name}`}
         type="text"
         placeholder={param.defaultValue ? `Default: ${param.defaultValue}` : param.name}
         value={value}

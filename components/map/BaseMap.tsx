@@ -111,7 +111,10 @@ export function BaseMap({
     });
 
     map.getContainer().addEventListener('mouseleave', () => {
-      const centre = map.getBounds().getCenter();
+      const bounds = map.getBounds();
+      if (!bounds) return; // Map not fully initialized yet
+      
+      const centre = bounds.getCenter();
       const centrePos = Position.fromLatLng(map, centre, map.plane);
       setCurrentPosition(centrePos);
       if (onPositionChange) {
@@ -156,11 +159,16 @@ export function BaseMap({
     }
 
     map.setView(centreLatLng, zoom);
-    setCurrentPosition(Position.fromLatLng(map, map.getBounds().getCenter(), map.plane));
+    const initialBounds = map.getBounds();
+    if (initialBounds) {
+      setCurrentPosition(Position.fromLatLng(map, initialBounds.getCenter(), map.plane));
+    }
 
     // Update URL params on move/zoom
     const updateUrl = () => {
-      const centre = map.getBounds().getCenter();
+      const bounds = map.getBounds();
+      if (!bounds) return; // Map not fully initialized yet
+      const centre = bounds.getCenter();
       const centrePos = Position.fromLatLng(map, centre, map.plane);
       const currentZoom = map.getZoom();
       window.history.replaceState(null, '', `?centreX=${centrePos.x}&centreY=${centrePos.y}&centreZ=${centrePos.z}&zoom=${currentZoom}`);

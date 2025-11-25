@@ -14,11 +14,13 @@ export function exportAllItems(
 ): string {
     const areas = collectionControl.getAreas();
     const polyPositions = collectionControl.getPolyArea();
+    const pathPositions = collectionControl.getPath();
     
     if (format === 'json') {
         const exportData: {
             areas?: Array<{ minX: number; minY: number; maxX: number; maxY: number; plane: number }>;
             polygon?: Array<{ x: number; y: number; z: number }>;
+            path?: Array<[number, number] | [number, number, number]>;
         } = {};
         
         if (areas.length > 0) {
@@ -45,6 +47,12 @@ export function exportAllItems(
             }));
         }
         
+        if (pathPositions.length > 0) {
+            exportData.path = pathPositions.map(pos => 
+                pos.z > 0 ? [pos.x, pos.y, pos.z] : [pos.x, pos.y]
+            );
+        }
+        
         return JSON.stringify(exportData, null, 2);
     } else if (format === 'array') {
         const parts: string[] = [];
@@ -65,6 +73,15 @@ export function exportAllItems(
         
         if (polyPositions.length > 0) {
             polyPositions.forEach(pos => {
+                parts.push(pos.z > 0 
+                    ? `[${pos.x}, ${pos.y}, ${pos.z}]`
+                    : `[${pos.x}, ${pos.y}]`
+                );
+            });
+        }
+        
+        if (pathPositions.length > 0) {
+            pathPositions.forEach(pos => {
                 parts.push(pos.z > 0 
                     ? `[${pos.x}, ${pos.y}, ${pos.z}]`
                     : `[${pos.x}, ${pos.y}]`
@@ -99,6 +116,15 @@ export function exportAllItems(
             });
         }
         
+        if (pathPositions.length > 0) {
+            pathPositions.forEach(pos => {
+                parts.push(pos.z > 0 
+                    ? `${pos.x},${pos.y},${pos.z}`
+                    : `${pos.x},${pos.y}`
+                );
+            });
+        }
+        
         return parts.join('\n');
     } else if (format === 'java') {
         const parts: string[] = [];
@@ -117,6 +143,13 @@ export function exportAllItems(
                 `new WorldPoint(${pos.x}, ${pos.y}, ${pos.z})`
             ).join(',\n    ');
             parts.push(`new WorldPoint[] {\n    ${polyAsString}\n}`);
+        }
+        
+        if (pathPositions.length > 0) {
+            const pathAsString = pathPositions.map(pos => 
+                `new WorldPoint(${pos.x}, ${pos.y}, ${pos.z})`
+            ).join(',\n    ');
+            parts.push(`new WorldPoint[] {\n    ${pathAsString}\n}`);
         }
         
         return parts.join(',\n');

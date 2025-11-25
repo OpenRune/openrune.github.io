@@ -23,7 +23,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { fetchFromBuildUrl } from '@/lib/api/apiClient';
+import { fetchFromBuildUrl, buildUrl } from '@/lib/api/apiClient';
 import { IconChevronLeft, IconChevronRight, IconTarget, IconCircleDashed, IconX, IconFileDownload } from '@tabler/icons-react';
 import { Info } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -60,6 +60,7 @@ interface SpriteData {
 
 interface ManifestResponse {
   [id: string]: SpriteData | any;
+  total?: number; // Total count of filtered results (when searching)
 }
 
 export interface TableColumn {
@@ -390,9 +391,11 @@ export function PaginatedTable({
 
   const [info, setInfo] = useState<InfoResponse | null>(null);
   const [data, setData] = useState<ManifestResponse | null>(null);
+  const [allSearchResults, setAllSearchResults] = useState<ManifestResponse | null>(null); // Store all search results for client-side pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchTotalCount, setSearchTotalCount] = useState<number | null>(null);
   const [itemsPerPage, setItemsPerPage] = useState(() => {
     const cookieVal = Cookies.get(perPageCookieKey);
     const parsed = cookieVal ? parseInt(cookieVal, 10) : defaultAmt;
@@ -432,8 +435,18 @@ export function PaginatedTable({
   const fetchManifest = useCallback(async (page: number) => {
     if (!info) return;
 
-    // Create a unique key for this fetch to prevent duplicates (include cache type to force refresh on change)
-    const fetchKey = `${selectedCacheType.id}-${endpoint}-${page}-${itemsPerPage}-${debouncedSearchQuery}-${filterStateKey}`;
+    // Check if searching
+    const isSearching = debouncedSearchQuery.trim() !== '';
+    
+    // When searching, we fetch all results once and paginate client-side
+    // Create a unique key for search fetch (without page, since we fetch all at once)
+    const searchFetchKey = `${selectedCacheType.id}-${endpoint}-search-${debouncedSearchQuery}-${filterStateKey}`;
+    
+    // For non-search, include page in the fetch key
+    const fetchKey = isSearching 
+      ? searchFetchKey
+      : `${selectedCacheType.id}-${endpoint}-${page}-${itemsPerPage}-${debouncedSearchQuery}-${filterStateKey}`;
+    
     if (fetchManifestRef.current === fetchKey) {
       return; // Already fetching or fetched this exact combination
     }
@@ -443,12 +456,29 @@ export function PaginatedTable({
       setLoading(true);
       setError(null);
       const path = `${endpoint}/data`;
-      const queryParams: Record<string, string | number | boolean> = {
-        limit: itemsPerPage,
-      };
+      const queryParams: Record<string, string | number | boolean> = {};
       
       // Check if any filters are active
       const hasActiveFilters = filters.some(filter => filterState[filter.key]);
+      
+      if (isSearching) {
+        // When searching, fetch ALL results (no limit, no offset)
+        queryParams.searchMode = searchMode;
+        queryParams.q = debouncedSearchQuery.trim();
+        // Don't add limit or offset - fetch all results
+      } else {
+        // When not searching, use normal pagination
+        queryParams.limit = itemsPerPage;
+        
+        if (hasActiveFilters) {
+          // When filters are active, use offset for pagination (IDs won't be sequential)
+          queryParams.offset = (page - 1) * itemsPerPage;
+        } else {
+          // Only use idRange when not searching and no filters are active
+          const [start, end] = getPageIdRange(page);
+          queryParams.idRange = `${start}..${end}`;
+        }
+      }
       
       // Add filter parameters
       filters.forEach((filter) => {
@@ -465,29 +495,34 @@ export function PaginatedTable({
         }
       });
       
-      // Add search parameters if search query is provided
-      if (debouncedSearchQuery.trim()) {
-        queryParams.searchMode = searchMode;
-        queryParams.q = debouncedSearchQuery.trim();
-        // When searching, use offset for pagination
-        queryParams.offset = (page - 1) * itemsPerPage;
-      } else if (hasActiveFilters) {
-        // When filters are active, use offset for pagination (IDs won't be sequential)
-        queryParams.offset = (page - 1) * itemsPerPage;
-      } else {
-        // Only use idRange when not searching and no filters are active
-        const [start, end] = getPageIdRange(page);
-        queryParams.idRange = `${start}..${end}`;
-      }
+      // Log the URL being fetched
+      const fullUrl = buildUrl(path, queryParams);
+      console.log('🔍 Fetching URL:', fullUrl);
       
       const response = await fetchFromBuildUrl(path, queryParams);
       if (!response.ok) {
         const errorText = await response.text().catch(() => response.statusText);
-        // Error logged for debugging
         throw new Error(`Failed to fetch manifest (${response.status}): ${errorText || response.statusText}`);
       }
       const manifestData: ManifestResponse = await response.json();
+      
       startTransition(() => {
+        if (isSearching) {
+          // Store all search results for client-side pagination
+          setAllSearchResults(manifestData);
+          // Extract total count from response
+          if (manifestData.total !== undefined) {
+            setSearchTotalCount(manifestData.total);
+          } else {
+            // If no total, count entries (excluding 'total' key)
+            const entryKeys = Object.keys(manifestData).filter(k => k !== 'total');
+            setSearchTotalCount(entryKeys.length);
+          }
+        } else {
+          // Clear search results when not searching
+          setAllSearchResults(null);
+          setSearchTotalCount(null);
+        }
         setData(manifestData);
         setLoading(false);
       });
@@ -647,9 +682,39 @@ export function PaginatedTable({
     }
   }, [filterState, filters.length, info, getTotalCount, totalCountField, itemsPerPage]);
 
+  // Track previous itemsPerPage to detect changes
+  const prevItemsPerPageRef = useRef<number>(itemsPerPage);
+
   // Fetch manifest when info is loaded, page changes, itemsPerPage changes, or filters change
   useEffect(() => {
     if (!info) return; // Wait for info to load first
+    
+    const isSearching = debouncedSearchQuery.trim() !== '';
+    const itemsPerPageChanged = prevItemsPerPageRef.current !== itemsPerPage;
+    
+    // Update ref for next comparison
+    prevItemsPerPageRef.current = itemsPerPage;
+    
+    // When searching, refetch if itemsPerPage changes, otherwise use client-side pagination
+    if (isSearching) {
+      // Adjust current page if it goes out of bounds when itemsPerPage changes
+      if (searchTotalCount !== null) {
+        const newTotalPages = Math.ceil(searchTotalCount / itemsPerPage);
+        if (currentPage > newTotalPages && newTotalPages > 0) {
+          setCurrentPage(newTotalPages);
+        }
+      }
+      
+      // If itemsPerPage changed, refetch the data
+      if (itemsPerPageChanged) {
+        fetchManifest(1);
+        return;
+      }
+      
+      // Don't fetch on page changes - use client-side pagination
+      // Only fetch when search query or filters change (handled by other effects)
+      return;
+    }
     
     // If we have totalPages > 0, ensure we're within bounds
     if (totalPages > 0) {
@@ -663,14 +728,22 @@ export function PaginatedTable({
         fetchManifest(1);
       }
     }
-  }, [info, currentPage, fetchManifest, itemsPerPage, totalPages, filterState]);
+  }, [info, currentPage, fetchManifest, itemsPerPage, totalPages, filterState, debouncedSearchQuery, searchTotalCount]);
 
-  // Reset to page 1 when search query changes
+  // Reset to page 1 when search query changes and fetch new results
   useEffect(() => {
-    if (debouncedSearchQuery) {
+    if (!info) return; // Wait for info to load first
+    
+    if (debouncedSearchQuery.trim()) {
       setCurrentPage(1);
+      setSearchTotalCount(null); // Reset search total count when search changes
+      // Fetch all search results
+      fetchManifest(1);
+    } else {
+      setSearchTotalCount(null); // Clear when search is cleared
+      setAllSearchResults(null); // Clear all search results when search is cleared
     }
-  }, [debouncedSearchQuery]);
+  }, [debouncedSearchQuery, info, fetchManifest]);
 
   // Default image URL generator - not used if custom columns are provided
   const defaultGetImageUrl = useCallback(
@@ -758,21 +831,43 @@ export function PaginatedTable({
   
   // Memoize entries to prevent unnecessary re-renders
   const entries = useMemo(() => {
-    if (!data) return [];
-    return Object.entries(data).sort(([a], [b]) => {
-      const numA = parseInt(a, 10);
-      const numB = parseInt(b, 10);
-      if (!isNaN(numA) && !isNaN(numB)) {
-        return numA - numB;
-      }
-      return a.localeCompare(b);
-    });
-  }, [data]);
+    const isSearching = debouncedSearchQuery.trim() !== '';
+    
+    // When searching, use allSearchResults and paginate client-side
+    const sourceData = isSearching ? allSearchResults : data;
+    
+    if (!sourceData) return [];
+    
+    // Exclude 'total' from entries if it exists
+    let allEntries = Object.entries(sourceData)
+      .filter(([key]) => key !== 'total')
+      .sort(([a], [b]) => {
+        const numA = parseInt(a, 10);
+        const numB = parseInt(b, 10);
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return numA - numB;
+        }
+        return a.localeCompare(b);
+      });
+    
+    // When searching, slice entries based on current page for client-side pagination
+    if (isSearching && allSearchResults) {
+      const start = (currentPage - 1) * itemsPerPage;
+      const end = start + itemsPerPage;
+      allEntries = allEntries.slice(start, end);
+    }
+    
+    return allEntries;
+  }, [data, allSearchResults, debouncedSearchQuery, currentPage, itemsPerPage]);
   
   // Memoize displayTotalEntries and filteredTotalPages
   const displayTotalEntries = useMemo(() => {
-    return debouncedSearchQuery.trim() ? entries.length : totalCount;
-  }, [debouncedSearchQuery, entries.length, totalCount]);
+    if (debouncedSearchQuery.trim()) {
+      // Use searchTotalCount if available, otherwise fall back to entries.length
+      return searchTotalCount !== null ? searchTotalCount : entries.length;
+    }
+    return totalCount;
+  }, [debouncedSearchQuery, entries.length, totalCount, searchTotalCount]);
   
   const filteredTotalPages = useMemo(() => {
     return debouncedSearchQuery.trim()
