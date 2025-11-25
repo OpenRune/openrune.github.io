@@ -1,6 +1,6 @@
 import { Area as AreaModel } from '@/lib/map/model/Area';
 import { Position } from '@/lib/map/model/Position';
-import { Area, Poly } from './types';
+import { Area, Poly, Path } from './types';
 
 export function areaModelToSelectionItem(area: AreaModel, index: number): Area & { plane?: number } {
     const minX = Math.min(area.startPosition.x, area.endPosition.x);
@@ -25,12 +25,26 @@ export function positionsToSelectionItem(positions: Position[], index: number): 
     };
 }
 
+export function positionsToPathItem(positions: Position[], index: number): Path & { plane?: number } {
+    const plane = positions.length > 0 ? positions[0].z : 0;
+    return {
+        id: `path-${index}`,
+        type: 'path',
+        points: positions.map(pos => ({ x: pos.x, y: pos.y, z: pos.z })),
+        plane
+    };
+}
+
 export function formatArea(area: Area): string {
     return `${area.bounds.minX},${area.bounds.minY},${area.bounds.maxX},${area.bounds.maxY}`;
 }
 
 export function formatPoly(poly: Poly): string {
     return `${poly.points.length} points`;
+}
+
+export function formatPath(path: Path): string {
+    return `${path.points.length} points`;
 }
 
 export function detectFormat(text: string): { format: 'json' | 'java' | 'array' | 'raw'; type: 'area' | 'poly' } {

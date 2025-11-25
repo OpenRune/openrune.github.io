@@ -1,7 +1,7 @@
 import { Position } from '@/lib/map/model/Position';
 import { CollectionControl } from '@/lib/map/controls/CollectionControl';
 
-export type ToolType = 'area' | 'poly' | null;
+export type ToolType = 'area' | 'poly' | 'path' | null;
 
 export interface Area {
     id: string;
@@ -22,7 +22,14 @@ export interface Poly {
     name?: string; // Optional session-only name
 }
 
-export type SelectionItem = Area | Poly;
+export interface Path {
+    id: string;
+    type: 'path';
+    points: Array<{ x: number; y: number; z?: number }>;
+    name?: string; // Optional session-only name
+}
+
+export type SelectionItem = Area | Poly | Path;
 
 export interface AreaSelectionProps {
     onItemClick?: (item: SelectionItem) => void;

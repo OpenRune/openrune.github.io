@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CollectionControl } from '@/lib/map/controls/CollectionControl';
 import { SelectionItem, ToolType } from './types';
-import { areaModelToSelectionItem, positionsToSelectionItem } from './utils';
+import { areaModelToSelectionItem, positionsToSelectionItem, positionsToPathItem } from './utils';
 import { STORAGE_KEY_SELECTED_TOOL } from './constants';
 
 export function useCollectionControl(collectionControl: CollectionControl | null | undefined) {
@@ -11,7 +11,7 @@ export function useCollectionControl(collectionControl: CollectionControl | null
     const [selectedTool, setSelectedTool] = useState<ToolType>(() => {
         if (typeof window === 'undefined') return 'area';
         const saved = localStorage.getItem(STORAGE_KEY_SELECTED_TOOL);
-        if (saved === 'area' || saved === 'poly') return saved;
+        if (saved === 'area' || saved === 'poly' || saved === 'path') return saved;
         return 'area';
     });
 
@@ -43,6 +43,12 @@ export function useCollectionControl(collectionControl: CollectionControl | null
                 }
             }
 
+            const pathPositions = collectionControl.getPath();
+            if (pathPositions.length > 0) {
+                const pathItem = positionsToPathItem(pathPositions, 0);
+                newItems.push(pathItem);
+            }
+
             setItems(newItems);
             setHiddenItems(newHiddenItems);
             
@@ -61,12 +67,23 @@ export function useCollectionControl(collectionControl: CollectionControl | null
 
         const savedTool = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_SELECTED_TOOL) : null;
         const currentCollectionTool = collectionControl.getCurrentTool();
-        const toolToUse = (savedTool === 'area' || savedTool === 'poly') 
-            ? savedTool 
-            : (currentCollectionTool || selectedTool || 'area');
+        // Default to 'area' if no tool is set
+        let toolToUse: ToolType = 'area';
+        if (savedTool === 'area' || savedTool === 'poly' || savedTool === 'path') {
+            toolToUse = savedTool;
+        } else if (currentCollectionTool) {
+            toolToUse = currentCollectionTool;
+        }
+        // If no saved tool and no current tool, default to 'area' (already set above)
+        
         setSelectedTool(toolToUse);
         if (toolToUse !== currentCollectionTool) {
             collectionControl.setToolMode(toolToUse);
+        }
+        
+        // Save default 'area' to localStorage if nothing was saved
+        if (typeof window !== 'undefined' && !savedTool && toolToUse === 'area') {
+            localStorage.setItem(STORAGE_KEY_SELECTED_TOOL, 'area');
         }
 
         const pollInterval = setInterval(() => {

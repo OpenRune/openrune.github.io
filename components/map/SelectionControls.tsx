@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 
 interface SelectionControlsProps {
     visible: boolean;
-    type: 'area' | 'poly' | null;
+    type: 'area' | 'poly' | 'path' | null;
 }
 
 export function SelectionControls({ visible, type }: SelectionControlsProps) {

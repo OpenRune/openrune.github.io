@@ -7,8 +7,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { ZoomIn, ZoomOut, ArrowUp, ArrowDown, Grid3x3, Tag } from 'lucide-react';
+import { ZoomIn, ZoomOut, ArrowUp, ArrowDown, Grid3x3, Grid, Tag, Settings } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { TileGridControl } from '@/lib/map/controls/TileGridControl';
+import { BsGrid3X3 } from "react-icons/bs";
+
+
 
 interface MapInfoPanelProps {
   position: Position | null;
@@ -18,11 +25,14 @@ interface MapInfoPanelProps {
   onZoomChange: (zoom: number) => void;
   showRegionGrid: boolean;
   onShowRegionGridChange: (show: boolean) => void;
+  showTileGrid: boolean;
+  onShowTileGridChange: (show: boolean) => void;
   showLabels: boolean;
   onShowLabelsChange: (show: boolean) => void;
   onGoToCoordinates?: (x: number, y: number, z: number) => void;
   onGoToRegionCoordinates?: (rx: number, ry: number) => void;
   onGoToRegion?: (regionId: number) => void;
+  tileGridControlRef?: React.RefObject<TileGridControl | null>;
   className?: string;
 }
 
@@ -34,13 +44,76 @@ export function MapInfoPanel({
   onZoomChange, 
   showRegionGrid, 
   onShowRegionGridChange, 
+  showTileGrid,
+  onShowTileGridChange,
   showLabels, 
   onShowLabelsChange,
   onGoToCoordinates,
   onGoToRegionCoordinates,
   onGoToRegion,
+  tileGridControlRef,
   className 
 }: MapInfoPanelProps) {
+  const STORAGE_KEY_TILE_GRID_COLOR = 'tile-grid-color';
+  const STORAGE_KEY_TILE_GRID_ALPHA = 'tile-grid-alpha';
+
+  // Load settings from localStorage on mount
+  const [tileGridColor, setTileGridColor] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(STORAGE_KEY_TILE_GRID_COLOR) || '#888888';
+    }
+    return '#888888';
+  });
+  const [tileGridAlpha, setTileGridAlpha] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(STORAGE_KEY_TILE_GRID_ALPHA);
+      return saved ? parseFloat(saved) : 0.4;
+    }
+    return 0.4;
+  });
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Load settings from localStorage and apply to control on mount
+  // This runs immediately when control is available, before grid is enabled
+  useEffect(() => {
+    if (tileGridControlRef?.current) {
+      // Apply saved settings to control immediately
+      // This ensures the color/alpha are set even if grid isn't enabled yet
+      tileGridControlRef.current.setColor(tileGridColor);
+      tileGridControlRef.current.setAlpha(tileGridAlpha);
+    }
+  }, [tileGridControlRef]); // Only run when control becomes available
+
+  // Also update when color/alpha change (for real-time updates)
+  useEffect(() => {
+    if (tileGridControlRef?.current) {
+      tileGridControlRef.current.setColor(tileGridColor);
+    }
+  }, [tileGridColor, tileGridControlRef]);
+
+  useEffect(() => {
+    if (tileGridControlRef?.current) {
+      tileGridControlRef.current.setAlpha(tileGridAlpha);
+    }
+  }, [tileGridAlpha, tileGridControlRef]);
+
+  // Save color to localStorage and update control
+  const handleColorChange = (color: string) => {
+    setTileGridColor(color);
+    localStorage.setItem(STORAGE_KEY_TILE_GRID_COLOR, color);
+    if (tileGridControlRef?.current) {
+      tileGridControlRef.current.setColor(color);
+    }
+  };
+
+  // Save alpha to localStorage and update control
+  const handleAlphaChange = (alpha: number) => {
+    setTileGridAlpha(alpha);
+    localStorage.setItem(STORAGE_KEY_TILE_GRID_ALPHA, alpha.toString());
+    if (tileGridControlRef?.current) {
+      tileGridControlRef.current.setAlpha(alpha);
+    }
+  };
   const region = position ? Region.fromPosition(position) : null;
   const regionPos = region ? region.toPosition() : null;
   
@@ -405,7 +478,7 @@ export function MapInfoPanel({
                     {showRegionGrid && (
                       <div className="absolute inset-0 bg-green-500/30 rounded-md pointer-events-none" />
                     )}
-                    <Grid3x3 className={cn(
+                    <BsGrid3X3 className={cn(
                       "h-3.5 w-3.5 transition-opacity relative z-10",
                       showRegionGrid ? "opacity-100" : "opacity-70"
                     )} />
@@ -415,6 +488,78 @@ export function MapInfoPanel({
                   <p>{showRegionGrid ? 'Hide' : 'Show'} Region Grid</p>
                 </TooltipContent>
               </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => onShowTileGridChange(!showTileGrid)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setSettingsOpen(true);
+                    }}
+                    disabled={false}
+                    className={cn(
+                      "h-7 w-7 border-border transition-all relative",
+                      showTileGrid 
+                        ? "bg-gray-700 border-gray-600 shadow-inner hover:bg-gray-700" 
+                        : "bg-black/100 hover:bg-gray-900 border-border"
+                    )}
+                    aria-pressed={showTileGrid}
+                  >
+                    {showTileGrid && (
+                      <div className="absolute inset-0 bg-green-500/30 rounded-md pointer-events-none" />
+                    )}
+                    <Grid className={cn(
+                      "h-3.5 w-3.5 transition-opacity relative z-10",
+                      showTileGrid ? "opacity-100" : "opacity-70"
+                    )} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{showTileGrid ? 'Hide' : 'Show'} Tile Grid (Right-click for settings)</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Tile Grid Settings</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="tile-grid-color">Color</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="tile-grid-color"
+                          type="color"
+                          value={tileGridColor}
+                          onChange={(e) => handleColorChange(e.target.value)}
+                          className="h-10 w-20"
+                        />
+                        <Input
+                          type="text"
+                          value={tileGridColor}
+                          onChange={(e) => handleColorChange(e.target.value)}
+                          className="flex-1"
+                          placeholder="#888888"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="tile-grid-alpha">Opacity: {Math.round(tileGridAlpha * 100)}%</Label>
+                      <Slider
+                        id="tile-grid-alpha"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={[tileGridAlpha]}
+                        onValueChange={(value) => handleAlphaChange(value[0])}
+                      />
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button

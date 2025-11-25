@@ -80,8 +80,9 @@ const OSRSMap: React.FC<OSRSMapProps> = ({ initialObjectId, compact = false }) =
     const [currentPosition, setCurrentPosition] = useState<Position | null>(null);
     const [zoom, setZoom] = useState<number>(7);
     const [showRegionGrid, setShowRegionGrid] = useState<boolean>(false);
+    const [showTileGrid, setShowTileGrid] = useState<boolean>(false);
     const [showLabels, setShowLabels] = useState<boolean>(false);
-    const [selectedItemType, setSelectedItemType] = useState<'area' | 'poly' | null>(null);
+    const [selectedItemType, setSelectedItemType] = useState<'area' | 'poly' | 'path' | null>(null);
     const [objectPositions, setObjectPositions] = useState<ObjectPosition[]>([]);
     const [currentObjectIndex, setCurrentObjectIndex] = useState<number>(-1);
     const [objectSearchQuery, setObjectSearchQuery] = useState<string>('');
@@ -154,6 +155,7 @@ const OSRSMap: React.FC<OSRSMapProps> = ({ initialObjectId, compact = false }) =
     // Use map controls hook
     const {
         gridControlRef,
+        tileGridControlRef,
         labelsControlRef,
         planeControlRef,
         coordinatesControlRef,
@@ -164,6 +166,7 @@ const OSRSMap: React.FC<OSRSMapProps> = ({ initialObjectId, compact = false }) =
     } = useMapControls({
         compact,
         showRegionGrid,
+        showTileGrid,
         showLabels,
         setZoom,
     });
@@ -434,6 +437,9 @@ const OSRSMap: React.FC<OSRSMapProps> = ({ initialObjectId, compact = false }) =
             if (gridControlRef.current) {
                 gridControlRef.current.updatePlane();
             }
+            if (tileGridControlRef.current) {
+                tileGridControlRef.current.updatePlane();
+            }
             // Trigger labels canvas redraw with new plane
             if (labelsControlRef.current) {
                 labelsControlRef.current.redraw();
@@ -510,6 +516,7 @@ const OSRSMap: React.FC<OSRSMapProps> = ({ initialObjectId, compact = false }) =
                 } else if (selected.type === 'poly') {
                     collectionControlRef.current.moveSelectedPolyArea(dx, dy);
                 }
+                // Note: Path movement not yet implemented in CollectionControl
             }
         };
 
@@ -552,8 +559,11 @@ const OSRSMap: React.FC<OSRSMapProps> = ({ initialObjectId, compact = false }) =
                 }}
                 showRegionGrid={showRegionGrid}
                 onShowRegionGridChange={setShowRegionGrid}
+                showTileGrid={showTileGrid}
+                onShowTileGridChange={setShowTileGrid}
                 showLabels={showLabels}
                 onShowLabelsChange={setShowLabels}
+                tileGridControlRef={tileGridControlRef}
                 onGoToCoordinates={(x, y, z) => {
                     if (coordinatesControlRef.current) {
                                     // Cap z at 3
