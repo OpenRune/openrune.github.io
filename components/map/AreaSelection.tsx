@@ -185,6 +185,8 @@ export function AreaSelection({
             }
         } else if (item.type === 'poly') {
             exportText = collectionControl.exportPolyArea(format);
+        } else if (item.type === 'path') {
+            exportText = collectionControl.exportPath(format);
         }
         
         if (exportText) {

@@ -11,21 +11,28 @@
       <change beforePath="$PROJECT_DIR$/app/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/layout.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/objects/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/objects/page.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/layout/cache-status-wrapper.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/layout/cache-status-wrapper.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/layout/settings-provider.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/layout/settings-provider.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/AreaItemList.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection/AreaItemList.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/ExportUtils.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection/ExportUtils.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/ImportView.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection/ImportView.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/importParsers.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection/importParsers.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/hooks.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection/hooks.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection/types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/utils.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/AreaSelection/utils.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/map/BaseMap.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/BaseMap.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/MapInfoPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/MapInfoPanel.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/map/OSRSMap.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/OSRSMap.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/ObjectFinder.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/ObjectFinder.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/SelectionControls.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/SelectionControls.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/map/hooks/useMapControls.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/hooks/useMapControls.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/map/hooks/useObjectMarkers.ts" beforeDir="false" afterPath="$PROJECT_DIR$/components/map/hooks/useObjectMarkers.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/search/GamevalIdSearch.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/search/GamevalIdSearch.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/sidebar/app-sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/sidebar/app-sidebar.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/ui/RSColorBox.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/RSColorBox.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/ui/paginated-table.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/paginated-table.tsx" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/components/ui/settings-modal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/settings-modal.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/update-modal.tsx" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/gamevals/GamevalProvider.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/lib/gamevals/GamevalProvider.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/model/Position.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/map/model/Position.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/map/controls/CollectionControl.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/map/controls/CollectionControl.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/map/controls/TileGridControl.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/map/controls/TileGridControl.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/map/model/Path.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/map/model/Path.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -44,36 +51,37 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "JavaScript Debug.Next.js: debug client-side.executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1": "true",
-    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "main",
-    "ignore.virus.scanning.warn.message": "true",
-    "js.debugger.nextJs.config.created.client": "true",
-    "js.debugger.nextJs.config.created.server": "true",
-    "junie.onboarding.icon.badge.shown": "true",
-    "last_opened_file_path": "D:/openrune.github.io/app/spotanims",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "npm.Next.js: server-side.executor": "Run",
-    "npm.build.executor": "Run",
-    "npm.lint.executor": "Run",
-    "npm.start.executor": "Run",
-    "settings.editor.selected.configurable": "settings.nodejs",
-    "to.speed.mode.migration.done": "true",
-    "ts.external.directory.path": "D:\\openrune.github.io\\node_modules\\typescript\\lib",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;JavaScript Debug.Next.js: debug client-side.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1&quot;: &quot;true&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;live&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;js.debugger.nextJs.config.created.client&quot;: &quot;true&quot;,
+    &quot;js.debugger.nextJs.config.created.server&quot;: &quot;true&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/openrune.github.io/app/spotanims&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_interpreter_path&quot;: &quot;C:/Users/chris/AppData/Roaming/JetBrains/WebStorm2025.2/node/versions/24.11.0/node&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;npm.Next.js: server-side.executor&quot;: &quot;Run&quot;,
+    &quot;npm.build.executor&quot;: &quot;Run&quot;,
+    &quot;npm.lint.executor&quot;: &quot;Run&quot;,
+    &quot;npm.start.executor&quot;: &quot;Run&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;settings.nodejs&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;D:\\openrune.github.io\\node_modules\\typescript\\lib&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\openrune.github.io\app\spotanims" />
@@ -132,6 +140,13 @@
       <envs />
       <method v="2" />
     </configuration>
+    <list>
+      <item itemvalue="JavaScript Debug.Next.js: debug client-side" />
+      <item itemvalue="npm.Next.js: server-side" />
+      <item itemvalue="npm.build" />
+      <item itemvalue="npm.lint" />
+      <item itemvalue="npm.start" />
+    </list>
     <recent_temporary>
       <list>
         <item itemvalue="npm.build" />
@@ -159,6 +174,7 @@
       <workItem from="1762549110332" duration="21194000" />
       <workItem from="1762705629251" duration="22000" />
       <workItem from="1762756118101" duration="12688000" />
+      <workItem from="1764541422837" duration="2374000" />
     </task>
     <servers />
   </component>
