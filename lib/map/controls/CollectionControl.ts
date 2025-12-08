@@ -624,8 +624,8 @@ export class CollectionControl extends L.Control {
                 return `new AABB(${values})`;
             case 'array':
                 return plane > 0
-                    ? `[${minX}, ${minY}, ${plane}, ${maxX}, ${maxY}, ${plane}]`
-                    : `[${minX}, ${minY}, ${maxX}, ${maxY}]`;
+                    ? `[ ${minX}, ${minY}, ${plane}, ${maxX}, ${maxY}, ${plane} ]`
+                    : `[ ${minX}, ${minY}, ${maxX}, ${maxY} ]`;
             case 'raw':
                 return plane > 0
                     ? `${minX},${minY},${plane},${maxX},${maxY},${plane}`
@@ -659,7 +659,7 @@ export class CollectionControl extends L.Control {
                 return `new WorldPoint[] {\n    ${polyAsString}\n}`;
             case 'array':
                 return positions.map(pos => 
-                    pos.z > 0 ? `[${pos.x}, ${pos.y}, ${pos.z}]` : `[${pos.x}, ${pos.y}]`
+                    pos.z > 0 ? `[ ${pos.x}, ${pos.y}, ${pos.z} ]` : `[ ${pos.x}, ${pos.y} ]`
                 ).join(',\n');
             case 'raw':
                 return positions.map(pos => 
@@ -717,7 +717,7 @@ export class CollectionControl extends L.Control {
                 return `new Polygon(new int[][] {\n    ${javaPoints}\n})`;
             case 'array':
                 return positions.map(pos => 
-                    pos.z > 0 ? `[${pos.x}, ${pos.y}, ${pos.z}]` : `[${pos.x}, ${pos.y}]`
+                    pos.z > 0 ? `[ ${pos.x}, ${pos.y}, ${pos.z} ]` : `[ ${pos.x}, ${pos.y} ]`
                 ).join(',\n');
             case 'raw':
                 return positions.map(pos => 

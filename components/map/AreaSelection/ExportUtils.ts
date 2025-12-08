@@ -65,8 +65,8 @@ export function exportAllItems(
                 const maxY = Math.max(area.startPosition.y, area.endPosition.y);
                 const plane = area.startPosition.z;
                 parts.push(plane > 0 
-                    ? `[${minX}, ${minY}, ${plane}, ${maxX}, ${maxY}, ${plane}]`
-                    : `[${minX}, ${minY}, ${maxX}, ${maxY}]`
+                    ? `[ ${minX}, ${minY}, ${plane}, ${maxX}, ${maxY}, ${plane} ]`
+                    : `[ ${minX}, ${minY}, ${maxX}, ${maxY} ]`
                 );
             });
         }
@@ -74,8 +74,8 @@ export function exportAllItems(
         if (polyPositions.length > 0) {
             polyPositions.forEach(pos => {
                 parts.push(pos.z > 0 
-                    ? `[${pos.x}, ${pos.y}, ${pos.z}]`
-                    : `[${pos.x}, ${pos.y}]`
+                    ? `[ ${pos.x}, ${pos.y}, ${pos.z} ]`
+                    : `[ ${pos.x}, ${pos.y} ]`
                 );
             });
         }
@@ -83,8 +83,8 @@ export function exportAllItems(
         if (pathPositions.length > 0) {
             pathPositions.forEach(pos => {
                 parts.push(pos.z > 0 
-                    ? `[${pos.x}, ${pos.y}, ${pos.z}]`
-                    : `[${pos.x}, ${pos.y}]`
+                    ? `[ ${pos.x}, ${pos.y}, ${pos.z} ]`
+                    : `[ ${pos.x}, ${pos.y} ]`
                 );
             });
         }
