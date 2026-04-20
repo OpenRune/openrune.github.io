@@ -57,6 +57,18 @@ function buildDestination(
   return `http://${target.ip}:${target.port}/${path}${query ? `?${query}` : ""}`;
 }
 
+function isZipDownloadPath(pathParts: string[]): boolean {
+  return pathParts.length >= 2 && pathParts[0] === "zip" && pathParts[1] === "download";
+}
+
+/** Zip routes can take a long time (build + large binary); avoid short proxy aborts. */
+function proxyTimeoutMsForPath(pathParts: string[]): number {
+  if (pathParts[0] === "zip") {
+    return isZipDownloadPath(pathParts) ? 0 : 120_000;
+  }
+  return 10_000;
+}
+
 async function proxyToCache(
   request: NextRequest,
   pathParts: string[],
@@ -65,13 +77,16 @@ async function proxyToCache(
   const target = parseTargetFromHeaderOrCookie(request, envTarget);
   const destination = buildDestination(request, pathParts, target);
   const isStatusRequest = pathParts.join("/") === "status";
+  const zipDownload = isZipDownloadPath(pathParts);
+  const proxyTimeoutMs = proxyTimeoutMsForPath(pathParts);
 
   const headers = new Headers(request.headers);
   headers.set("host", `${target.ip}:${target.port}`);
   headers.delete("content-length");
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const controller = proxyTimeoutMs > 0 ? new AbortController() : null;
+  const timeoutId =
+    controller != null ? setTimeout(() => controller.abort(), proxyTimeoutMs) : null;
 
   try {
     const body =
@@ -83,7 +98,7 @@ async function proxyToCache(
       method: request.method,
       headers,
       body,
-      signal: controller.signal,
+      signal: controller?.signal,
       redirect: "manual",
       cache: "no-store",
     });
@@ -108,6 +123,21 @@ async function proxyToCache(
     if (nullBodyStatus) {
       await upstream.arrayBuffer();
     }
+
+    if (zipDownload && upstream.body && !nullBodyStatus) {
+      const response = new NextResponse(upstream.body, {
+        status,
+        statusText: upstream.statusText,
+      });
+      upstream.headers.forEach((value, key) => {
+        const lower = key.toLowerCase();
+        if (!["content-encoding", "transfer-encoding"].includes(lower)) {
+          response.headers.set(key, value);
+        }
+      });
+      return response;
+    }
+
     const responseBody = nullBodyStatus ? null : await upstream.arrayBuffer();
     const response = new NextResponse(responseBody, {
       status,
@@ -163,7 +193,7 @@ async function proxyToCache(
       { status: 502 },
     );
   } finally {
-    clearTimeout(timeoutId);
+    if (timeoutId != null) clearTimeout(timeoutId);
   }
 }
 

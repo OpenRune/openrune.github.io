@@ -9,13 +9,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCacheType } from "@/context/cache-type-context";
 import type { GamevalType } from "@/context/gameval-context";
-import {
-  INVTYPES,
-  ITEMTYPES,
-  NPCTYPES,
-  SEQTYPES,
-  SPOTTYPES,
-} from "@/context/gameval-context";
 import type { AppSettings } from "@/context/settings-context";
 import { useSettings } from "@/context/settings-context";
 import { cacheProxyHeaders, diffCacheOrderedPair, diffConfigContentUrl } from "@/lib/cache-proxy-client";
@@ -29,10 +22,10 @@ import {
   CONFIG_TYPES,
   DIFF_COMBINED_SEARCH_WRAP_CLASS,
   GAMEVAL_MIN_REVISION,
+  sectionGamevalTypeForSection,
 } from "./diff-constants";
 import { configLinesFromDiffBody } from "./diff-config-content";
-import { DiffConfigDiffText } from "./diff-config-diff-text";
-import { ColorLineText } from "./diff-config-diff-text";
+import { ColorLineText, DiffConfigDiffText } from "./diff-config-diff-text";
 import { DiffArchiveTable } from "./diff-archive-table";
 import { idQueryMatchesNumericId, looksLikeSpriteIdQueryText } from "./diff-id-search";
 import { openruneColumnHeaderLabel } from "./diff-openrune-archive-columns";
@@ -49,7 +42,6 @@ import {
 } from "./diff-table-archive-styles";
 import type { ConfigFilterMode, ConfigLine, DiffMode, DiffSearchFieldMode, SearchTag, Section } from "./diff-types";
 
-const CONFIG_FETCHABLE = new Set<string>(CONFIG_TYPES);
 function normalizeRemoteConfigLines(payload: unknown): ConfigLine[] {
   return configLinesFromDiffBody(payload);
 }
@@ -61,20 +53,7 @@ function isDecodePayload(data: unknown): boolean {
 }
 
 function configSectionGamevalType(section: Section): GamevalType | null {
-  switch (section) {
-    case "items":
-      return ITEMTYPES;
-    case "npcs":
-      return NPCTYPES;
-    case "sequences":
-      return SEQTYPES;
-    case "spotanim":
-      return SPOTTYPES;
-    case "inv":
-      return INVTYPES;
-    default:
-      return null;
-  }
+  return sectionGamevalTypeForSection(section);
 }
 
 function configStaticRowsIncludeGamevalColumn(section: Section): boolean {
@@ -89,31 +68,37 @@ function configGamevalSuggestionSettingsEnabled(
   section: Section,
   display: AppSettings["suggestionDisplay"],
 ): boolean {
-  switch (section) {
+  const gamevalType = configSectionGamevalType(section);
+  if (!gamevalType) return false;
+  switch (gamevalType.toLowerCase()) {
     case "items":
       return display.items;
     case "npcs":
       return display.npcs;
+    case "objects":
+      return display.objects;
     case "sequences":
       return display.sequences;
-    case "spotanim":
+    case "spotanims":
       return display.spotanims;
     case "inv":
       return display.objects;
     default:
-      return false;
+      // Unknown/new gameval type from API: enable suggestions by default.
+      return true;
   }
 }
 
 type DiffConfigViewProps = {
   section: Section;
+  sectionLabel?: string;
   diffViewMode: DiffMode;
   combinedRev: number;
   baseRev: number;
   rev: number;
 };
 
-export function DiffConfigView({ section, diffViewMode, combinedRev, baseRev, rev }: DiffConfigViewProps) {
+export function DiffConfigView({ section, sectionLabel, diffViewMode, combinedRev, baseRev, rev }: DiffConfigViewProps) {
   const searchParams = useSearchParams();
   const { settings } = useSettings();
   const { selectedCacheType } = useCacheType();
@@ -140,7 +125,7 @@ export function DiffConfigView({ section, diffViewMode, combinedRev, baseRev, re
   const [remoteDiffError, setRemoteDiffError] = React.useState<string | null>(null);
   const diffFetchRef = React.useRef(0);
 
-  const fetchableDiffSection = CONFIG_FETCHABLE.has(section);
+  const fetchableDiffSection = (CONFIG_TYPES as readonly string[]).includes(section);
   const liveDiffText = diffViewMode === "diff" && fetchableDiffSection;
 
   React.useEffect(() => {
@@ -380,7 +365,7 @@ export function DiffConfigView({ section, diffViewMode, combinedRev, baseRev, re
     return { regex: regexHint } as const;
   }, [combinedRev]);
 
-  const sectionTitle = section.charAt(0).toUpperCase() + section.slice(1);
+  const sectionTitle = sectionLabel?.trim() || (section.charAt(0).toUpperCase() + section.slice(1));
   const diffHeaderTitle =
     diffViewMode === "diff" ? `${sectionTitle} (Base ${baseRev} → Compare ${rev})` : sectionTitle;
 

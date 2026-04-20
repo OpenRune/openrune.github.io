@@ -12,9 +12,8 @@ import {
 } from "./gameval-search-suggestion-list";
 import { isGamevalSuggestPanelOpen, looksLikeSpriteIdQueryText, sanitizeSpriteIdSearchInput } from "./diff-id-search";
 import { DIFF_SEARCH_MODE_PLACEHOLDERS } from "./diff-search-modes";
-import type { DiffSearchFieldMode, SearchTag } from "./diff-types";
+import { DIFF_SEARCH_FIELD_MODE_LABELS, DIFF_SEARCH_FIELD_MODES_ALL, type DiffSearchFieldMode, type SearchTag } from "./diff-types";
 import { DiffSearchTagRow } from "./diff-search-tag-row";
-import { DIFF_SEARCH_FIELD_MODES_ALL, DIFF_SEARCH_FIELD_MODE_LABELS } from "./diff-types";
 
 export type { GamevalSearchAutocompleteConfig };
 
@@ -36,6 +35,7 @@ export type DiffUnifiedSearchFieldProps = {
   onClearTags?: () => void;
   placeholders?: Partial<Record<DiffSearchFieldMode, string>>;
   className?: string;
+  size?: "default" | "large";
   searchAriaLabel?: string;
   /** Sprite-style gameval tag search: show matching enum names while typing in Gameval mode. */
   gamevalAutocomplete?: GamevalSearchAutocompleteConfig | null;
@@ -56,6 +56,7 @@ export function DiffUnifiedSearchField({
   onClearTags,
   placeholders,
   className,
+  size = "large",
   searchAriaLabel = "Search",
   gamevalAutocomplete = null,
 }: DiffUnifiedSearchFieldProps) {
@@ -101,6 +102,7 @@ export function DiffUnifiedSearchField({
 
   const selectedLabel = DIFF_SEARCH_FIELD_MODE_LABELS[mode] ?? mode;
   const placeholder = labels[mode] ?? "";
+  const large = size === "large";
 
   const showTagRow = tagModes.includes(mode);
   const showTags = showTagRow && tags.length > 0 && onTagToggle && onTagRemove && onClearTags;
@@ -182,13 +184,14 @@ export function DiffUnifiedSearchField({
       <div className="relative">
         <div
           className={cn(
-            "relative z-50 flex h-10 w-full min-w-0 flex-nowrap items-stretch rounded-md border border-border bg-muted/25 shadow-sm",
+            "relative z-50 flex w-full min-w-0 flex-nowrap items-stretch rounded-md border border-border bg-muted/25 shadow-sm",
+            large ? "h-11" : "h-10",
             "dark:bg-muted/20",
           )}
         >
-          <label className="flex min-w-0 flex-1 cursor-text items-center gap-2.5 pl-3 pr-1">
+          <label className={cn("flex min-w-0 flex-1 cursor-text items-center pl-3 pr-1", large ? "gap-3" : "gap-2.5")}>
             <span className="sr-only">{searchAriaLabel}</span>
-            <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <Search className={cn("shrink-0 text-muted-foreground", large ? "size-[1.05rem]" : "size-4")} aria-hidden />
             <input
               type="text"
               value={value}
@@ -218,7 +221,8 @@ export function DiffUnifiedSearchField({
                   : undefined
               }
               className={cn(
-                "min-h-0 min-w-0 flex-1 bg-transparent py-2 text-sm text-foreground outline-none",
+                "min-h-0 min-w-0 flex-1 bg-transparent text-foreground outline-none",
+                large ? "py-2.5 text-[15px]" : "py-2 text-sm",
                 "placeholder:text-muted-foreground",
               )}
             />
@@ -231,7 +235,8 @@ export function DiffUnifiedSearchField({
             type="button"
             data-mode-trigger
             className={cn(
-              "flex h-full items-center gap-1.5 border-0 bg-muted/50 px-3.5 text-sm font-medium text-foreground",
+              "flex h-full items-center border-0 bg-muted/50 font-medium text-foreground",
+              large ? "gap-1.5 px-3.5 text-[15px]" : "gap-1.5 px-3.5 text-sm",
               "hover:bg-muted/80 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
               "dark:bg-muted/35 dark:hover:bg-muted/55",
               selectedIsDisabled && "text-muted-foreground opacity-70",
@@ -242,7 +247,7 @@ export function DiffUnifiedSearchField({
             onClick={() => setModeOpen((o) => !o)}
           >
             <span className="select-none">{selectedLabel}</span>
-            <ChevronDown className="size-3.5 shrink-0 opacity-70" />
+            <ChevronDown className={cn("shrink-0 opacity-70", large ? "size-4" : "size-3.5")} />
           </button>
 
           {modeOpen ? (

@@ -4,11 +4,12 @@ import * as React from "react";
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TableCell, TableHead, TableRow } from "@/components/ui/table";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow, Table } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCacheType } from "@/context/cache-type-context";
 import type { GamevalExtraData, GamevalType } from "@/context/gameval-context";
 import {
+  GAMEVAL_TYPE_MAP,
   IFTYPES,
   INVTYPES,
   ITEMTYPES,
@@ -26,7 +27,7 @@ import {
   useGamevals,
 } from "@/context/gameval-context";
 import type { AppSettings } from "@/context/settings-context";
-import { cacheProxyHeaders, diffSpriteResolveUrl } from "@/lib/cache-proxy-client";
+import { cacheProxyHeaders, diffConfigSchemaUrl, diffSpriteResolveUrl } from "@/lib/cache-proxy-client";
 import { conditionalJsonFetch } from "@/lib/openrune-idb-cache";
 import { cn } from "@/lib/utils";
 import { RsColorBox } from "@/components/ui/rs-color-box";
@@ -34,20 +35,26 @@ import { RSSprite } from "@/components/ui/RSSprite";
 import { RSTexture } from "@/components/ui/RSTexture";
 
 import { DiffConfigArchiveView } from "./diff-config-archive-view";
-import type { ConfigArchiveTableRow, DiffConfigArchiveTextLineProps } from "./diff-config-archive-types";
-import { GAMEVAL_MIN_REVISION } from "./diff-constants";
+import type {
+  ConfigArchiveTableRow,
+  ConfigFieldRenderSchema,
+  DiffConfigArchiveTextLineProps,
+} from "./diff-config-archive-types";
+import { GAMEVAL_MIN_REVISION, interfaceComponentCombinedId, normalizeConfigTypeForCacheApi, sectionGamevalTypeForSection } from "./diff-constants";
 import { configLinesFromCachePayload } from "./diff-config-content";
-import type { DiffMode, DiffSearchFieldMode } from "./diff-types";
-import type { ConfigLine } from "./diff-types";
+import type { ConfigLine, DiffMode, DiffSearchFieldMode } from "./diff-types";
 import {
+  getParamSmartDefaultField,
   openruneColumnHeaderLabel,
   openruneEntityArchiveColumnKeys,
+  type TableColumnPreference,
 } from "./diff-openrune-archive-columns";
 import type { ArchiveEntitySection } from "./diff-openrune-archive-columns";
 import {
   OpenRuneArchiveTableCell,
   OpenRuneItemImage,
   OpenRuneNpcImage,
+  OpenRuneObjectImage,
 } from "./diff-openrune-archive-table-cell";
 import { DIFF_ARCHIVE_TABLE_CELL_CLASS, DIFF_ARCHIVE_TABLE_HEAD_CLASS } from "./diff-table-archive-styles";
 import { useSpotanimSequenceTicks } from "./diff-spotanim-sequence-ticks";
@@ -59,21 +66,6 @@ const TABLE_BASE = 1;
 const GAMEVAL_BULK_PAGE = 500;
 const TEXT_LINE_HEIGHT = 28;
 
-function getColorFieldType(name: string): "hsl" | "rgb" | null {
-  const l = name.toLowerCase();
-  if (l === "modifiedtexturecolours" || l === "modifiedtexturecolors") return null;
-  if (l === "originaltexturecolours" || l === "originaltexturecolors") return null;
-  if (l === "rgb" || l.endsWith("rgb")) return "rgb";
-  if (l.includes("colour") || l.includes("color")) return "hsl";
-  return null;
-}
-
-function isTextureField(name: string): boolean {
-  const l = name.toLowerCase();
-  if (l === "modifiedtexturecolours" || l === "modifiedtexturecolors") return true;
-  if (l === "originaltexturecolours" || l === "originaltexturecolors") return true;
-  return l === "texture" || l.endsWith("texture") || l.endsWith("textureid");
-}
 
 function displayTextureFieldName(name: string): string {
   const l = name.toLowerCase();
@@ -94,6 +86,66 @@ function displayTextureFieldLine(text: string): string {
 function getFieldName(line: string): string | null {
   const i = line.indexOf("=");
   return i > 0 ? line.slice(0, i).trim() : null;
+}
+
+function parseFieldRenderSchemaPayload(data: unknown): {
+  fields: Record<string, ConfigFieldRenderSchema>;
+  tableColumns: TableColumnPreference[];
+  searchFieldByMode: Partial<Record<"name" | "regex", string>>;
+  hasGameval?: boolean;
+} {
+  if (!data || typeof data !== "object") return { fields: {}, tableColumns: [], searchFieldByMode: {} };
+  const root = data as Record<string, unknown>;
+  const fieldsRaw =
+    root.fields && typeof root.fields === "object" ? (root.fields as Record<string, unknown>) : root;
+
+  const fields: Record<string, ConfigFieldRenderSchema> = {};
+  for (const [key, value] of Object.entries(fieldsRaw)) {
+    if (typeof value === "string") fields[key] = { kind: value as ConfigFieldRenderSchema["kind"] };
+  }
+
+  const tableColumns: TableColumnPreference[] = [];
+  const tableRaw = root.tableColumns;
+  if (Array.isArray(tableRaw)) {
+    for (const entry of tableRaw) {
+      if (typeof entry === "string") {
+        tableColumns.push(entry);
+        continue;
+      }
+      if (Array.isArray(entry)) {
+        const aliases = entry.filter((v): v is string => typeof v === "string" && v.trim().length > 0);
+        if (aliases.length > 0) tableColumns.push(aliases);
+      }
+    }
+  }
+
+  const searchFieldByMode: Partial<Record<"name" | "regex", string>> = {};
+  const searchModesRaw = root.searchModes;
+  if (searchModesRaw && typeof searchModesRaw === "object") {
+    const raw = searchModesRaw as Record<string, unknown>;
+    const nameField = raw.name;
+    const regexField = raw.regex;
+    if (typeof nameField === "string" && nameField.trim().length > 0) searchFieldByMode.name = nameField;
+    if (typeof regexField === "string" && regexField.trim().length > 0) searchFieldByMode.regex = regexField;
+  }
+
+  const hasGameval = typeof root.hasGameval === "boolean" ? root.hasGameval : undefined;
+
+  return { fields, tableColumns, searchFieldByMode, hasGameval };
+}
+
+function resolveFieldSchemaKind(
+  fieldRenderSchemaByField: Record<string, ConfigFieldRenderSchema> | undefined,
+  fieldName: string,
+): ConfigFieldRenderSchema["kind"] | null {
+  if (!fieldRenderSchemaByField) return null;
+  const exact = fieldRenderSchemaByField[fieldName];
+  if (exact?.kind) return exact.kind;
+  const lower = fieldName.toLowerCase();
+  for (const [key, value] of Object.entries(fieldRenderSchemaByField)) {
+    if (key.toLowerCase() === lower && value.kind) return value.kind;
+  }
+  return null;
 }
 
 /** True when the value after `=` is a list/array (contains `[` or `,`). */
@@ -125,6 +177,23 @@ function RsTextureSwatch({ value, combinedRev }: { value: number; combinedRev: n
         fitMax
         keepAspectRatio
         className="rounded-[2px]"
+        enableClickModel
+      />
+    </span>
+  );
+}
+
+function RsSpriteSwatch({ value, combinedRev }: { value: number; combinedRev: number }) {
+  return (
+    <span className="mx-1.5 inline-block align-middle" style={{ lineHeight: 0 }}>
+      <RSSprite
+        id={value}
+        rev={combinedRev}
+        width={12}
+        height={12}
+        fitMax
+        keepAspectRatio
+        rounded
         enableClickModel
       />
     </span>
@@ -180,9 +249,11 @@ function splitHighlightRegex(text: string, patternRaw: string): HighlightSeg[] |
 const FIND_MARK_CLASS =
   "rounded-[2px] bg-yellow-300/90 px-0.5 font-mono text-sm font-normal not-italic text-foreground dark:bg-yellow-500/45";
 
-const INLINE_GAMEVAL_REF_REGEX = /\b([a-z][a-z0-9_]*)\.([A-Za-z0-9_:$\/-]+)\b/gi;
+const INLINE_GAMEVAL_REF_REGEX = /\b([a-z][a-z0-9_]*)\.([A-Za-z0-9_:$\/-]+(?:\s*\++)?)/gi;
 const INLINE_GAMEVAL_BUTTON_CLASS =
-  "cursor-pointer rounded-[2px] px-0.5 text-sky-700 underline decoration-sky-500/55 underline-offset-2 transition-colors hover:bg-sky-500/10 hover:text-sky-900 dark:text-sky-300 dark:hover:bg-sky-500/15 dark:hover:text-sky-100";
+  "inline-flex h-[18px] cursor-pointer items-center whitespace-pre rounded border border-sky-500/45 bg-sky-500/10 px-1 text-sky-900 shadow-sm transition-colors hover:bg-sky-500/20 dark:text-sky-100";
+const INLINE_GAMEVAL_BUTTON_ALT_CLASS =
+  "inline-flex h-[18px] cursor-pointer items-center whitespace-pre rounded border border-amber-500/45 bg-amber-500/10 px-1 text-amber-900 shadow-sm transition-colors hover:bg-amber-500/20 dark:text-amber-100";
 
 const TABLE_GAMEVAL_BUTTON_CLASS =
   "cursor-pointer rounded border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 text-xs font-mono text-sky-800 transition-colors hover:bg-sky-500/20 hover:border-sky-500/60 dark:text-sky-200 dark:hover:bg-sky-500/20";
@@ -213,7 +284,9 @@ const INLINE_GAMEVAL_GROUP_TO_TYPE: Record<string, GamevalType> = {
   dbtables: TABLETYPES,
   tabletypes: TABLETYPES,
   interfaces: IFTYPES,
+  interface: IFTYPES,
   iftypes: IFTYPES,
+  components: IFTYPES,
   jingles: SOUNDTYPES,
   soundtypes: SOUNDTYPES,
 };
@@ -224,6 +297,21 @@ type InlineGamevalReference = {
   name: string;
   raw: string;
 };
+
+type EnumDialogState = {
+  row: ConfigArchiveTableRow;
+  entries: Record<string, string>;
+};
+
+function normalizeGamevalDisplay(group: string, name: string, fallback = ""): string {
+  const normalizedGroup = group.trim().toLowerCase();
+  const normalizedName = name.trim();
+  if (!normalizedGroup && !normalizedName) return fallback;
+  if (!normalizedName) return normalizedGroup || fallback;
+  const prefixed = `${normalizedGroup}.`;
+  if (normalizedName.toLowerCase().startsWith(prefixed)) return normalizedName;
+  return `${normalizedGroup}.${normalizedName}`;
+}
 
 function findInlineGamevalReferences(text: string): InlineGamevalReference[] {
   const out: InlineGamevalReference[] = [];
@@ -278,6 +366,234 @@ function configTypeForGamevalType(type: GamevalType): string | null {
   }
 }
 
+function parseInlineGamevalToken(text: string): InlineGamevalReference | null {
+  const normalizedText = text.trim().replace(/^['"\s]+|['"\s]+$/g, "");
+  const match = /^([a-z][a-z0-9_]*)\.([A-Za-z0-9_:$\/.-]+(?:\s*\++)?)$/i.exec(normalizedText);
+  if (!match) return null;
+  const group = match[1]?.toLowerCase() ?? "";
+  const type = INLINE_GAMEVAL_GROUP_TO_TYPE[group];
+  if (!type) return null;
+  let name = match[2] ?? "";
+  const prefixed = `${group}.`;
+  if (name.toLowerCase().startsWith(prefixed)) {
+    name = name.slice(prefixed.length);
+  }
+  return { type, group, name, raw: normalizeGamevalDisplay(group, name, normalizedText) };
+}
+
+function resolveInlineGamevalFromText(
+  text: string,
+  combinedRev: number,
+  lookupGamevalByName: (type: GamevalType, name: string, rev?: number | "latest") => number | undefined,
+): { ref: InlineGamevalReference; id: number } | null {
+  const parsed = parseInlineGamevalToken(text);
+  if (!parsed) return null;
+  const id = lookupGamevalByName(parsed.type, parsed.name, combinedRev);
+  if (id == null) return null;
+  return { ref: parsed, id };
+}
+
+function renderDialogGamevalChip(opts: {
+  text: string;
+  combinedRev: number;
+  lookupGamevalByName: (type: GamevalType, name: string, rev?: number | "latest") => number | undefined;
+  loadGamevalType: (type: GamevalType, rev?: number | "latest") => Promise<void>;
+  onOpenRef: (ref: { ref: InlineGamevalReference; id: number }) => void;
+  alt?: boolean;
+  showTooltip?: boolean;
+}) {
+  const parsed = parseInlineGamevalToken(opts.text);
+  const cleanedText = opts.text.trim().replace(/^['"\s]+|['"\s]+$/g, "");
+  if (!parsed) return <span className="font-mono text-xs break-all text-foreground">{cleanedText || "—"}</span>;
+  const className = opts.alt ? INLINE_GAMEVAL_BUTTON_ALT_CLASS : INLINE_GAMEVAL_BUTTON_CLASS;
+  const label = parsed.raw.trim() || cleanedText;
+  const resolvedId = opts.lookupGamevalByName(parsed.type, parsed.name, opts.combinedRev);
+  return (
+    <button
+      type="button"
+      className={cn(className, "h-auto min-h-[18px] whitespace-normal break-all")}
+      onClick={() => {
+        void (async () => {
+          let id = resolvedId ?? opts.lookupGamevalByName(parsed.type, parsed.name, opts.combinedRev);
+          if (id == null) {
+            await opts.loadGamevalType(parsed.type, opts.combinedRev);
+            id = opts.lookupGamevalByName(parsed.type, parsed.name, opts.combinedRev);
+          }
+          if (id != null) opts.onOpenRef({ ref: parsed, id });
+        })();
+      }}
+      title={opts.showTooltip ?? true ? `Open ${parsed.raw}` : undefined}
+    >
+      <span className="font-mono text-xs">{label}{resolvedId != null ? ` (${resolvedId})` : ""}</span>
+    </button>
+  );
+}
+
+function EnumRowDialog({
+  state,
+  combinedRev,
+  onOpenChange,
+  lookupGamevalByName,
+  loadGamevalType,
+  onOpenRef,
+}: {
+  state: EnumDialogState | null;
+  combinedRev: number;
+  onOpenChange: (open: boolean) => void;
+  lookupGamevalByName: (type: GamevalType, name: string, rev?: number | "latest") => number | undefined;
+  loadGamevalType: (type: GamevalType, rev?: number | "latest") => Promise<void>;
+  onOpenRef: (ref: { ref: InlineGamevalReference; id: number }) => void;
+}) {
+  const { selectedCacheType } = useCacheType();
+  const [dialogLines, setDialogLines] = React.useState<ConfigLine[] | null>(null);
+
+  React.useEffect(() => {
+    if (!state) {
+      setDialogLines(null);
+      return;
+    }
+
+    let cancelled = false;
+    const params = new URLSearchParams({
+      type: "enum",
+      id: String(state.row.id),
+      rev: String(combinedRev),
+    });
+    const url = `/api/cache-proxy/cache?${params.toString()}`;
+    const cacheKey = `cache:enum-dialog:${selectedCacheType.id}:${state.row.id}:${combinedRev}`;
+
+    void (async () => {
+      try {
+        const { data } = await conditionalJsonFetch<unknown>(cacheKey, url, {
+          headers: cacheProxyHeaders(selectedCacheType),
+        });
+        if (cancelled) return;
+        setDialogLines(configLinesFromCachePayload(data, "enum", { includeCommentWithoutHeaderLabel: false }) ?? []);
+      } catch {
+        if (cancelled) return;
+        setDialogLines([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [state, combinedRev, selectedCacheType]);
+
+  const parsedDialog = React.useMemo(() => {
+    const values: Array<{ index: number; key: string; value: string }> = [];
+    let keyType: string | null = null;
+    let valueType: string | null = null;
+    let defaultValue: string | null = null;
+
+    for (const line of dialogLines ?? []) {
+      const text = line.line.trim();
+      if (!text || text.startsWith("//") || (text.startsWith("[") && text.endsWith("]"))) continue;
+      const eq = text.indexOf("=");
+      if (eq <= 0) continue;
+      const field = text.slice(0, eq).trim();
+      const rhs = text.slice(eq + 1);
+      if (field === "key") {
+        keyType = rhs;
+        continue;
+      }
+      if (field === "value") {
+        valueType = rhs;
+        continue;
+      }
+      if (field === "default") {
+        defaultValue = rhs;
+        continue;
+      }
+      const valueMatch = /^value(\d+)$/.exec(field);
+      if (!valueMatch) continue;
+      const comma = rhs.indexOf(",");
+      if (comma === -1) {
+        values.push({ index: Number.parseInt(valueMatch[1]!, 10), key: rhs, value: "—" });
+      } else {
+        values.push({
+          index: Number.parseInt(valueMatch[1]!, 10),
+          key: rhs.slice(0, comma),
+          value: rhs.slice(comma + 1),
+        });
+      }
+    }
+
+    return {
+      keyType: keyType ?? state?.entries.key ?? "—",
+      valueType: valueType ?? state?.entries.value ?? "—",
+      defaultValue: defaultValue ?? state?.entries.default ?? "—",
+      values: values.sort((a, b) => a.index - b.index),
+    };
+  }, [dialogLines, state]);
+
+  return (
+    <Dialog open={state != null} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-5xl">
+        <DialogHeader>
+          <DialogTitle>{state ? `Enum ${state.row.id}` : "Enum"}</DialogTitle>
+          <DialogDescription>
+            {state ? `Key ${parsedDialog.keyType} · Value ${parsedDialog.valueType} · ${parsedDialog.values.length} entries` : ""}
+          </DialogDescription>
+        </DialogHeader>
+        {state ? (
+          <div className="grid gap-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Key Type</div>
+                <div className="mt-1 font-mono text-sm text-foreground">{parsedDialog.keyType}</div>
+              </div>
+              <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Value Type</div>
+                <div className="mt-1 font-mono text-sm text-foreground">{parsedDialog.valueType}</div>
+              </div>
+              <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Default</div>
+                <div className="mt-1 min-h-5 text-sm text-foreground">{renderDialogGamevalChip({ text: parsedDialog.defaultValue, combinedRev, lookupGamevalByName, loadGamevalType, onOpenRef, alt: true })}</div>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-md border border-border/60 bg-background/90">
+              <div className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">{parsedDialog.values.length} enum values</div>
+              <div className="max-h-[55vh] overflow-auto">
+                <Table>
+                  <colgroup>
+                    <col className="w-10" />
+                    <col className="w-[38%]" />
+                    <col />
+                  </colgroup>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className={DIFF_ARCHIVE_TABLE_HEAD_CLASS}>#</TableHead>
+                      <TableHead className={DIFF_ARCHIVE_TABLE_HEAD_CLASS}>Key</TableHead>
+                      <TableHead className={DIFF_ARCHIVE_TABLE_HEAD_CLASS}>Value</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {parsedDialog.values.map(({ index, key, value }) => {
+                      return (
+                        <TableRow key={`${key}-${index}`} className="border-t align-top">
+                          <TableCell className={cn(DIFF_ARCHIVE_TABLE_CELL_CLASS, "font-mono text-xs text-muted-foreground")}>{index}</TableCell>
+                          <TableCell className={DIFF_ARCHIVE_TABLE_CELL_CLASS}>
+                            {renderDialogGamevalChip({ text: key, combinedRev, lookupGamevalByName, loadGamevalType, onOpenRef })}
+                          </TableCell>
+                          <TableCell className={DIFF_ARCHIVE_TABLE_CELL_CLASS}>
+                            {renderDialogGamevalChip({ text: value, combinedRev, lookupGamevalByName, loadGamevalType, onOpenRef, alt: true })}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function GamevalReferenceDialog({
   combinedRev,
   openRef,
@@ -302,6 +618,8 @@ function GamevalReferenceDialog({
   const isSpriteRef = displayRef?.ref.type === SPRITETYPES;
   const isItemRef = displayRef?.ref.type === ITEMTYPES;
   const isNpcRef = displayRef?.ref.type === NPCTYPES;
+  const isObjectRef = displayRef?.ref.type === OBJTYPES;
+  const isInterfaceRef = displayRef?.ref.type === IFTYPES;
   const spritePreviewUrl =
     isSpriteRef && displayRef ? diffSpriteResolveUrl(displayRef.id, { base: TABLE_BASE, rev: combinedRev }) : null;
   const extra = displayRef ? getGamevalExtra(displayRef.ref.type, displayRef.id, combinedRev) : undefined;
@@ -314,6 +632,14 @@ function GamevalReferenceDialog({
         .sort((a, b) => a.id - b.id),
     [extra],
   );
+  const interfaceSubRows = React.useMemo(() => {
+    if (!displayRef || !isInterfaceRef) return [] as Array<{ childId: number; label: string; combinedId: number }>;
+    return subEntries.map((entry) => ({
+      childId: entry.id,
+      label: entry.value,
+      combinedId: interfaceComponentCombinedId(displayRef.id, entry.id),
+    }));
+  }, [displayRef, isInterfaceRef, subEntries]);
 
   React.useEffect(() => {
     // Don't clear state on close — keep previous data visible during exit animation.
@@ -339,7 +665,7 @@ function GamevalReferenceDialog({
     setConfigError(null);
 
     const params = new URLSearchParams({
-      type: configType === "spotanim" ? "spotanims" : configType,
+      type: normalizeConfigTypeForCacheApi(configType),
       id: String(openRef.id),
       rev: String(combinedRev),
     });
@@ -377,9 +703,15 @@ function GamevalReferenceDialog({
       <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-3xl">
         <DialogHeader>
           <div className="flex items-start justify-between gap-4">
-            {displayRef && (isItemRef || isNpcRef) ? (
+            {displayRef && (isItemRef || isNpcRef || isObjectRef) ? (
               <div className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center overflow-hidden rounded border border-border/60 bg-background/90 p-1">
-                {isItemRef ? <OpenRuneItemImage id={displayRef.id} /> : <OpenRuneNpcImage id={displayRef.id} />}
+                {isItemRef ? (
+                  <OpenRuneItemImage id={displayRef.id} />
+                ) : isNpcRef ? (
+                  <OpenRuneNpcImage id={displayRef.id} />
+                ) : (
+                  <OpenRuneObjectImage id={displayRef.id} />
+                )}
               </div>
             ) : null}
             <div className="min-w-0 flex-1">
@@ -415,6 +747,38 @@ function GamevalReferenceDialog({
                   rounded
                   className="rounded-md"
                 />
+              </div>
+            ) : isInterfaceRef ? (
+              <div className="rounded-md border border-border/60 bg-background/90">
+                <div className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
+                  {interfaceSubRows.length} component{interfaceSubRows.length === 1 ? "" : "s"} in interface
+                </div>
+                {interfaceSubRows.length === 0 ? (
+                  <div className="p-3 text-sm text-muted-foreground">No component entries in extras for this interface.</div>
+                ) : (
+                  <div className="max-h-[50vh] overflow-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className={DIFF_ARCHIVE_TABLE_HEAD_CLASS}>#</TableHead>
+                          <TableHead className={DIFF_ARCHIVE_TABLE_HEAD_CLASS}>Name</TableHead>
+                          <TableHead className={DIFF_ARCHIVE_TABLE_HEAD_CLASS}>ID</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {interfaceSubRows.map((row, idx) => (
+                          <TableRow key={row.childId} className="border-t align-top">
+                            <TableCell className={cn(DIFF_ARCHIVE_TABLE_CELL_CLASS, "font-mono text-xs text-muted-foreground")}>{idx + 1}</TableCell>
+                            <TableCell className={DIFF_ARCHIVE_TABLE_CELL_CLASS}>
+                              <span className="font-mono text-xs">{row.label || "—"}</span>
+                            </TableCell>
+                            <TableCell className={cn(DIFF_ARCHIVE_TABLE_CELL_CLASS, "font-mono text-xs tabular-nums")}>{row.combinedId}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </div>
             ) : configStatus === "loading" ? (
               <div className="rounded-md border border-border/60 bg-background/80 p-4">
@@ -493,18 +857,56 @@ const FindHighlightedText = React.memo(function FindHighlightedText({
   );
 });
 
+function splitHoverTarget(rawLine: string): { prefix: string; value: string } | null {
+  const firstEq = rawLine.indexOf("=");
+  if (firstEq <= 0) return null;
+  const paramMatch = /^param=parm_\d+=/.exec(rawLine);
+  if (paramMatch) {
+    const secondEq = rawLine.indexOf("=", firstEq + 1);
+    if (secondEq > firstEq) {
+      return { prefix: rawLine.slice(0, secondEq + 1), value: rawLine.slice(secondEq + 1) || " " };
+    }
+  }
+  return { prefix: rawLine.slice(0, firstEq + 1), value: rawLine.slice(firstEq + 1) || " " };
+}
+
 /** Shared by entity archive views and the combined gamevals explorer text mode. */
 export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
   line,
   combinedRev: _combinedRev,
+  lookupRevisions,
   hoverText,
+  fieldRenderSchemaByField,
   showInline: _showInline,
+  pipTooltip = true,
   findKind,
   findQuery,
   findMarkActive,
 }: DiffConfigArchiveTextLineProps) {
   const { loadGamevalType, hasLoaded, lookupGameval, lookupGamevalByName, getGamevalExtra } = useGamevals();
   const [openRef, setOpenRef] = React.useState<{ ref: InlineGamevalReference; id: number } | null>(null);
+  const candidateRevisions = React.useMemo(() => {
+    const out: number[] = [];
+    const pushUnique = (n: number) => {
+      if (!Number.isFinite(n)) return;
+      if (!out.includes(n)) out.push(n);
+    };
+    for (const n of lookupRevisions ?? []) pushUnique(n);
+    pushUnique(_combinedRev);
+    return out;
+  }, [lookupRevisions, _combinedRev]);
+
+  const resolveGamevalIdByName = React.useCallback(
+    (type: GamevalType, name: string): number | undefined => {
+      for (const rev of candidateRevisions) {
+        const id = lookupGamevalByName(type, name, rev);
+        if (id != null) return id;
+      }
+      return lookupGamevalByName(type, name, _combinedRev);
+    },
+    [candidateRevisions, lookupGamevalByName, _combinedRev],
+  );
+
   const hl =
     findMarkActive && findQuery?.trim()
       ? { kind: findKind ?? "literal", query: findQuery.trim(), active: true as const }
@@ -520,24 +922,13 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
 
   React.useEffect(() => {
     for (const type of inlineRefTypes) {
-      if (!hasLoaded(type, _combinedRev)) {
-        void loadGamevalType(type, _combinedRev);
+      for (const rev of candidateRevisions) {
+        if (!hasLoaded(type, rev)) {
+          void loadGamevalType(type, rev);
+        }
       }
     }
-  }, [inlineRefTypes, hasLoaded, loadGamevalType, _combinedRev]);
-
-  const splitHoverTarget = (rawLine: string): { prefix: string; value: string } | null => {
-    const firstEq = rawLine.indexOf("=");
-    if (firstEq <= 0) return null;
-    const paramMatch = /^param=parm_\d+=/.exec(rawLine);
-    if (paramMatch) {
-      const secondEq = rawLine.indexOf("=", firstEq + 1);
-      if (secondEq > firstEq) {
-        return { prefix: rawLine.slice(0, secondEq + 1), value: rawLine.slice(secondEq + 1) || " " };
-      }
-    }
-    return { prefix: rawLine.slice(0, firstEq + 1), value: rawLine.slice(firstEq + 1) || " " };
-  };
+  }, [inlineRefTypes, hasLoaded, loadGamevalType, candidateRevisions]);
 
   const resolveHoverTextId = (baseHoverText: string, value: string): string => {
     if (!baseHoverText) return baseHoverText;
@@ -549,7 +940,7 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
     const name = tokenMatch[2] ?? "";
     const type = INLINE_GAMEVAL_GROUP_TO_TYPE[group];
     if (!type) return baseHoverText;
-    const id = lookupGamevalByName(type, name, _combinedRev);
+    const id = resolveGamevalIdByName(type, name);
     if (id == null) return baseHoverText;
     return `${baseHoverText}\nid: ${id}`;
   };
@@ -592,6 +983,7 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
 
       const nodes: React.ReactNode[] = [];
       let cursor = 0;
+      let refIndex = 0;
       INLINE_GAMEVAL_REF_REGEX.lastIndex = 0;
       let match: RegExpExecArray | null;
       while ((match = INLINE_GAMEVAL_REF_REGEX.exec(text)) !== null) {
@@ -614,35 +1006,39 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
         }
 
         const name = match[2] ?? "";
-        const id = lookupGamevalByName(type, name, _combinedRev);
+        const id = resolveGamevalIdByName(type, name);
         if (id == null) {
           nodes.push(
             <FindHighlightedText
-              key={`ref-${start}`}
+              key={`ref-plain-${start}`}
               text={raw}
               kind={hl?.kind ?? "literal"}
               query={hl?.query ?? ""}
               enabled={Boolean(hl)}
             />,
           );
-        } else {
-          nodes.push(
-            <button
-              key={`ref-${start}`}
-              type="button"
-              className={INLINE_GAMEVAL_BUTTON_CLASS}
-              onClick={() => setOpenRef({ ref: { type, group, name, raw }, id })}
-              title={`Open ${raw}`}
-            >
-              <FindHighlightedText
-                text={raw}
-                kind={hl?.kind ?? "literal"}
-                query={hl?.query ?? ""}
-                enabled={Boolean(hl)}
-              />
-            </button>,
-          );
+          cursor = end;
+          continue;
         }
+        const buttonClass = refIndex % 2 === 0 ? INLINE_GAMEVAL_BUTTON_CLASS : INLINE_GAMEVAL_BUTTON_ALT_CLASS;
+        const displayLabel = `${raw}${id != null ? ` (${id})` : ""}`;
+        nodes.push(
+          <button
+            key={`ref-${start}`}
+            type="button"
+            className={buttonClass}
+            onClick={() => setOpenRef({ ref: { type, group, name, raw }, id })}
+            title={pipTooltip ? `Open ${raw}` : undefined}
+          >
+            <FindHighlightedText
+              text={displayLabel}
+              kind={hl?.kind ?? "literal"}
+              query={hl?.query ?? ""}
+              enabled={Boolean(hl)}
+            />
+          </button>,
+        );
+        refIndex += 1;
         cursor = end;
       }
       if (cursor < text.length) {
@@ -658,13 +1054,18 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
       }
       return <>{nodes}</>;
     },
-    [hl?.kind, hl?.query, lookupGamevalByName, _combinedRev],
+    [hl?.kind, hl?.query, resolveGamevalIdByName, pipTooltip],
   );
 
   const fn = getFieldName(line);
-  if (fn && (getColorFieldType(fn) || isTextureField(fn))) {
-    const colorKind = getColorFieldType(fn);
-    const textureField = isTextureField(fn);
+  const schemaKind = fn ? resolveFieldSchemaKind(fieldRenderSchemaByField, fn) : null;
+  const colorKind =
+    schemaKind === "colour"
+      ? (fn != null && fn.toLowerCase().includes("rgb") ? "rgb" : "hsl")
+      : null;
+  const textureField = fn != null && schemaKind === "texture";
+  const spriteField = fn != null && schemaKind === "sprite";
+  if (fn && (colorKind || textureField || spriteField)) {
     const displayLine = displayTextureFieldLine(line);
     const eqIdx = displayLine.indexOf("=");
     const prefix = displayLine.slice(0, eqIdx + 1);
@@ -674,7 +1075,7 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
     const hlEnabled = Boolean(hl);
     const isArray = isArrayValue(rest);
     const valueParts: React.ReactNode[] = [];
-    const re = /(-?\d+)/g;
+    const re = /([a-z][a-z0-9_]*\.[A-Za-z0-9_:$\/-]+(?:\s*\++)?)|(-?\d+)/gi;
     let last = 0;
     let m: RegExpExecArray | null;
     while ((m = re.exec(rest)) !== null) {
@@ -688,17 +1089,55 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
             enabled={hlEnabled}
           />,
         );
-      const widget = colorKind ? (
-        <RsColorSwatch key={`sw${m.index}`} value={+m[1]} kind={colorKind} />
-      ) : textureField ? (
-        <RsTextureSwatch key={`sw${m.index}`} value={+m[1]} combinedRev={_combinedRev} />
-      ) : null;
+      const token = m[1] ?? m[2] ?? "";
+      let widgetValue: number | null = null;
+      let spriteGamevalId: number | null = null;
+      if (m[2] != null) {
+        const n = Number(m[2]);
+        widgetValue = Number.isFinite(n) ? n : null;
+      } else if (m[1] != null) {
+        const parsed = parseInlineGamevalToken(m[1]);
+        if (parsed) {
+          const id = resolveGamevalIdByName(parsed.type, parsed.name);
+          if (id != null) {
+            if (spriteField) spriteGamevalId = id;
+            else widgetValue = id;
+          }
+        }
+      }
+      const widget = widgetValue != null
+        ? colorKind ? (
+            <RsColorSwatch key={`sw${m.index}`} value={widgetValue} kind={colorKind} />
+          ) : textureField ? (
+            <RsTextureSwatch key={`sw${m.index}`} value={widgetValue} combinedRev={_combinedRev} />
+          ) : spriteField ? (
+            <RsSpriteSwatch key={`sw${m.index}`} value={widgetValue} combinedRev={_combinedRev} />
+          ) : null
+        : null;
       if (isArray && widget) valueParts.push(widget);
-      valueParts.push(
-        <FindHighlightedText key={`n${m.index}`} text={m[1]} kind={hlKind} query={hlQuery} enabled={hlEnabled} />,
-      );
-      if (!isArray && widget) valueParts.push(widget);
-      last = m.index + m[1].length;
+      if (spriteField && m[1] != null && spriteGamevalId != null) {
+        const parsed = parseInlineGamevalToken(m[1])!;
+        const buttonClass = INLINE_GAMEVAL_BUTTON_CLASS;
+        const displayLabel = `${parsed.raw} (${spriteGamevalId})`;
+        valueParts.push(
+          <button
+            key={`gv${m.index}`}
+            type="button"
+            className={buttonClass}
+            onClick={() => setOpenRef({ ref: parsed, id: spriteGamevalId! })}
+            title={pipTooltip ? `Open ${parsed.raw}` : undefined}
+          >
+            <FindHighlightedText text={displayLabel} kind={hlKind} query={hlQuery} enabled={hlEnabled} />
+          </button>,
+          <RsSpriteSwatch key={`sw${m.index}`} value={spriteGamevalId} combinedRev={_combinedRev} />,
+        );
+      } else {
+        valueParts.push(
+          <FindHighlightedText key={`n${m.index}`} text={token} kind={hlKind} query={hlQuery} enabled={hlEnabled} />,
+        );
+        if (!isArray && widget) valueParts.push(widget);
+      }
+      last = m.index + token.length;
     }
     if (last < rest.length)
       valueParts.push(
@@ -728,6 +1167,7 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
     const countSuffixMatch = /,count=\d+$/i.exec(split.value);
     const mainValue = countSuffixMatch ? split.value.slice(0, split.value.length - countSuffixMatch[0].length) : split.value;
     const countSuffix = countSuffixMatch ? countSuffixMatch[0] : "";
+    const hasInlineGamevals = findInlineGamevalReferences(mainValue).length > 0;
     return (
       <>
         <span className="whitespace-pre">
@@ -737,7 +1177,9 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
             query={hl?.query ?? ""}
             enabled={Boolean(hl)}
           />
-          {wrapHoverValue(renderTextWithInlineGamevals(mainValue), resolveHoverTextId(hoverText ?? "", mainValue))}
+          {hasInlineGamevals
+            ? renderTextWithInlineGamevals(mainValue)
+            : wrapHoverValue(renderTextWithInlineGamevals(mainValue), resolveHoverTextId(hoverText ?? "", mainValue))}
           {countSuffix && (
             <FindHighlightedText
               text={countSuffix}
@@ -791,7 +1233,7 @@ type EntityMeta = {
   suggestionEnabled: (d: AppSettings["suggestionDisplay"]) => boolean;
 };
 
-const ENTITY_META: Record<ArchiveEntitySection, EntityMeta> = {
+const ENTITY_META_OVERRIDES: Partial<Record<ArchiveEntitySection, EntityMeta>> = {
   items: {
     title: "Items",
     tableEntitySingular: "item",
@@ -805,6 +1247,20 @@ const ENTITY_META: Record<ArchiveEntitySection, EntityMeta> = {
     searchHint: "Items: ID, gameval (items), name substring, or regex.",
     gamevalType: ITEMTYPES,
     suggestionEnabled: (d) => d.items,
+  },
+  objects: {
+    title: "Objects",
+    tableEntitySingular: "object",
+    tableEntityPlural: "objects",
+    paginationCountLabel: "objects",
+    emptyTableMessage: "No object rows for this revision (or no matches).",
+    decodingMessage: "Object data is still decoding on the cache server. Try again in a moment.",
+    tableErrorVerb: "load objects table",
+    contentErrorVerb: "load objects content",
+    gamevalFilterErrorVerb: "filter objects by gameval",
+    searchHint: "Objects: ID, gameval (objects), name substring, or regex.",
+    gamevalType: OBJTYPES,
+    suggestionEnabled: (d) => d.objects,
   },
   npcs: {
     title: "NPCs",
@@ -876,10 +1332,51 @@ const ENTITY_META: Record<ArchiveEntitySection, EntityMeta> = {
     gamevalType: null,
     suggestionEnabled: () => false,
   },
+  param: {
+    title: "Parameters",
+    tableEntitySingular: "parameter",
+    tableEntityPlural: "parameters",
+    paginationCountLabel: "parameters",
+    emptyTableMessage: "No parameter rows for this revision (or no matches).",
+    decodingMessage: "Parameter data is still decoding on the cache server. Try again in a moment.",
+    tableErrorVerb: "load parameters table",
+    contentErrorVerb: "load parameters content",
+    gamevalFilterErrorVerb: "filter parameters",
+    searchHint: "Parameters: use ID or name substring (type, ismembers).",
+    gamevalType: null,
+    suggestionEnabled: () => false,
+  },
 };
+
+function titleCaseSection(section: string): string {
+  return section
+    .split(/[_\s-]+/g)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function defaultEntityMeta(section: ArchiveEntitySection): EntityMeta {
+  const label = titleCaseSection(section);
+  return {
+    title: label,
+    tableEntitySingular: section,
+    tableEntityPlural: `${section}s`,
+    paginationCountLabel: `${section}s`,
+    emptyTableMessage: `No ${section} rows for this revision (or no matches).`,
+    decodingMessage: `${label} data is still decoding on the cache server. Try again in a moment.`,
+    tableErrorVerb: `load ${section} table`,
+    contentErrorVerb: `load ${section} content`,
+    gamevalFilterErrorVerb: `filter ${section}`,
+    searchHint: `${label}: use ID or gameval where available.`,
+    gamevalType: null,
+    suggestionEnabled: () => true,
+  };
+}
 
 export type DiffConfigArchiveEntityViewProps = {
   section: ArchiveEntitySection;
+  sectionLabel?: string;
   diffViewMode: DiffMode;
   combinedRev: number;
   baseRev: number;
@@ -888,17 +1385,75 @@ export type DiffConfigArchiveEntityViewProps = {
 
 export function DiffConfigArchiveEntityView({
   section,
+  sectionLabel,
   diffViewMode,
   combinedRev,
   baseRev,
   rev,
 }: DiffConfigArchiveEntityViewProps) {
-  const meta = ENTITY_META[section];
+  const meta = React.useMemo(() => {
+    const baseMeta = ENTITY_META_OVERRIDES[section] ?? defaultEntityMeta(section);
+    const trimmedLabel = sectionLabel?.trim();
+    if (!trimmedLabel) return baseMeta;
+    const labelLower = trimmedLabel.toLowerCase();
+    return {
+      ...baseMeta,
+      title: trimmedLabel,
+      tableEntitySingular: labelLower,
+      tableEntityPlural: labelLower,
+      paginationCountLabel: labelLower,
+      emptyTableMessage: `No ${labelLower} rows for this revision (or no matches).`,
+      decodingMessage: `${trimmedLabel} data is still decoding on the cache server. Try again in a moment.`,
+      tableErrorVerb: `load ${labelLower} table`,
+      contentErrorVerb: `load ${labelLower} content`,
+      gamevalFilterErrorVerb: `filter ${labelLower}`,
+      searchHint: `${trimmedLabel}: use ID or gameval where available.`,
+    };
+  }, [section, sectionLabel]);
+  const { selectedCacheType } = useCacheType();
   const { lookupGameval, lookupGamevalByName, loadGamevalType, hasLoaded, getGamevalExtra } = useGamevals();
-  const useGamevalColumn = meta.gamevalType != null;
-  const showImageCol = section === "items" || section === "npcs";
+  const sectionGamevalType = sectionGamevalTypeForSection(section) ?? meta.gamevalType;
+  const [schemaHasGameval, setSchemaHasGameval] = React.useState<boolean | undefined>(undefined);
+  const useGamevalColumn = schemaHasGameval ?? (sectionGamevalType != null);
+  const showImageCol = section === "items" || section === "npcs" || section === "objects";
 
   const [openRef, setOpenRef] = React.useState<{ ref: InlineGamevalReference; id: number } | null>(null);
+  const [openEnumRow, setOpenEnumRow] = React.useState<EnumDialogState | null>(null);
+  const [fieldRenderSchemaByField, setFieldRenderSchemaByField] = React.useState<Record<string, ConfigFieldRenderSchema>>({});
+  const [tableColumnPreferences, setTableColumnPreferences] = React.useState<TableColumnPreference[]>([]);
+  const [tableSearchFieldByMode, setTableSearchFieldByMode] = React.useState<Partial<Record<"name" | "regex", string>>>({});
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const configType = section;
+    const url = diffConfigSchemaUrl(configType);
+    const cacheKey = `diff:config:schema:${selectedCacheType.id}:${configType}`;
+
+    const run = async () => {
+      try {
+        const { data } = await conditionalJsonFetch<unknown>(cacheKey, url, {
+          headers: cacheProxyHeaders(selectedCacheType),
+        });
+        if (cancelled) return;
+        const parsed = parseFieldRenderSchemaPayload(data);
+        setFieldRenderSchemaByField(parsed.fields);
+        setTableColumnPreferences(parsed.tableColumns);
+        setTableSearchFieldByMode(parsed.searchFieldByMode);
+        setSchemaHasGameval(parsed.hasGameval);
+      } catch {
+        if (cancelled) return;
+        setFieldRenderSchemaByField({});
+        setTableColumnPreferences([]);
+        setTableSearchFieldByMode({});
+        setSchemaHasGameval(undefined);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [section, selectedCacheType]);
 
   const spotanimSequenceTicksById = useSpotanimSequenceTicks(
     section === "spotanim",
@@ -913,6 +1468,32 @@ export function DiffConfigArchiveEntityView({
       void loadGamevalType(SEQTYPES, combinedRev);
     }
   }, [section, combinedRev, hasLoaded, loadGamevalType]);
+
+  // Eagerly load all known gameval types so chips in text view and tables are immediately clickable.
+  React.useEffect(() => {
+    for (const type of Object.values(GAMEVAL_TYPE_MAP)) {
+      if (!hasLoaded(type, combinedRev)) {
+        void loadGamevalType(type, combinedRev);
+      }
+    }
+  }, [combinedRev, hasLoaded, loadGamevalType]);
+
+  const openGamevalTextRef = React.useCallback(
+    async (text: string, revArg: number) => {
+      const parsed = parseInlineGamevalToken(text);
+      if (!parsed) return null;
+      let id = lookupGamevalByName(parsed.type, parsed.name, revArg);
+      if (id == null) {
+        await loadGamevalType(parsed.type, revArg);
+        id = lookupGamevalByName(parsed.type, parsed.name, revArg);
+      }
+      if (id == null) return null;
+      const resolved = { ref: parsed, id };
+      setOpenRef(resolved);
+      return resolved;
+    },
+    [lookupGamevalByName, loadGamevalType],
+  );
 
   const rowEntriesForCell = React.useCallback(
     (row: ConfigArchiveTableRow): Record<string, string> => {
@@ -952,21 +1533,27 @@ export function DiffConfigArchiveEntityView({
 
   const buildTablePlan = React.useCallback(
     ({ displayRows, combinedRev: revArg }: { displayRows: ConfigArchiveTableRow[]; combinedRev: number }) => {
-      const keys = openruneEntityArchiveColumnKeys(section, displayRows.length > 0 ? displayRows : [], revArg);
-      const gvType = meta.gamevalType;
+      const keys = openruneEntityArchiveColumnKeys(
+        section,
+        displayRows.length > 0 ? displayRows : [],
+        revArg,
+        useGamevalColumn,
+        tableColumnPreferences,
+      );
+      const gvType = sectionGamevalType;
       const colCount = keys.length + (showImageCol ? 1 : 0);
 
       return {
         colgroup: (
-          <>
+          <colgroup>
             <col className="w-16" />
             {showImageCol ? (
               <col className={section === "items" ? "w-12" : "w-14"} />
             ) : null}
             {keys.map((colKey) => (
-              <col key={colKey} className={colKey === "gameval" ? "min-w-[10rem]" : colKey === "tickDuration" ? "w-36" : colKey === "animationId" ? "min-w-[8rem]" : "min-w-[6rem]"} />
+              <col key={colKey} className={colKey === "gameval" ? "min-w-[10rem]" : colKey === "tickDuration" ? "w-36" : colKey === "animationId" ? "min-w-[8rem]" : colKey === "key" || colKey === "value" ? "w-20" : colKey === "model" ? "min-w-[10rem]" : "min-w-[6rem]"} />
             ))}
-          </>
+          </colgroup>
         ),
         headerCellsAfterId: (
           <>
@@ -982,8 +1569,21 @@ export function DiffConfigArchiveEntityView({
         ),
         renderTableRow: (row: ConfigArchiveTableRow) => {
           const entries = rowEntriesForCell(row);
+          const enumClickable = section === "enum";
           return (
-            <TableRow key={row.id} className="border-t align-top hover:bg-muted/35">
+            <TableRow
+              key={row.id}
+              className={cn("border-t align-top hover:bg-muted/35", enumClickable && "cursor-pointer")}
+              onClick={enumClickable ? () => setOpenEnumRow({ row, entries }) : undefined}
+              onKeyDown={enumClickable ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setOpenEnumRow({ row, entries });
+                }
+              } : undefined}
+              role={enumClickable ? "button" : undefined}
+              tabIndex={enumClickable ? 0 : undefined}
+            >
               <TableCell className={cn(DIFF_ARCHIVE_TABLE_CELL_CLASS, "font-mono")}>{row.id}</TableCell>
               {showImageCol ? (
                 <TableCell className={cn(DIFF_ARCHIVE_TABLE_CELL_CLASS, section === "items" ? "p-1" : "p-2")}>
@@ -993,7 +1593,13 @@ export function DiffConfigArchiveEntityView({
                       section === "items" ? "h-8 w-8 p-0.5" : "h-12 w-12 p-1",
                     )}
                   >
-                    {section === "items" ? <OpenRuneItemImage id={row.id} /> : <OpenRuneNpcImage id={row.id} />}
+                    {section === "items" ? (
+                      <OpenRuneItemImage id={row.id} />
+                    ) : section === "npcs" ? (
+                      <OpenRuneNpcImage id={row.id} />
+                    ) : (
+                      <OpenRuneObjectImage id={row.id} />
+                    )}
                   </div>
                 </TableCell>
               ) : null}
@@ -1033,6 +1639,95 @@ export function DiffConfigArchiveEntityView({
                     </TableCell>
                   );
                 }
+                if (key === "default") {
+                  const rawDefault = entries.default ?? "";
+                  const parsedDefault = resolveInlineGamevalFromText(rawDefault, revArg, lookupGamevalByName);
+                  if (parsedDefault != null || parseInlineGamevalToken(rawDefault) != null) {
+                    return (
+                      <TableCell key={key} className={DIFF_ARCHIVE_TABLE_CELL_CLASS}>
+                        <button
+                          type="button"
+                          className={TABLE_GAMEVAL_BUTTON_CLASS}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void openGamevalTextRef(rawDefault, revArg);
+                          }}
+                          title={`Open ${(parsedDefault?.ref.raw ?? parseInlineGamevalToken(rawDefault)?.raw) ?? rawDefault}`}
+                        >
+                          <span className="block max-w-[12rem] truncate">{(parsedDefault?.ref.raw ?? parseInlineGamevalToken(rawDefault)?.raw ?? rawDefault).trim().replace(/^['"\s]+|['"\s]+$/g, "")}{parsedDefault != null ? ` (${parsedDefault.id})` : ""}</span>
+                        </button>
+                      </TableCell>
+                    );
+                  }
+                }
+                if (key === "default" && section === "param") {
+                  const selectedDefaultField = getParamSmartDefaultField(entries);
+                  const rawSelected = row.entriesRaw?.[selectedDefaultField];
+
+                  let group: string | null = null;
+                  let name: string | null = null;
+                  let rawValue: string | null = null;
+
+                  if (rawSelected && typeof rawSelected === "object" && !Array.isArray(rawSelected)) {
+                    const rs = rawSelected as Record<string, unknown>;
+                    rawValue = rs.value != null ? String(rs.value) : null;
+                    const ref = rs.ref;
+                    if (ref && typeof ref === "object") {
+                      const rr = ref as Record<string, unknown>;
+                      group = typeof rr.group === "string" ? rr.group : null;
+                      name = typeof rr.name === "string" ? rr.name : null;
+                    }
+                  }
+
+                  const fallback = (entries.default ?? "").trim().replace(/^['"\s]+|['"\s]+$/g, "");
+                  if ((!group || !name) && fallback.includes(".")) {
+                    const dot = fallback.indexOf(".");
+                    const g = fallback.slice(0, dot).trim();
+                    const n = fallback.slice(dot + 1).trim();
+                    if (g && n) {
+                      group = g;
+                      name = n;
+                    }
+                  }
+
+                  if (group && name) {
+                    const refType = INLINE_GAMEVAL_GROUP_TO_TYPE[group.toLowerCase()];
+                    const resolvedIdByName = refType ? lookupGamevalByName(refType, name, revArg) : undefined;
+                    const resolvedIdByUpper =
+                      refType && resolvedIdByName == null ? lookupGamevalByName(refType, name.toUpperCase(), revArg) : undefined;
+                    const rawNumericId = rawValue != null && /^-?\d+$/.test(rawValue.trim())
+                      ? Number(rawValue)
+                      : undefined;
+                    const selectedEntryRaw = entries[selectedDefaultField];
+                    const selectedEntryNumericId =
+                      selectedEntryRaw != null && /^-?\d+$/.test(selectedEntryRaw.trim())
+                        ? Number(selectedEntryRaw)
+                        : undefined;
+                    const resolvedId = resolvedIdByName ?? resolvedIdByUpper ?? rawNumericId ?? selectedEntryNumericId;
+
+                    if (refType && resolvedId != null && Number.isFinite(resolvedId)) {
+                      const label = name;
+                      const openLabel = `${group}.${name}`;
+                      return (
+                        <TableCell key={key} className={DIFF_ARCHIVE_TABLE_CELL_CLASS}>
+                          <button
+                            type="button"
+                            className={TABLE_GAMEVAL_BUTTON_CLASS}
+                            onClick={() =>
+                              setOpenRef({
+                                ref: { type: refType, group, name, raw: rawValue ?? String(resolvedId) },
+                                id: resolvedId,
+                              })
+                            }
+                            title={`Open ${openLabel} (${resolvedId})`}
+                          >
+                            <span className="block max-w-[12rem] truncate">{label} ({resolvedId})</span>
+                          </button>
+                        </TableCell>
+                      );
+                    }
+                  }
+                }
                 return (
                   <OpenRuneArchiveTableCell
                     key={key}
@@ -1045,6 +1740,9 @@ export function DiffConfigArchiveEntityView({
                     gamevalType={gvType}
                     lookupGameval={lookupGameval}
                     getGamevalExtra={getGamevalExtra}
+                    onOpenRef={(ref) => setOpenRef(ref)}
+                    pipTooltip
+                    fieldRenderSchemaByField={fieldRenderSchemaByField}
                   />
                 );
               })}
@@ -1077,75 +1775,60 @@ export function DiffConfigArchiveEntityView({
         readyAriaLabel: `${meta.title} table`,
       };
     },
-    [lookupGameval, lookupGamevalByName, getGamevalExtra, meta.gamevalType, meta.tableEntityPlural, meta.title, rowEntriesForCell, section, setOpenRef, showImageCol],
+    [lookupGameval, lookupGamevalByName, getGamevalExtra, sectionGamevalType, meta.tableEntityPlural, meta.title, rowEntriesForCell, section, setOpenRef, showImageCol, fieldRenderSchemaByField, tableColumnPreferences, useGamevalColumn],
   );
 
   const tableSearchDisabledModes = React.useMemo((): readonly DiffSearchFieldMode[] => {
+    const hasNameField = typeof tableSearchFieldByMode.name === "string" && tableSearchFieldByMode.name.trim().length > 0;
+    const hasRegexField = typeof tableSearchFieldByMode.regex === "string" && tableSearchFieldByMode.regex.trim().length > 0;
+    const disabled: DiffSearchFieldMode[] = [];
     if (!useGamevalColumn) {
-      return ["gameval"];
+      disabled.push("gameval");
+    } else if (combinedRev < GAMEVAL_MIN_REVISION) {
+      disabled.push("gameval");
     }
-    const nameRegex: DiffSearchFieldMode[] = ["name", "regex"];
-    if (section === "items" || section === "npcs") {
-      if (combinedRev < GAMEVAL_MIN_REVISION) return ["gameval"];
-      return [];
-    }
-    if (combinedRev < GAMEVAL_MIN_REVISION) return ["gameval", ...nameRegex];
-    return nameRegex;
-  }, [combinedRev, useGamevalColumn, section]);
+    if (!hasNameField) disabled.push("name");
+    if (!hasRegexField) disabled.push("regex");
+    return disabled;
+  }, [combinedRev, tableSearchFieldByMode.name, tableSearchFieldByMode.regex, useGamevalColumn]);
 
   const tableSearchModeTitles = React.useMemo(() => {
     const revHint = `Needs revision ${GAMEVAL_MIN_REVISION}+ (current ${combinedRev}).`;
-    const nameRegexHelp = {
-      name: "Substring match across visible row fields.",
-      regex: "JavaScript-style regex over concatenated row fields.",
+    const hasNameField = typeof tableSearchFieldByMode.name === "string" && tableSearchFieldByMode.name.trim().length > 0;
+    const hasRegexField = typeof tableSearchFieldByMode.regex === "string" && tableSearchFieldByMode.regex.trim().length > 0;
+    return {
+      gameval: useGamevalColumn ? (combinedRev < GAMEVAL_MIN_REVISION ? revHint : meta.searchHint) : meta.searchHint,
+      name: hasNameField ? `Substring match on field '${tableSearchFieldByMode.name}'.` : "Name search is disabled for this table.",
+      regex: hasRegexField ? `Regex match on field '${tableSearchFieldByMode.regex}'.` : "Regex search is disabled for this table.",
     } as const;
-    if (!useGamevalColumn) {
-      return {
-        gameval: meta.searchHint,
-        ...nameRegexHelp,
-      } as const;
-    }
-    if (section === "items" || section === "npcs") {
-      if (combinedRev < GAMEVAL_MIN_REVISION) {
-        return {
-          gameval: revHint,
-          ...nameRegexHelp,
-        } as const;
-      }
-      return {
-        gameval: meta.searchHint,
-        ...nameRegexHelp,
-      } as const;
-    }
-    if (combinedRev < GAMEVAL_MIN_REVISION) {
-      return {
-        gameval: revHint,
-        name: meta.searchHint,
-        regex: meta.searchHint,
-      } as const;
-    }
-    return { name: meta.searchHint, regex: meta.searchHint } as const;
-  }, [combinedRev, meta.searchHint, useGamevalColumn, section]);
+  }, [combinedRev, meta.searchHint, tableSearchFieldByMode.name, tableSearchFieldByMode.regex, useGamevalColumn]);
 
   const gamevalAutocomplete =
-    meta.gamevalType != null
+    sectionGamevalType != null
       ? {
-          type: meta.gamevalType,
+          type: sectionGamevalType,
           revUsesCombined: true as const,
           enabled: meta.suggestionEnabled,
         }
       : null;
 
   const gamevalBulkFilter =
-    meta.gamevalType != null
+    sectionGamevalType != null
       ? {
-          filterGamevalType: meta.gamevalType,
+          filterGamevalType: sectionGamevalType,
           rowToFilterId: (row: ConfigArchiveTableRow) => row.id,
           bulkPageSize: GAMEVAL_BULK_PAGE,
-          preloadTypes: [meta.gamevalType],
-          readyWhenLoaded: meta.gamevalType,
+          preloadTypes: [sectionGamevalType],
+          readyWhenLoaded: sectionGamevalType,
         }
       : null;
+
+  const TextLineWithSchema = React.useMemo<React.ComponentType<DiffConfigArchiveTextLineProps>>(
+    () => function TextLineWithSchema(props) {
+      return <ArchivePlainTextLine {...props} fieldRenderSchemaByField={fieldRenderSchemaByField} />;
+    },
+    [fieldRenderSchemaByField],
+  );
 
   return (
     <>
@@ -1169,11 +1852,15 @@ export function DiffConfigArchiveEntityView({
         contentErrorVerb: meta.contentErrorVerb,
         gamevalFilterErrorVerb: meta.gamevalFilterErrorVerb,
       }}
-      tableSearch={{ disabledModes: tableSearchDisabledModes, modeTitles: tableSearchModeTitles }}
+      tableSearch={{
+        disabledModes: tableSearchDisabledModes,
+        modeTitles: tableSearchModeTitles,
+        searchFieldByMode: tableSearchFieldByMode,
+      }}
       gamevalAutocomplete={gamevalAutocomplete}
       gamevalBulkFilter={gamevalBulkFilter}
       buildTablePlan={buildTablePlan}
-        TextLine={ArchivePlainTextLine}
+        TextLine={TextLineWithSchema}
         textRowHeight={TEXT_LINE_HEIGHT}
       />
       <GamevalReferenceDialog
@@ -1184,6 +1871,16 @@ export function DiffConfigArchiveEntityView({
         }}
         lookupGameval={lookupGameval}
         getGamevalExtra={getGamevalExtra}
+      />
+      <EnumRowDialog
+        state={openEnumRow}
+        combinedRev={combinedRev}
+        onOpenChange={(open) => {
+          if (!open) setOpenEnumRow(null);
+        }}
+        lookupGamevalByName={lookupGamevalByName}
+        loadGamevalType={loadGamevalType}
+        onOpenRef={(ref) => setOpenRef(ref)}
       />
     </>
   );

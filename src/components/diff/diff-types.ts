@@ -10,14 +10,8 @@ export type Section =
   | "textures"
   /** Combined gameval dump explorer (`?section=gamevals`). */
   | "gamevals"
-  | "items"
-  | "npcs"
-  | "sequences"
-  | "spotanim"
-  | "inv"
-  | "overlay"
-  | "underlay"
-  | GamevalsFullSection;
+  | GamevalsFullSection
+  | (string & {});
 
 export type ConfigFilterMode = "all" | "added" | "changed" | "removed";
 

@@ -23,6 +23,7 @@ type CacheTypeSelectorCardProps = {
   className?: string;
   showUnavailableBanner?: boolean;
   showGoHomeButton?: boolean;
+  onSelect?: () => void;
 };
 
 function StatusBadge({
@@ -151,6 +152,7 @@ export function CacheTypeSelectorCard({
   className,
   showUnavailableBanner = true,
   showGoHomeButton = false,
+  onSelect,
 }: CacheTypeSelectorCardProps) {
   const {
     selectedCacheType,
@@ -207,7 +209,10 @@ export function CacheTypeSelectorCard({
                 key={cacheType.id}
                 type="button"
                 disabled={!canSelect}
-                onClick={() => setSelectedCacheType(cacheType)}
+                onClick={() => {
+                  setSelectedCacheType(cacheType);
+                  onSelect?.();
+                }}
                 className={[
                   "w-full rounded-lg border p-4 text-left transition-colors",
                   !status || status === ServerStatus.ERROR

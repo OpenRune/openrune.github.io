@@ -4,19 +4,32 @@ import type { GamevalType } from "@/context/gameval-context";
 import type { AppSettings } from "@/context/settings-context";
 import type { DiffMode, DiffSearchFieldMode, SearchTag } from "./diff-types";
 
+export type ConfigFieldRenderKind = "raw" | "gameval" | "sprite" | "texture" | "colour";
+
+export type ConfigFieldRenderSchema = {
+  kind: ConfigFieldRenderKind;
+};
+
 /** Server config table row (`diff/config/{type}/table`). */
 export type ConfigArchiveTableRow = {
   id: number;
   sectionId?: string;
   entries: Record<string, string>;
+  /** Raw server field values (preserves `{ value, ref }` gameval objects when present). */
+  entriesRaw?: Record<string, unknown>;
 };
 
 export type DiffConfigArchiveTextLineProps = {
   line: string;
   combinedRev: number;
+  /** Optional revision candidates for gameval name lookup (diff mode can include base+compare). */
+  lookupRevisions?: readonly number[];
   hoverText?: string;
+  fieldRenderSchemaByField?: Record<string, ConfigFieldRenderSchema>;
   /** Optional (e.g. texture inline previews from settings). */
   showInline?: boolean;
+  /** Show hover tooltip on pip buttons. Defaults to true. */
+  pipTooltip?: boolean;
   findKind?: "literal" | "regex";
   findQuery?: string;
   findMarkActive?: boolean;
@@ -85,6 +98,7 @@ export type DiffConfigArchiveViewProps = {
   tableSearch: {
     disabledModes: readonly DiffSearchFieldMode[];
     modeTitles: Partial<Record<DiffSearchFieldMode, string>>;
+    searchFieldByMode?: Partial<Record<"name" | "regex", string>>;
     tagModes?: readonly ("gameval")[];
   };
 
@@ -106,4 +120,10 @@ export type DiffConfigArchiveViewProps = {
   getTextLineShowInline?: (settings: AppSettings) => boolean;
   textOverscan?: number;
   textFindDebounceMs?: number;
+  /** Shown on the search row, aligned to the far right (e.g. zip download). */
+  searchRowTrailing?: React.ReactNode;
+  /** Optional search control size for table mode. */
+  tableSearchSize?: "default" | "large";
+  /** Optional wrapper classes for table-mode search container width/layout. */
+  tableSearchWrapClassName?: string;
 };

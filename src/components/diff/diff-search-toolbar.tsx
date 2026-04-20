@@ -130,10 +130,10 @@ export function DiffSearchToolbar({
     <div className="mb-3 flex flex-col gap-2">
       <div className="flex min-w-0 flex-nowrap items-center gap-2">
         {leading ? <div className="shrink-0">{leading}</div> : null}
-        <div ref={suggestRootRef} className="relative z-[60] min-w-0 max-w-xl flex-1">
+        <div ref={suggestRootRef}  className="relative z-[60] w-full max-w-xs flex-none">
           <Input
             ref={inputRef}
-            className="w-full min-w-0"
+            className="w-full"
             placeholder={placeholder}
             value={value}
             onChange={(e) => {

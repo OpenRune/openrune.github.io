@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -433,115 +434,124 @@ export function RSSprite({
 
   const spriteModalElement = enableClickModel ? (
     <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-      <DialogContent className="flex h-[min(500px,85vh)] max-w-4xl flex-col" showCloseButton>
-        <DialogHeader className="shrink-0">
+      <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-3xl" showCloseButton>
+        <DialogHeader>
           <DialogTitle>
             {modalTitle ??
               (textureId !== undefined ? (
                 <>{titleGameval ? titleGameval : `Texture ${textureId}`}</>
               ) : (
-                <>
-                  Sprite{titleGameval ? `: ${titleGameval}` : ""} [{id}]
-                </>
+                <>{titleGameval ? `sprites.${titleGameval}` : `Sprite [${id}]`}</>
               ))}
           </DialogTitle>
+          <DialogDescription>
+            {textureId !== undefined ? `texture · ID ${textureId}` : `sprites · ID ${id}`}
+          </DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue="sprite" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <TabsList
-            className={cn(
-              "mb-3 w-full shrink-0",
-              tabCount === 1 && "grid-cols-1",
-              tabCount === 2 && "grid-cols-2",
-              tabCount === 3 && "grid-cols-3",
-              tabCount === 4 && "grid-cols-4",
-              tabCount >= 5 && "grid-cols-5",
-              "grid",
-            )}
-          >
-            <TabsTrigger value="sprite" className="flex-1">
-              Sprite
-            </TabsTrigger>
-            {hasSubsprites ? (
-              <TabsTrigger value="subsprites" className="flex-1">
-                Subsprites
-              </TabsTrigger>
-            ) : null}
-            {extraTabs.map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value} className="flex-1">
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          <TabsContent value="sprite" className="mt-0 flex min-h-0 flex-1 flex-col items-center justify-center overflow-auto p-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={modalImageSrc}
-              alt={`Sprite ${id}`}
-              className="max-h-[60vh] max-w-full object-contain"
-              draggable={false}
-              decoding="async"
-              style={{ imageRendering: "pixelated" }}
-            />
-            <div className="mt-4 flex shrink-0 justify-center gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => void copyImageUrl()}>
-                Copy URL
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={downloadImage}>
-                Download
-              </Button>
-            </div>
-          </TabsContent>
-
-          {(hasSubsprites || (extraData?.count && extraData.count > 1)) && (
-            <TabsContent value="subsprites" className="mt-0 min-h-0 flex-1 overflow-auto">
-              {loadingSubsprites ? (
-                <div className="flex items-center justify-center py-8">
-                  <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : subspritesError ? (
-                <div className="py-8 text-center text-sm text-destructive">{subspritesError}</div>
-              ) : subsprites.length === 0 ? (
-                <div className="py-8 text-center text-sm text-muted-foreground">No subsprites available</div>
-              ) : (
-                <div className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-3 md:grid-cols-4">
-                  {subsprites.map((sub) => {
-                    const url = spritesProxyUrl({
-                      id,
-                      indexed: sub.index,
-                      width: 128,
-                      height: 128,
-                      keepAspectRatio: true,
-                      base,
-                      rev,
-                    });
-                    return (
-                      <div key={sub.index} className="flex flex-col items-center gap-2">
-                        <div className="text-sm font-medium">Index {sub.index}</div>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={sub.imageUrl || url}
-                          alt={`Subsprite ${sub.index}`}
-                          className="max-h-32 max-w-full rounded border object-contain"
-                          draggable={false}
-                          decoding="async"
-                          loading="lazy"
-                          style={{ imageRendering: "pixelated" }}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
+        <div className="grid gap-4 text-sm">
+          <Tabs defaultValue="sprite">
+            <TabsList
+              className={cn(
+                "mb-3 w-full",
+                tabCount === 1 && "grid-cols-1",
+                tabCount === 2 && "grid-cols-2",
+                tabCount === 3 && "grid-cols-3",
+                tabCount === 4 && "grid-cols-4",
+                tabCount >= 5 && "grid-cols-5",
+                "grid",
               )}
-            </TabsContent>
-          )}
+            >
+              <TabsTrigger value="sprite" className="flex-1">
+                Sprite
+              </TabsTrigger>
+              {hasSubsprites ? (
+                <TabsTrigger value="subsprites" className="flex-1">
+                  Subsprites
+                </TabsTrigger>
+              ) : null}
+              {extraTabs.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value} className="flex-1">
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-          {extraTabs.map((tab) => (
-            <TabsContent key={tab.value} value={tab.value} className="mt-0 min-h-0 flex-1 overflow-hidden">
-              {tab.content}
+            <TabsContent value="sprite" className="mt-0">
+              <div className="flex flex-col items-center gap-4 rounded-md border border-border/60 bg-background/90 p-6">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={modalImageSrc}
+                  alt={`Sprite ${id}`}
+                  className="max-h-[50vh] max-w-full object-contain"
+                  draggable={false}
+                  decoding="async"
+                  style={{ imageRendering: "pixelated" }}
+                />
+                <div className="flex shrink-0 justify-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => void copyImageUrl()}>
+                    Copy URL
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={downloadImage}>
+                    Download
+                  </Button>
+                </div>
+              </div>
             </TabsContent>
-          ))}
-        </Tabs>
+
+            {hasSubsprites || (extraData?.count && extraData.count > 1) ? (
+              <TabsContent value="subsprites" className="mt-0">
+                <div className="rounded-md border border-border/60 bg-background/90">
+                  <div className="max-h-[50vh] overflow-auto">
+                    {loadingSubsprites ? (
+                      <div className="flex items-center justify-center py-8">
+                        <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : subspritesError ? (
+                      <div className="py-8 text-center text-sm text-destructive">{subspritesError}</div>
+                    ) : subsprites.length === 0 ? (
+                      <div className="py-8 text-center text-sm text-muted-foreground">No subsprites available</div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-3 md:grid-cols-4">
+                        {subsprites.map((sub) => {
+                          const url = spritesProxyUrl({
+                            id,
+                            indexed: sub.index,
+                            width: 128,
+                            height: 128,
+                            keepAspectRatio: true,
+                            base,
+                            rev,
+                          });
+                          return (
+                            <div key={sub.index} className="flex flex-col items-center gap-2">
+                              <div className="text-sm font-medium">Index {sub.index}</div>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={sub.imageUrl || url}
+                                alt={`Subsprite ${sub.index}`}
+                                className="max-h-32 max-w-full rounded border object-contain"
+                                draggable={false}
+                                decoding="async"
+                                loading="lazy"
+                                style={{ imageRendering: "pixelated" }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+            ) : null}
+
+            {extraTabs.map((tab) => (
+              <TabsContent key={tab.value} value={tab.value} className="mt-0">
+                <div className="rounded-md border border-border/60 bg-background/90 p-4">{tab.content}</div>
+              </TabsContent>
+            ))}
+          </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   ) : null;

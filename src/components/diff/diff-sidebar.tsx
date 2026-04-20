@@ -72,6 +72,8 @@ type DiffSidebarProps = {
   deltaBadges?: DeltaBadgeMap | null;
   /** Dynamic nav sections from server; falls back to static CONFIG_TYPES / archive list when null. */
   navSections?: { archives: NavSection[]; configs: NavSection[] } | null;
+  /** Per-revision support flags computed from decoded bin content. */
+  sectionSupport?: { archives: Record<string, boolean>; configs: Record<string, boolean> } | null;
 };
 
 export function DiffSidebar({
@@ -93,6 +95,7 @@ export function DiffSidebar({
   diffHref,
   deltaBadges = null,
   navSections = null,
+  sectionSupport = null,
 }: DiffSidebarProps) {
   const fullActive = diffViewMode === "combined";
   const diffActive = diffViewMode === "diff";
@@ -118,7 +121,7 @@ export function DiffSidebar({
   );
 
   return (
-    <nav className="flex w-48 flex-shrink-0 flex-col gap-2 overflow-y-auto rounded-lg border bg-muted/30 p-2">
+    <nav className="flex w-56 flex-shrink-0 flex-col gap-2 overflow-y-auto rounded-lg border bg-muted/30 p-2">
       <header className="shrink-0">
         <div className="flex rounded-lg border bg-background/80 p-0.5">
           <Link
@@ -215,17 +218,19 @@ export function DiffSidebar({
           const active = id === section;
           const counts = deltaFor(id);
           const isGamevalsArchive = id === "gamevals";
+          const unsupportedByRevision = sectionSupport?.archives[id] === false;
           const gamevalsDisabled =
             isGamevalsArchive && (!archivesGamevalEnabled || diffViewMode === "diff");
+          const archiveDisabled = gamevalsDisabled || unsupportedByRevision;
 
           const archiveButton = (
             <button
               type="button"
-              disabled={gamevalsDisabled}
+              disabled={archiveDisabled}
               className={cn(
                 SIDEBAR_NAV_ROW_CLASS,
                 active ? "bg-primary text-primary-foreground" : "hover:bg-muted",
-                gamevalsDisabled && "cursor-not-allowed opacity-45 hover:bg-transparent",
+                archiveDisabled && "cursor-not-allowed opacity-45 hover:bg-transparent",
               )}
               onClick={() => setSection(id as Section)}
             >
@@ -233,7 +238,7 @@ export function DiffSidebar({
                 {isGamevalsArchive ? <IconDatabase size={16} /> : <DiffTypeIcon type={id as Section} />}
                 <span className="truncate">{label}</span>
               </span>
-              {diffViewMode === "diff" && counts && !isGamevalsArchive ? (
+              {diffViewMode === "diff" && counts && !isGamevalsArchive && !unsupportedByRevision ? (
                 <Tooltip>
                   <TooltipTrigger>
                     <DiffNavDeltaBadges counts={counts} />
@@ -250,19 +255,20 @@ export function DiffSidebar({
             </button>
           );
 
-          if (gamevalsDisabled) {
+          if (archiveDisabled) {
             return (
-              <span
-                key={id}
-                className="mt-0.5 block w-full"
-                title={
-                  diffViewMode === "diff"
+              <Tooltip key={id}>
+                <TooltipTrigger>
+                  <span className="mt-0.5 block w-full">{archiveButton}</span>
+                </TooltipTrigger>
+                <TooltipContent opaque side="right" className="text-xs">
+                  {unsupportedByRevision
+                    ? "Not supported for the selected revision."
+                    : diffViewMode === "diff"
                     ? "Gamevals are only available in Full mode (same as legacy diff site)."
-                    : `Gamevals need revision ${minRevision ?? GAMEVAL_MIN_REVISION}+ for this view (Full: selected rev; Diff: Compare).`
-                }
-              >
-                {archiveButton}
-              </span>
+                    : `Gamevals need revision ${minRevision ?? GAMEVAL_MIN_REVISION}+ for this view (Full: selected rev; Diff: Compare).`}
+                </TooltipContent>
+              </Tooltip>
             );
           }
 
@@ -277,23 +283,42 @@ export function DiffSidebar({
         </div>
         {configSections.map(({ id, label }) => {
           const counts = deltaFor(id);
-          return (
+          const unsupportedByRevision = sectionSupport?.configs[id] === false;
+          const configButton = (
             <button
               key={id}
               type="button"
+              disabled={unsupportedByRevision}
               className={cn(
                 SIDEBAR_NAV_ROW_CLASS,
                 section === id ? "bg-primary text-primary-foreground" : "hover:bg-muted",
+                unsupportedByRevision && "cursor-not-allowed opacity-45 hover:bg-transparent",
               )}
               onClick={() => setSection(id as Section)}
+              title={unsupportedByRevision ? "Not supported for the selected revision." : undefined}
             >
               <span className="flex min-w-0 items-center gap-2">
                 <DiffTypeIcon type={id as Section} />
                 <span className="truncate">{label}</span>
               </span>
-              {diffViewMode === "diff" && counts ? <DiffNavDeltaBadges counts={counts} /> : null}
+              {diffViewMode === "diff" && counts && !unsupportedByRevision ? <DiffNavDeltaBadges counts={counts} /> : null}
             </button>
           );
+
+          if (unsupportedByRevision) {
+            return (
+              <Tooltip key={id}>
+                <TooltipTrigger>
+                  <span className="mt-0.5 block w-full">{configButton}</span>
+                </TooltipTrigger>
+                <TooltipContent opaque side="right" className="text-xs">
+                  Not supported for the selected revision.
+                </TooltipContent>
+              </Tooltip>
+            );
+          }
+
+          return configButton;
         })}
       </div>
     </nav>

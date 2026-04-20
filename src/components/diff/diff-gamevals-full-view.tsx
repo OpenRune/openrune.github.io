@@ -33,6 +33,7 @@ import {
   GAMEVAL_FULL_TAB_ORDER,
   GAMEVAL_MIN_REVISION,
   GAMEVAL_VARCS_MIN_REVISION,
+  interfaceComponentCombinedId,
   TEXTURE_PER_PAGE_OPTIONS,
 } from "./diff-constants";
 import { DiffSectionHeader } from "./diff-section-header";
@@ -83,11 +84,6 @@ const DB_SLOT_OPTIONS = [
 ] as const;
 
 type DbSlotChoice = (typeof DB_SLOT_OPTIONS)[number]["value"];
-
-/** Same packing as JVM: `(interfaceId shl 16) or subChildId`. */
-export function interfaceComponentCombinedId(interfaceId: number, subChildId: number): number {
-  return (interfaceId << 16) | subChildId;
-}
 
 function sortedInterfaceSubEntries(
   interfaceId: number,

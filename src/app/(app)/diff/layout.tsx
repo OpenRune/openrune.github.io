@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DiffConfigView } from "@/components/diff/diff-config-view";
 import {
+  applyNavConfigSections,
   DELTA_COUNTS,
   DIFF_DEFAULT_SECTION,
   DIFF_ROUTE_DIFFVIEW,
@@ -39,6 +40,7 @@ import {
   diffDeltaSpritesSummaryUrl,
   diffDeltaSummaryUrl,
   diffRevisionsUrl,
+  diffSupportManifestUrl,
   parseDiffRevisionsResponse,
 } from "@/lib/cache-proxy-client";
 import { mergeDeltaBadgeMaps, type DeltaBadgeMap } from "@/lib/diff-delta-merge";
@@ -101,6 +103,35 @@ function DiffLayoutFallback() {
   );
 }
 
+type SectionSupportManifest = {
+  rev: number;
+  archives: Record<string, boolean>;
+  configs: Record<string, boolean>;
+};
+
+function parseSectionSupportManifest(data: unknown): SectionSupportManifest | null {
+  if (!data || typeof data !== "object") return null;
+  const raw = data as Record<string, unknown>;
+  if (typeof raw.rev !== "number") return null;
+  if (!raw.archives || typeof raw.archives !== "object") return null;
+  if (!raw.configs || typeof raw.configs !== "object") return null;
+
+  const parseBoolMap = (value: unknown): Record<string, boolean> => {
+    if (!value || typeof value !== "object") return {};
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).flatMap(([k, v]) =>
+        typeof v === "boolean" ? [[k, v]] : [],
+      ),
+    );
+  };
+
+  return {
+    rev: raw.rev,
+    archives: parseBoolMap(raw.archives),
+    configs: parseBoolMap(raw.configs),
+  };
+}
+
 function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -114,6 +145,7 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
   const [deltaBadges, setDeltaBadges] = React.useState<DeltaBadgeMap | null>(null);
   const [navConfig, setNavConfig] = React.useState<NavConfig | null>(null);
   const [gamevalGroups, setGamevalGroups] = React.useState<GamevalGroup[]>([]);
+  const [sectionSupport, setSectionSupport] = React.useState<SectionSupportManifest | null>(null);
 
   const [viewRev, setViewRev] = React.useState<"latest" | number>("latest");
   const [baseRev, setBaseRev] = React.useState(REVISIONS_FALLBACK[0]);
@@ -137,6 +169,7 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
   const revisionsDesc = React.useMemo(() => [...sortedAsc].sort((a, b) => b - a), [sortedAsc]);
 
   const combinedRev = viewRev === "latest" ? latestRevision : viewRev;
+  const activeRevisionForSupport = diffViewMode === "combined" ? combinedRev : rev;
 
   const navGamevalsMinRevision = React.useMemo(
     () => navConfig?.archives.find((entry) => entry.id === "gamevals")?.minRevision ?? GAMEVAL_MIN_REVISION,
@@ -144,7 +177,8 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
   );
 
   const archivesGamevalEnabled =
-    diffViewMode === "combined" ? combinedRev >= navGamevalsMinRevision : rev >= navGamevalsMinRevision;
+    (diffViewMode === "combined" ? combinedRev >= navGamevalsMinRevision : rev >= navGamevalsMinRevision) &&
+    (sectionSupport?.archives.gamevals ?? true);
 
   const effectiveGamevalRevision = diffViewMode === "combined" ? combinedRev : rev;
 
@@ -183,7 +217,10 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
         ]);
         if (navRes.ok) {
           const parsed = parseNavConfig(await navRes.json());
-          if (parsed) setNavConfig(parsed);
+          if (parsed) {
+            setNavConfig(parsed);
+            applyNavConfigSections(parsed);
+          }
         }
         if (groupRes.ok) {
           setGamevalGroups(parseGamevalGroups(await groupRes.json()));
@@ -194,6 +231,25 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
     }
     void loadNav();
   }, [selectedCacheType]);
+
+  React.useEffect(() => {
+    const targetRev = activeRevisionForSupport;
+    const key = `diff:support:manifest:${selectedCacheType.id}:${targetRev}`;
+
+    void (async () => {
+      try {
+        const { data } = await conditionalJsonFetch<unknown>(
+          key,
+          diffSupportManifestUrl(targetRev),
+          { headers: cacheProxyHeaders(selectedCacheType) },
+        );
+        const parsed = parseSectionSupportManifest(data);
+        setSectionSupport(parsed);
+      } catch {
+        setSectionSupport(null);
+      }
+    })();
+  }, [activeRevisionForSupport, selectedCacheType]);
 
   const replaceWorkbenchUrl = React.useCallback(
     (
@@ -271,6 +327,25 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
       setSection(DIFF_DEFAULT_SECTION);
     }
   }, [archivesGamevalEnabled, section]);
+
+  React.useEffect(() => {
+    if (!sectionSupport) return;
+    const isArchive = section === "sprites" || section === "textures" || section === "gamevals";
+    const supported = isArchive
+      ? sectionSupport.archives[section] !== false
+      : sectionSupport.configs[section] !== false;
+    if (supported) return;
+
+    const configCandidates = navConfig?.configs.map((entry) => entry.id) ?? Object.keys(sectionSupport.configs);
+    const archiveCandidates = navConfig?.archives.map((entry) => entry.id) ?? Object.keys(sectionSupport.archives);
+    const fallbackConfig = configCandidates.find((id) => sectionSupport.configs[id] !== false);
+    const fallbackArchive = archiveCandidates.find((id) => sectionSupport.archives[id] !== false);
+    const nextSection = (fallbackConfig ?? fallbackArchive ?? DIFF_DEFAULT_SECTION) as Section;
+
+    if (nextSection !== section) {
+      setSectionAndUrl(nextSection);
+    }
+  }, [navConfig, section, sectionSupport, setSectionAndUrl]);
 
   /** Gamevals explorer is Full-only (matches legacy diff site). */
   React.useEffect(() => {
@@ -437,13 +512,39 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
     setRev((cur) => (cur === nextTo ? cur : nextTo));
 
     if (!hasValidBase || !hasValidCompare) {
-      replaceWorkbenchUrl("diff", viewRev, nextBase, nextTo, section);
+      const rawSection = searchParams.get(DIFF_URL_PARAM_SECTION);
+      const resolvedSection =
+        rawSection != null && rawSection !== ""
+          ? resolveDiffSectionFromUrl(rawSection, archivesGamevalEnabled, nextTo)
+          : section;
+      const rewrittenSection =
+        rawSection != null &&
+        rawSection !== "" &&
+        resolvedSection === DIFF_DEFAULT_SECTION &&
+        rawSection !== DIFF_DEFAULT_SECTION &&
+        isArchiveEntitySection(rawSection)
+          ? rawSection
+          : resolvedSection;
+      replaceWorkbenchUrl("diff", viewRev, nextBase, nextTo, rewrittenSection);
     }
-  }, [revisionsReady, sortedAsc, diffViewMode, searchParams, latestRevision, baseRev, rev, replaceWorkbenchUrl, viewRev, section]);
+  }, [
+    revisionsReady,
+    sortedAsc,
+    diffViewMode,
+    searchParams,
+    latestRevision,
+    baseRev,
+    rev,
+    replaceWorkbenchUrl,
+    viewRev,
+    section,
+    archivesGamevalEnabled,
+  ]);
 
   React.useEffect(() => {
     const raw = searchParams.get(DIFF_URL_PARAM_SECTION);
     if (raw == null || raw === "") return;
+    const canRewriteSectionUrl = revisionsReady;
 
     if (raw.startsWith("gamevals_") && archivesGamevalEnabled) {
       const suffix = raw.slice("gamevals_".length) as GamevalType;
@@ -452,7 +553,7 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
           setGamevalTab(suffix);
         }
         setSection((cur) => (cur === "gamevals" ? cur : "gamevals"));
-        if (raw !== "gamevals") {
+        if (canRewriteSectionUrl && raw !== "gamevals") {
           replaceWorkbenchUrl(diffViewMode, viewRev, baseRev, rev, "gamevals");
         }
         return;
@@ -460,9 +561,14 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
     }
 
     const resolved = resolveDiffSectionFromUrl(raw, archivesGamevalEnabled, effectiveGamevalRevision);
-    setSection((cur) => (cur === resolved ? cur : resolved));
+    const preserveRawArchiveSection =
+      resolved === DIFF_DEFAULT_SECTION &&
+      raw !== DIFF_DEFAULT_SECTION &&
+      isArchiveEntitySection(raw);
+    const nextSection = preserveRawArchiveSection ? (raw as Section) : resolved;
+    setSection((cur) => (cur === nextSection ? cur : nextSection));
 
-    if (raw !== resolved) {
+    if (canRewriteSectionUrl && !preserveRawArchiveSection && raw !== resolved) {
       replaceWorkbenchUrl(diffViewMode, viewRev, baseRev, rev, resolved);
     }
   }, [
@@ -472,6 +578,7 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
     effectiveGamevalRevision,
     knownGamevalTabs,
     replaceWorkbenchUrl,
+    revisionsReady,
     rev,
     searchParams,
     viewRev,
@@ -493,6 +600,11 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
     },
     [baseRev, combinedRev, defaultDiffPair.baseRev, defaultDiffPair.compareRev, diffViewMode, latestRevision, rev, section],
   );
+  const activeConfigSectionLabel = React.useMemo(() => {
+    const match = navConfig?.configs.find((entry) => entry.id === section || entry.apiType === section);
+    if (!match) return undefined;
+    return match.displayName ?? match.navLabel ?? match.label;
+  }, [navConfig, section]);
 
   return (
     <Card className="mx-auto flex h-[calc(100vh-3rem)] max-w-[98%] flex-col overflow-hidden p-4">
@@ -519,7 +631,8 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
             fullHref={fullHref}
             diffHref={diffHref}
             deltaBadges={deltaBadges}
-                    navSections={navConfig}
+                navSections={navConfig}
+                sectionSupport={sectionSupport}
           />
 
           <div className="flex min-h-0 w-full flex-grow flex-col overflow-hidden rounded-lg border bg-card">
@@ -558,6 +671,7 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
                 <DiffConfigArchiveEntityView
                   key={section}
                   section={section}
+                  sectionLabel={activeConfigSectionLabel}
                   diffViewMode={diffViewMode}
                   combinedRev={combinedRev}
                   baseRev={baseRev}
@@ -566,6 +680,7 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
               ) : (
                 <DiffConfigView
                   section={section}
+                  sectionLabel={activeConfigSectionLabel}
                   diffViewMode={diffViewMode}
                   combinedRev={combinedRev}
                   baseRev={baseRev}

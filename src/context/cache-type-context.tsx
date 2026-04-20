@@ -167,7 +167,7 @@ export function CacheTypeProvider({ children }: { children: React.ReactNode }) {
 
     const intervalId = window.setInterval(() => {
       void refreshCacheStatuses({ silent: true });
-    }, 30000);
+    }, 60_000);
 
     return () => window.clearInterval(intervalId);
   }, [refreshCacheStatuses]);

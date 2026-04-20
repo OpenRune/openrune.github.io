@@ -34,7 +34,7 @@ export async function checkCacheStatus(
   cacheType: CacheType,
 ): Promise<StatusResponse | null> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  const timeoutId = setTimeout(() => controller.abort(), 12_000);
 
   try {
     const cacheTypeHeader = JSON.stringify({

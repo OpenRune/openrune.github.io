@@ -35,6 +35,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { CacheTypeSelectorCard } from "@/components/cache-type-selector-card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SettingsModal } from "@/components/layout/settings-modal";
 import { useSettings } from "@/context/settings-context";
 
@@ -303,6 +305,7 @@ export function SidebarNav({
   const { selectedCacheType, cacheStatuses, checkingStatuses } = useCacheType();
   const { settings } = useSettings();
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [cacheTypeDialogOpen, setCacheTypeDialogOpen] = React.useState(false);
   const [openGroups, setOpenGroups] = React.useState<string[]>([]);
   const selectedStatus = cacheStatuses.get(selectedCacheType.id);
   const selectedStatusChecking = checkingStatuses.has(selectedCacheType.id);
@@ -385,12 +388,13 @@ export function SidebarNav({
 
       <div className="px-2 pt-1 pb-2">
         <div className="flex flex-col gap-1">
-          <Link
-            href="/cache-type"
+          <button
+            type="button"
             className={footerItemClass}
             aria-label={
               collapsed ? "Cache Type" : `Cache Type: ${selectedCacheType.name}`
             }
+            onClick={() => setCacheTypeDialogOpen(true)}
           >
             <div className="flex min-w-0 items-center gap-2">
               <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
@@ -411,7 +415,16 @@ export function SidebarNav({
               ) : null}
             </div>
             {!collapsed ? <ChevronDown className="ml-auto size-3.5 shrink-0 opacity-70" /> : null}
-          </Link>
+          </button>
+
+          <Dialog open={cacheTypeDialogOpen} onOpenChange={setCacheTypeDialogOpen}>
+            <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Select Cache Type</DialogTitle>
+              </DialogHeader>
+              <CacheTypeSelectorCard showUnavailableBanner={false} onSelect={() => setCacheTypeDialogOpen(false)} />
+            </DialogContent>
+          </Dialog>
 
           <Link href="/api-docs" className={footerItemClass} aria-label="API Endpoints">
             <Code2 className="size-4 shrink-0" />

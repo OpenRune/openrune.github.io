@@ -1,4 +1,5 @@
 import { GAMEVAL_TYPE_MAP, type GamevalType } from "@/context/gameval-context";
+import type { NavConfig } from "@/lib/nav-config";
 
 import type { ConfigLine, ConfigRow, DiffMode, GamevalsFullSection, Section } from "./diff-types";
 
@@ -17,7 +18,7 @@ export const GAMEVAL_FULL_SECTIONS: readonly GamevalsFullSection[] = GAMEVAL_FUL
 );
 
 /** Width wrapper for combined diff search (sprites full view, config table, …). */
-export const DIFF_COMBINED_SEARCH_WRAP_CLASS = "mb-3 w-[min(100%,36rem)] max-w-full shrink-0";
+export const DIFF_COMBINED_SEARCH_WRAP_CLASS = "mb-3 w-[40%] min-w-[24rem] max-w-[48rem] shrink-0";
 
 /** App Router path for the combined (“Full”) config explorer. */
 export const DIFF_ROUTE_FULL = "/diff/full";
@@ -36,8 +37,8 @@ export const DIFF_URL_PARAM_FROM = "from";
 export const DIFF_URL_PARAM_TO = "to";
 export const DIFF_URL_PARAM_SECTION = "section";
 
-/** Initial section when opening `/diff/full` with no `section` query (lighter than sprites). */
-export const DIFF_DEFAULT_SECTION: Section = "items";
+/** Initial section when opening `/diff/full` with no `section` query (prefer lighter inventories over items). */
+export const DIFF_DEFAULT_SECTION: Section = "inv";
 
 /** Serialized revision query for the current mode (`rev` when pinned full, else `base`/`compare`). */
 export function diffRevisionQueryForMode(
@@ -59,10 +60,95 @@ export function diffRevisionQueryForMode(
   return p.toString();
 }
 
-export const CONFIG_TYPES: Section[] = ["inv", "overlay", "underlay", "items", "npcs", "sequences", "spotanim"];
+let apiTypeToSectionId: Record<string, string> = {
+  spotanims: "spotanim",
+  params: "param",
+};
+let sectionGamevalType: Record<string, GamevalType> = {};
+
+export let CONFIG_TYPES: Section[] = [];
+
+export function normalizeSectionIdFromApiType(rawType: string): string {
+  const t = rawType.trim().toLowerCase();
+  return apiTypeToSectionId[t] ?? t;
+}
+
+/** Optional primary gameval type for a section (from `/cache/nav`). */
+export function sectionGamevalTypeForSection(section: string): GamevalType | null {
+  const key = section.trim().toLowerCase();
+  return sectionGamevalType[key] ?? null;
+}
+
+function singularizeSectionPrefix(sectionId: string): string {
+  const s = sectionId.trim().toLowerCase();
+  if (s.endsWith("ies") && s.length > 3) return `${s.slice(0, -3)}y`;
+  if (s.endsWith("s") && s.length > 1) return s.slice(0, -1);
+  return s;
+}
+
+/** Normalize a config type string for the cache API (handles singular-to-plural aliases). */
+export function normalizeConfigTypeForCacheApi(configType: string): string {
+  const normalized = configType.trim().toLowerCase();
+  if (normalized === "spotanim") return "spotanims";
+  if (normalized === "param") return "params";
+  return configType;
+}
+
+/** Prefix used for `[prefix_id]` headers in combined cache text rendering. */
+export function sectionPrefixForConfigType(rawType: string): string {
+  return singularizeSectionPrefix(normalizeSectionIdFromApiType(rawType));
+}
+
+/** Apply `/cache/nav` config section ids (and apiType aliases) at runtime. */
+export function applyNavConfigSections(navConfig: NavConfig | null): void {
+  if (!navConfig || !Array.isArray(navConfig.configs) || navConfig.configs.length === 0) {
+    CONFIG_TYPES = [];
+    apiTypeToSectionId = {
+      spotanims: "spotanim",
+      params: "param",
+    };
+    sectionGamevalType = {};
+    DIFF_ALL_SECTIONS = [
+      "sprites",
+      "textures",
+      "gamevals",
+      ...GAMEVAL_FULL_SECTIONS,
+      ...CONFIG_TYPES,
+    ];
+    return;
+  }
+
+  const nextConfigTypes = [...new Set(navConfig.configs.map((s) => s.id.trim().toLowerCase()).filter(Boolean))] as Section[];
+  CONFIG_TYPES = nextConfigTypes;
+
+  const nextApiTypeMap: Record<string, string> = {
+    spotanims: "spotanim",
+    params: "param",
+  };
+  const nextSectionGamevalType: Record<string, GamevalType> = {};
+  navConfig.configs.forEach((section) => {
+    const id = section.id.trim().toLowerCase();
+    if (!id) return;
+    nextApiTypeMap[id] = id;
+    const apiType = section.apiType?.trim().toLowerCase();
+    if (apiType) nextApiTypeMap[apiType] = id;
+    const gamevalType = section.gamevalType?.trim().toLowerCase();
+    if (gamevalType) nextSectionGamevalType[id] = gamevalType;
+  });
+  apiTypeToSectionId = nextApiTypeMap;
+  sectionGamevalType = nextSectionGamevalType;
+
+  DIFF_ALL_SECTIONS = [
+    "sprites",
+    "textures",
+    "gamevals",
+    ...GAMEVAL_FULL_SECTIONS,
+    ...CONFIG_TYPES,
+  ];
+}
 
 /** Every sidebar tab value (sprites, archives, configs). */
-export const DIFF_ALL_SECTIONS: readonly Section[] = [
+export let DIFF_ALL_SECTIONS: Section[] = [
   "sprites",
   "textures",
   "gamevals",
@@ -204,6 +290,11 @@ export function defaultDiffRevisionPair(sortedAsc: readonly number[]): { baseRev
   return { baseRev: latest, compareRev: below ?? latest };
 }
 
+/** Same packing as JVM: `(interfaceId shl 16) or subChildId`. */
+export function interfaceComponentCombinedId(interfaceId: number, childId: number): number {
+  return (interfaceId << 16) | childId;
+}
+
 export const SPRITE_PER_PAGE_OPTIONS = [105, 150, 200, 250, 300].sort((a, b) => b - a) as readonly number[];
 
 /** Same paging options as sprites (archive-style combined table). */
@@ -242,6 +333,15 @@ export const CONFIG_FULL_ROWS: Record<Section, ConfigRow[]> = {
     { id: 1127, type: "context", entries: { name: "Rune platebody", gameval: "RUNE_PLATEBODY", noted: "false" } },
     { id: 11840, type: "context", entries: { name: "Dragon boots", gameval: "DRAGON_BOOTS", noted: "false" } },
     { id: 4151, type: "context", entries: { name: "Abyssal whip", gameval: "ABYSSAL_WHIP", noted: "false" } },
+  ],
+  objects: [
+    { id: 100, type: "context", entries: { name: "Door", gameval: "DOOR" } },
+    { id: 2091, type: "context", entries: { name: "Bank booth", gameval: "BANK_BOOTH" } },
+  ],
+  param: [
+    { id: 3500, type: "context", entries: { type: "int", ismembers: "false", defaultInt: "0", defaultString: "", defaultLong: "0" } },
+    { id: 3501, type: "context", entries: { type: "string", ismembers: "true", defaultInt: "0", defaultString: "", defaultLong: "0" } },
+    { id: 3502, type: "context", entries: { type: "long", ismembers: "false", defaultInt: "0", defaultString: "", defaultLong: "0" } },
   ],
   npcs: [
     { id: 7413, type: "context", entries: { name: "Commander Zilyana", gameval: "COMMANDER_ZILYANA" } },
@@ -292,6 +392,16 @@ export const CONFIG_DIFF_LINES: Record<Section, ConfigLine[]> = {
     { type: "removed", line: "cost=120000" },
     { type: "add", line: "cost=135000" },
   ],
+  objects: [
+    { type: "context", line: "// 2091" },
+    { type: "change", line: "name=Bank booth" },
+    { type: "context", line: "gameval=BANK_BOOTH" },
+  ],
+  param: [
+    { type: "context", line: "// 3500" },
+    { type: "change", line: "type=int" },
+    { type: "context", line: "defaultInt=0" },
+  ],
   npcs: [
     { type: "context", line: "// 7413" },
     { type: "change", line: "combatLevel=596" },
@@ -329,6 +439,8 @@ export const DELTA_COUNTS: Record<string, { added: number; changed: number; remo
   textures: { added: 4, changed: 12, removed: 0 },
   gamevals: { added: 19, changed: 36, removed: 2 },
   items: { added: 19, changed: 36, removed: 2 },
+  objects: { added: 4, changed: 11, removed: 1 },
+  param: { added: 1, changed: 3, removed: 0 },
   npcs: { added: 2, changed: 7, removed: 1 },
   sequences: { added: 1, changed: 9, removed: 0 },
   spotanim: { added: 2, changed: 4, removed: 0 },

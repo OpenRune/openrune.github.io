@@ -11,7 +11,6 @@ import { TablePaginationBar } from "@/components/ui/table-pagination-bar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCacheType } from "@/context/cache-type-context";
 import type { GamevalType } from "@/context/gameval-context";
-import { INVTYPES, ITEMTYPES, NPCTYPES, OBJTYPES, SEQTYPES, SPOTTYPES } from "@/context/gameval-context";
 import { useGamevals } from "@/context/gameval-context";
 import { useSettings, type AppSettings } from "@/context/settings-context";
 import {
@@ -19,6 +18,7 @@ import {
   combinedSpritesUrl,
   diffCacheOrderedPair,
   diffConfigContentUrl,
+  diffConfigTableAllUrl,
   diffConfigTableUrl,
 } from "@/lib/cache-proxy-client";
 import { conditionalJsonFetch, getTableSearchIndex, putTableSearchIndex } from "@/lib/openrune-idb-cache";
@@ -30,6 +30,9 @@ import { ChevronDown, ChevronUp, Loader2, Minus, Pencil, Plus, Search } from "lu
 import {
   DIFF_COMBINED_SEARCH_WRAP_CLASS,
   GAMEVAL_MIN_REVISION,
+  normalizeConfigTypeForCacheApi,
+  normalizeSectionIdFromApiType,
+  sectionGamevalTypeForSection,
   TEXTURE_PER_PAGE_OPTIONS,
 } from "./diff-constants";
 import { matchesSpriteGamevalTags, spriteMatchesSubstringName } from "./diff-sprite-gameval-filter";
@@ -54,32 +57,22 @@ import {
   DIFF_ARCHIVE_TABLE_HEAD_CLASS,
   DIFF_ARCHIVE_TABLE_HEADER_CLASS,
 } from "./diff-table-archive-styles";
-import { configLinesFromContentPayload } from "./diff-config-content";
-import { configLinesFromCachePayload } from "./diff-config-content";
+import { configLinesFromCachePayload, configLinesFromContentPayload } from "./diff-config-content";
 import type { ConfigFilterMode, ConfigLine, DiffSearchFieldMode, SearchTag } from "./diff-types";
 
 const DEFAULT_BULK_PAGE = 500;
 const DEFAULT_TEXT_OVERSCAN = 14;
 const DEFAULT_FIND_DEBOUNCE_MS = 100;
+const TABLE_PAGE_CACHE_LIMIT = 96;
+
+type TablePageCacheEntry = {
+  rows: ConfigArchiveTableRow[];
+  total: number;
+  status: "ok" | "decoding";
+};
 
 function configTypeToHeaderGamevalType(configType: string): GamevalType | null {
-  switch (configType.trim().toLowerCase()) {
-    case "items":
-      return ITEMTYPES;
-    case "npcs":
-      return NPCTYPES;
-    case "sequences":
-      return SEQTYPES;
-    case "spotanim":
-    case "spotanims":
-      return SPOTTYPES;
-    case "inv":
-      return INVTYPES;
-    case "objects":
-      return OBJTYPES;
-    default:
-      return null;
-  }
+  return sectionGamevalTypeForSection(normalizeSectionIdFromApiType(configType));
 }
 
 function parseConfigTablePayload(data: Record<string, unknown>): {
@@ -125,24 +118,27 @@ function parseConfigTablePayload(data: Record<string, unknown>): {
     .map((r) => ({
       id: (r as ConfigArchiveTableRow).id,
       sectionId: (r as ConfigArchiveTableRow).sectionId,
-      entries:
-        ((r as { entries?: unknown }).entries && typeof (r as { entries?: unknown }).entries === "object"
-          ? Object.entries((r as { entries?: Record<string, unknown> }).entries ?? {}).reduce<Record<string, string>>(
-              (acc, [k, v]) => {
-                acc[k] = valueToEntryString(v);
-                return acc;
-              },
-              {},
-            )
-          : (r as { fields?: unknown }).fields && typeof (r as { fields?: unknown }).fields === "object"
-            ? Object.entries((r as { fields?: Record<string, unknown> }).fields ?? {}).reduce<Record<string, string>>(
-                (acc, [k, v]) => {
-                  acc[k] = valueToEntryString(v);
-                  return acc;
-                },
-                {},
-              )
-            : {}),
+      entries: (() => {
+        const source =
+          (r as { entries?: unknown }).entries && typeof (r as { entries?: unknown }).entries === "object"
+            ? ((r as { entries?: Record<string, unknown> }).entries ?? {})
+            : (r as { fields?: unknown }).fields && typeof (r as { fields?: unknown }).fields === "object"
+              ? ((r as { fields?: Record<string, unknown> }).fields ?? {})
+              : {};
+        return Object.entries(source).reduce<Record<string, string>>((acc, [k, v]) => {
+          acc[k] = valueToEntryString(v);
+          return acc;
+        }, {});
+      })(),
+      entriesRaw: (() => {
+        if ((r as { entries?: unknown }).entries && typeof (r as { entries?: unknown }).entries === "object") {
+          return { ...((r as { entries?: Record<string, unknown> }).entries ?? {}) };
+        }
+        if ((r as { fields?: unknown }).fields && typeof (r as { fields?: unknown }).fields === "object") {
+          return { ...((r as { fields?: Record<string, unknown> }).fields ?? {}) };
+        }
+        return {};
+      })(),
     }));
   const totalRaw = data.total;
   const total =
@@ -191,6 +187,7 @@ const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualText
   layout,
   rowH,
   combinedRev,
+  lookupRevisions,
   debouncedFindQuery,
   findKind,
   findMarkActive,
@@ -211,6 +208,7 @@ const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualText
   layout: "unified" | "split";
   rowH: number;
   combinedRev: number;
+  lookupRevisions?: readonly number[];
   debouncedFindQuery: string;
   findKind: "literal" | "regex";
   findMarkActive: boolean;
@@ -341,6 +339,7 @@ const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualText
             <TextLine
               line={leftLine || " "}
               combinedRev={combinedRev}
+              lookupRevisions={lookupRevisions}
               hoverText={hoverText}
               showInline={getTextLineShowInline?.(settings)}
               findKind={findKind}
@@ -364,6 +363,7 @@ const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualText
             <TextLine
               line={rightLine || " "}
               combinedRev={combinedRev}
+              lookupRevisions={lookupRevisions}
               hoverText={hoverText}
               showInline={getTextLineShowInline?.(settings)}
               findKind={findKind}
@@ -411,6 +411,7 @@ const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualText
         <TextLine
           line={line}
           combinedRev={combinedRev}
+          lookupRevisions={lookupRevisions}
           hoverText={hoverText}
           showInline={getTextLineShowInline?.(settings)}
           findKind={findKind}
@@ -440,6 +441,9 @@ export function DiffConfigArchiveView({
   getTextLineShowInline,
   textOverscan = DEFAULT_TEXT_OVERSCAN,
   textFindDebounceMs = DEFAULT_FIND_DEBOUNCE_MS,
+  searchRowTrailing,
+  tableSearchSize = "default",
+  tableSearchWrapClassName,
 }: DiffConfigArchiveViewProps) {
   const searchParams = useSearchParams();
   const { selectedCacheType } = useCacheType();
@@ -453,6 +457,17 @@ export function DiffConfigArchiveView({
   const isDiff = diffViewMode === "diff";
   const urlWantsText = isCombined && searchParams.get("view") === "text";
   const archiveGamevalRev = isCombined ? combinedRev : rev;
+  const textLookupRevisions = React.useMemo(() => {
+    if (!isDiff) return [archiveGamevalRev] as const;
+    const out: number[] = [];
+    const pushUnique = (n: number) => {
+      if (Number.isFinite(n) && !out.includes(n)) out.push(n);
+    };
+    // Prefer compare revision first, then base revision for names added/renamed across revisions.
+    pushUnique(rev);
+    pushUnique(baseRev);
+    return out;
+  }, [archiveGamevalRev, baseRev, isDiff, rev]);
 
   const [viewMode, setViewMode] = React.useState<"text" | "table">(() =>
     diffViewMode === "combined" ? (urlWantsText ? "text" : "table") : "text",
@@ -536,6 +551,7 @@ export function DiffConfigArchiveView({
   const [tableTotal, setTableTotal] = React.useState(0);
   const [tableStatus, setTableStatus] = React.useState<"idle" | "loading" | "ok" | "error" | "decoding">("idle");
   const [tableError, setTableError] = React.useState<string | null>(null);
+  const tablePageCacheRef = React.useRef(new Map<string, TablePageCacheEntry>());
 
   const [contentLines, setContentLines] = React.useState<ConfigLine[]>([]);
   const [contentStatus, setContentStatus] = React.useState<
@@ -604,8 +620,14 @@ export function DiffConfigArchiveView({
 
   const gamevalAutocompleteRef = React.useRef(gamevalAutocomplete);
   gamevalAutocompleteRef.current = gamevalAutocomplete;
+  const lookupGamevalRef = React.useRef(lookupGameval);
+  lookupGamevalRef.current = lookupGameval;
+  const getGamevalExtraRef = React.useRef(getGamevalExtra);
+  getGamevalExtraRef.current = getGamevalExtra;
   const gamevalAutocompleteType = gamevalAutocomplete?.type ?? null;
   const tableSearchIndexRequestRef = React.useRef(0);
+  /** Keys for which a bulk index build has been initiated (latches so in-flight fetches aren't abandoned). */
+  const tableSearchIndexRequestedKeysRef = React.useRef(new Set<string>());
 
   const bulkPageSize = bulk?.bulkPageSize ?? DEFAULT_BULK_PAGE;
   const readyType = bulk?.readyWhenLoaded ?? bulk?.filterGamevalType;
@@ -645,8 +667,21 @@ export function DiffConfigArchiveView({
       ((tableSearchMode === "id" || tableSearchMode === "name" || tableSearchMode === "regex") &&
         debouncedTableQuery.trim().length > 0));
 
+  // When search becomes active, latch this key so we don't abort a started fetch.
   React.useEffect(() => {
-    if (!isCombined || viewMode !== "table" || !tableSearchIndexCacheKey) {
+    if (indexedQueryActive && tableSearchIndexCacheKey) {
+      tableSearchIndexRequestedKeysRef.current.add(tableSearchIndexCacheKey);
+    }
+  }, [indexedQueryActive, tableSearchIndexCacheKey]);
+
+  React.useEffect(() => {
+    const shouldFetch =
+      isCombined &&
+      viewMode === "table" &&
+      !!tableSearchIndexCacheKey &&
+      (indexedQueryActive || tableSearchIndexRequestedKeysRef.current.has(tableSearchIndexCacheKey));
+
+    if (!shouldFetch) {
       setTableSearchIndex(null);
       setTableSearchIndexStatus("idle");
       setTableSearchIndexError(null);
@@ -670,49 +705,30 @@ export function DiffConfigArchiveView({
       }
 
       try {
-        const allRows: ConfigArchiveTableRow[] = [];
-        const etags: string[] = [];
-        let offset = 0;
-        let serverTotal = Number.POSITIVE_INFINITY;
+        const url = diffConfigTableAllUrl(configType, { base: tableBase, rev: combinedRev });
+        const cacheKey = `diff:config:table-all:${cacheTypeId}:${configType}:${tableBase}:${combinedRev}`;
+        const { data, etag } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url, {
+          headers: cacheProxyHeaders(selectedCacheTypeRef.current),
+        });
 
-        while (offset < serverTotal) {
-          if (requestId !== tableSearchIndexRequestRef.current) return;
+        if (requestId !== tableSearchIndexRequestRef.current) return;
 
-          const url = diffConfigTableUrl(configType, {
-            base: tableBase,
-            rev: combinedRev,
-            offset,
-            limit: bulkPageSize,
-            q: undefined,
-            mode: "id",
-          });
-          const cacheKey = `diff:config:table:${cacheTypeId}:${url}`;
-          const { data, etag } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url, {
-            headers: cacheProxyHeaders(selectedCacheTypeRef.current),
-          });
-
-          if (requestId !== tableSearchIndexRequestRef.current) return;
-
-          const parsed = parseConfigTablePayload(data as Record<string, unknown>);
-          if (parsed.decoding) {
-            setTableSearchIndex(null);
-            setTableSearchIndexStatus("idle");
-            return;
-          }
-
-          serverTotal = parsed.total;
-          allRows.push(...parsed.rows);
-          etags.push(etag ?? `offset:${offset}:count:${parsed.rows.length}`);
-          if (parsed.rows.length === 0 || parsed.rows.length < bulkPageSize) break;
-          offset += bulkPageSize;
+        const parsed = parseConfigTablePayload(data as Record<string, unknown>);
+        if (parsed.decoding) {
+          setTableSearchIndex(null);
+          setTableSearchIndexStatus("idle");
+          return;
         }
+
+        const allRows = parsed.rows;
+        const sourceFingerprint = etag ?? `all:${configType}:${tableBase}:${combinedRev}:count:${allRows.length}`;
 
         const nextIndex = buildConfigArchiveTableSearchIndex(allRows, {
           combinedRev,
-          sourceFingerprint: etags.join("|"),
+          sourceFingerprint,
           gamevalBulkFilter: gvReadyForBulk ? gamevalBulkFilterRef.current : null,
-          lookupGameval,
-          getGamevalExtra,
+          lookupGameval: lookupGamevalRef.current,
+          getGamevalExtra: getGamevalExtraRef.current,
         });
 
         if (requestId !== tableSearchIndexRequestRef.current) return;
@@ -736,14 +752,12 @@ export function DiffConfigArchiveView({
   }, [
     isCombined,
     viewMode,
+    indexedQueryActive,
     tableSearchIndexCacheKey,
     configType,
     tableBase,
     combinedRev,
-    bulkPageSize,
     cacheTypeId,
-    lookupGameval,
-    getGamevalExtra,
     labels.tableEntityPlural,
     gvReadyForBulk,
   ]);
@@ -755,6 +769,7 @@ export function DiffConfigArchiveView({
       tableQuery: debouncedTableQuery,
       gamevalTags,
       gamevalTextFragment: debouncedGamevalTextFragment,
+      searchFieldByMode: tableSearch.searchFieldByMode,
     });
   }, [
     indexedQueryActive,
@@ -763,10 +778,42 @@ export function DiffConfigArchiveView({
     debouncedTableQuery,
     gamevalTags,
     debouncedGamevalTextFragment,
+    tableSearch.searchFieldByMode,
   ]);
 
   const indexedClientPageActive =
     viewMode === "table" && indexedQueryActive && indexedFilteredRows !== null && tableSearchIndexStatus === "ready";
+
+  const serverMode = tableSearchMode === "gameval" ? "id" : tableSearchMode;
+  const serverQ =
+    (tableSearchMode === "id" || tableSearchMode === "name" || tableSearchMode === "regex") &&
+    debouncedTableQuery.length > 0
+      ? debouncedTableQuery
+      : undefined;
+
+  const tableServerPageKey = React.useMemo(() => {
+    return [
+      cacheTypeId,
+      configType,
+      String(tableBase),
+      String(combinedRev),
+      serverMode,
+      serverQ ?? "",
+      String(page),
+      String(perPage),
+    ].join("\u0000");
+  }, [cacheTypeId, configType, tableBase, combinedRev, serverMode, serverQ, page, perPage]);
+
+  const cacheServerPage = React.useCallback((key: string, value: TablePageCacheEntry) => {
+    const cache = tablePageCacheRef.current;
+    if (cache.has(key)) cache.delete(key);
+    cache.set(key, value);
+    while (cache.size > TABLE_PAGE_CACHE_LIMIT) {
+      const oldest = cache.keys().next().value;
+      if (!oldest) break;
+      cache.delete(oldest);
+    }
+  }, []);
 
   React.useEffect(() => {
     if (!isCombined || combinedRev < GAMEVAL_MIN_REVISION) return;
@@ -827,6 +874,18 @@ export function DiffConfigArchiveView({
     if (syntaxDrivenClientTableActive) return;
     if (tableSearchMode === "gameval" && gamevalClientFilterActive && gamevalBulkFilterRef.current) return;
 
+    const cachedPage = tablePageCacheRef.current.get(tableServerPageKey);
+    if (cachedPage) {
+      setTableRows(cachedPage.rows);
+      setTableTotal(cachedPage.total);
+      setTableStatus(cachedPage.status);
+      setTableError(null);
+      setClientFilteredRows(null);
+      setClientFetchStatus("idle");
+      setClientFetchError(null);
+      return;
+    }
+
     const requestId = ++tableRequestRef.current;
     setTableStatus("loading");
     setTableError(null);
@@ -835,12 +894,7 @@ export function DiffConfigArchiveView({
     setClientFetchError(null);
 
     const offset = (page - 1) * perPage;
-    const serverMode = tableSearchMode === "gameval" ? "id" : tableSearchMode;
-    const serverQ =
-      (tableSearchMode === "id" || tableSearchMode === "name" || tableSearchMode === "regex") &&
-      debouncedTableQuery.length > 0
-        ? debouncedTableQuery
-        : undefined;
+    const nextPageOffset = offset + perPage;
 
     const run = async () => {
       try {
@@ -866,12 +920,59 @@ export function DiffConfigArchiveView({
           setTableRows([]);
           setTableTotal(0);
           setTableStatus("decoding");
+          cacheServerPage(tableServerPageKey, { rows: [], total: 0, status: "decoding" });
           return;
         }
 
         setTableRows(parsed.rows);
         setTableTotal(parsed.total);
         setTableStatus("ok");
+        cacheServerPage(tableServerPageKey, { rows: parsed.rows, total: parsed.total, status: "ok" });
+
+        // Prefetch adjacent page data to make page switching feel instant.
+        if (nextPageOffset < parsed.total) {
+          const nextPage = page + 1;
+          const nextPageKey = [
+            cacheTypeId,
+            configType,
+            String(tableBase),
+            String(combinedRev),
+            serverMode,
+            serverQ ?? "",
+            String(nextPage),
+            String(perPage),
+          ].join("\u0000");
+          if (!tablePageCacheRef.current.has(nextPageKey)) {
+            void (async () => {
+              try {
+                const nextUrl = diffConfigTableUrl(configType, {
+                  base: tableBase,
+                  rev: combinedRev,
+                  offset: nextPageOffset,
+                  limit: perPage,
+                  q: serverQ,
+                  mode: serverMode,
+                });
+                const nextCacheKey = `diff:config:table:${cacheTypeId}:${nextUrl}`;
+                const { data: nextData } = await conditionalJsonFetch<Record<string, unknown>>(nextCacheKey, nextUrl, {
+                  headers: cacheProxyHeaders(selectedCacheTypeRef.current),
+                });
+                const nextParsed = parseConfigTablePayload(nextData as Record<string, unknown>);
+                if (nextParsed.decoding) {
+                  cacheServerPage(nextPageKey, { rows: [], total: 0, status: "decoding" });
+                  return;
+                }
+                cacheServerPage(nextPageKey, {
+                  rows: nextParsed.rows,
+                  total: nextParsed.total,
+                  status: "ok",
+                });
+              } catch {
+                // Ignore prefetch failures; normal fetch path will handle errors.
+              }
+            })();
+          }
+        }
       } catch (e) {
         if (requestId !== tableRequestRef.current) return;
         setTableRows([]);
@@ -897,6 +998,10 @@ export function DiffConfigArchiveView({
     tableBase,
     labels.tableErrorVerb,
     syntaxDrivenClientTableActive,
+    tableServerPageKey,
+    serverMode,
+    serverQ,
+    cacheServerPage,
   ]);
 
   React.useEffect(() => {
@@ -1161,7 +1266,7 @@ export function DiffConfigArchiveView({
           url = diffConfigContentUrl(configType, o);
           cacheKey = `diff:config:content:${cacheTypeId}:${configType}:pair:${o.base}:${o.rev}`;
         } else {
-          const search = new URLSearchParams({ type: configType === "spotanim" ? "spotanims" : configType, rev: String(combinedRev) });
+          const search = new URLSearchParams({ type: normalizeConfigTypeForCacheApi(configType), rev: String(combinedRev) });
           url = `/api/cache-proxy/cache?${search.toString()}`;
           cacheKey = `cache:config:content:${cacheTypeId}:${configType}:${combinedRev}`;
         }
@@ -1471,28 +1576,51 @@ export function DiffConfigArchiveView({
 
   const clientPageActive = gamevalBulkClientPageActive || syntaxClientPageActive;
 
-  const displayTotal =
-    viewMode === "table" && clientSidePagination
-      ? indexedClientPageActive
-        ? indexedFilteredRows!.length
-        : clientPageActive
-          ? clientFilteredRows!.length
-        : 0
-      : tableTotal;
+  const displayTotal = React.useMemo(() => {
+    if (viewMode === "table" && clientSidePagination) {
+      if (indexedClientPageActive) return indexedFilteredRows!.length;
+      if (clientPageActive) return clientFilteredRows!.length;
+      return 0;
+    }
+    return tableTotal;
+  }, [
+    viewMode,
+    clientSidePagination,
+    indexedClientPageActive,
+    indexedFilteredRows,
+    clientPageActive,
+    clientFilteredRows,
+    tableTotal,
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(displayTotal / perPage));
   const safePage = Math.min(Math.max(1, page), totalPages);
 
-  const displayRows =
-    viewMode === "table" && clientSidePagination
-      ? indexedClientPageActive
-        ? indexedFilteredRows!.slice((safePage - 1) * perPage, safePage * perPage)
-        : clientPageActive
-          ? clientFilteredRows!.slice((safePage - 1) * perPage, safePage * perPage)
-        : []
-      : tableRows;
+  const displayRows = React.useMemo(() => {
+    if (viewMode === "table" && clientSidePagination) {
+      const start = (safePage - 1) * perPage;
+      const end = safePage * perPage;
+      if (indexedClientPageActive) return indexedFilteredRows!.slice(start, end);
+      if (clientPageActive) return clientFilteredRows!.slice(start, end);
+      return [];
+    }
+    return tableRows;
+  }, [
+    viewMode,
+    clientSidePagination,
+    safePage,
+    perPage,
+    indexedClientPageActive,
+    indexedFilteredRows,
+    clientPageActive,
+    clientFilteredRows,
+    tableRows,
+  ]);
 
-  const tablePlan = buildTablePlan({ displayRows, combinedRev });
+  const tablePlan = React.useMemo(
+    () => buildTablePlan({ displayRows, combinedRev }),
+    [buildTablePlan, displayRows, combinedRev],
+  );
 
   const clientDerivedTableLoading =
     (indexedQueryActive && tableSearchIndexStatus === "loading" && tableSearchIndex == null) ||
@@ -1627,10 +1755,12 @@ export function DiffConfigArchiveView({
       ) : null}
 
       {isCombined && viewMode === "table" ? (
-        <div className={DIFF_COMBINED_SEARCH_WRAP_CLASS}>
-          <DiffUnifiedSearchField
+        <div className="mb-3 flex w-full min-w-0 flex-wrap items-center gap-2 justify-between">
+          <div className={cn(DIFF_COMBINED_SEARCH_WRAP_CLASS, tableSearchWrapClassName)}>
+            <DiffUnifiedSearchField
             mode={tableSearchMode}
             onModeChange={setTableSearchMode}
+              size={tableSearchSize}
             disabledModes={tableSearch.disabledModes}
             modeOptionTitles={tableSearch.modeTitles}
             tagModes={tableSearch.tagModes ?? ["gameval"]}
@@ -1651,9 +1781,12 @@ export function DiffConfigArchiveView({
             onClearTags={() => setGamevalTags([])}
             gamevalAutocomplete={gamevalAutocompleteForField}
           />
+          </div>
+          {searchRowTrailing ? <div className="flex shrink-0 items-center">{searchRowTrailing}</div> : null}
         </div>
       ) : (
-        <div className="mb-3 flex w-full min-w-0 max-w-full flex-wrap items-start gap-2">
+        <div className="mb-3 flex w-full min-w-0 max-w-full flex-wrap items-center gap-2 justify-between">
+          <div className="flex min-w-0 flex-1 flex-wrap items-start gap-2">
           {isDiff ? (
             <OptionDropdown
               className="w-[8.5rem] shrink-0"
@@ -1814,7 +1947,7 @@ export function DiffConfigArchiveView({
             ) : null}
           </div>
           {isDiff ? (
-            <div className="ml-auto hidden h-8 shrink-0 items-center gap-1 rounded-md border border-border/60 bg-muted/35 px-2 text-[11px] text-muted-foreground lg:flex">
+            <div className="ml-auto hidden h-8 shrink-0 items-center gap-1 self-start rounded-md border border-border/60 bg-muted/35 px-2 pt-0.5 text-[11px] text-muted-foreground lg:flex">
               <span className="font-mono text-amber-700 dark:text-amber-400">~</span>
               <span>changed</span>
               <span className="mx-0.5 text-border">|</span>
@@ -1825,6 +1958,8 @@ export function DiffConfigArchiveView({
               <span>removed</span>
             </div>
           ) : null}
+          </div>
+          {searchRowTrailing ? <div className="flex shrink-0 items-center self-start pt-0.5">{searchRowTrailing}</div> : null}
         </div>
       )}
 
@@ -1931,6 +2066,7 @@ export function DiffConfigArchiveView({
                             layout={isDiff ? diffLayout : "unified"}
                             rowH={rowH}
                             combinedRev={archiveGamevalRev}
+                            lookupRevisions={textLookupRevisions}
                             debouncedFindQuery={debouncedQ}
                             findKind={textFindKind}
                             findMarkActive={findOk && textMatchSet.has(i)}

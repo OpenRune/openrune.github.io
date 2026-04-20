@@ -56,6 +56,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     currentPage && selectedStatusResolved && !canUsePageOffline(currentPage) && !isOnline,
   );
 
+  const wentOfflineRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!isOnline && selectedStatusResolved) {
+      wentOfflineRef.current = true;
+    }
+    if (isOnline && wentOfflineRef.current && currentPage && !canUsePageOffline(currentPage)) {
+      wentOfflineRef.current = false;
+      window.location.reload();
+    }
+  }, [isOnline, selectedStatusResolved, currentPage]);
+
   return (
     <div className="flex min-h-dvh w-full">
       <aside

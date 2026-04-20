@@ -22,8 +22,17 @@ export interface SseEvent<T = unknown> {
   data: T;
 }
 
+/** Payload from cache server `SseEventType.ZIP_PROGRESS` broadcasts. */
+export type ZipProgressSsePayload = {
+  jobId: string;
+  type: string;
+  progress: number;
+  message: string;
+  downloadUrl: string | null;
+};
+
 export type SseEventDataMap = {
   [SseEventType.STATUS]: StatusResponse;
   [SseEventType.ACTIVITY]: unknown;
-  [SseEventType.ZIP_PROGRESS]: unknown;
+  [SseEventType.ZIP_PROGRESS]: ZipProgressSsePayload;
 };

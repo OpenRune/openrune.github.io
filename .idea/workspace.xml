@@ -5,197 +5,37 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="51982a52-4621-4b78-827a-2c8ff91c7405" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/117performance/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/activity/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api-docs/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/cache-proxy/[...path]/route.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/map/[...path]/route.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/server/sse/route.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/share/route.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/colors/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/diff/components/ConfigTableView.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/diff/components/DiffDiffView.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/diff/components/DiffFullView.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/diff/components/DiffSidebar.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/diff/components/DiffSpriteImage.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/diff/components/VirtualizedConfigLines.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/diff/configTableUtils.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/diff/diffUtils.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/diff/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/favicon.ico" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/global-error.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/globals.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/items/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/layout.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/map/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/not-found.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/npcs/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/objects/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/sequences/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/spotanims/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/sprites/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/textures/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/theme.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/underlays-overlays/page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components.json" beforeDir="false" afterPath="$PROJECT_DIR$/components.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ClientToaster.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ColorPicker.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/FloatingSidebarTrigger.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/active-theme.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/download-manager.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/layout/Providers.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/layout/cache-status-wrapper.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/layout/cache-type-provider.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/layout/content-wrapper.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/layout/page-container.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/layout/settings-provider.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/layout/theme-provider.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/AreaItemList.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/ExportUtils.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/ImportView.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/constants.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/hooks.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/importParsers.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/types.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/AreaSelection/utils.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/BaseMap.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/MapControls.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/MapInfoPanel.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/MapSettingsPanel.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/NodeEditor.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/OSRSMap.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/ObjectFinder.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/QueryBuilderButton.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/QueryResultsModal.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/SelectionControls.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/hooks/useMapControls.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/hooks/useObjectMarkers.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/hooks/useQueryExecution.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/map/useBlockEditor.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/performance/DataDisplay.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/performance/FileDropdown.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/performance/FramesTab.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/performance/SettingsTab.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/performance/ShareModal.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/performance/SummaryTab.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/performance/TimingMapTab.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/performance/UploadModal.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/search-table/searchModes/gameval.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/search-table/searchModes/id.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/search-table/searchModes/index.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/search-table/searchModes/name.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/search-table/searchModes/regex.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/search/GamevalIdSearch.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/sidebar/SideBarToggle.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/sidebar/app-header-content.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/sidebar/app-sidebar.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/ColorUtils.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/RSColorBox.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/RSSprite.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/RSTexture.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/avatar.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/badge.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/button.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/cache-status-banner.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/cache-type-modal.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/cache-type-selector-page.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/card.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/checkbox.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/collapsible.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/command.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/context-menu.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/dialog.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/download-dialog.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/dropdown-menu.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/form.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/heading.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/input.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/label.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/logo.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/paginated-table.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/popover.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/progress.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/scroll-area.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/search-table.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/search-table/GamevalTags.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/search-table/searchModes.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/select.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/separator.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/settings-modal.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/sheet.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/sidebar.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/skeleton.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/slider.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/switch.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/sygnet.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/table-columns/common-columns.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/table-columns/info-content.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/table.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/tabs.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/themetoggle.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/ui/tooltip.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hooks/use-mobile.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hooks/useInfoContent.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/js-cookie.d.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/RSSprite.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/api/apiClient.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/api/diskJsonCache.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/api/types.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/cacheStatus.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/cacheTypes.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/constants/appConfig.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/constants/imageUrls.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/font.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/gamevals/GamevalProvider.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/gamevals/GamevalTypeProvider.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/gamevals/index.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/gamevals/types.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/controls/CollectionControl.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/controls/CoordinatesControl.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/controls/GridControl.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/controls/PlaneControl.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/controls/RegionBaseCoordinatesControl.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/controls/RegionLabelsCanvas.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/controls/RegionLookupControl.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/controls/TileGridControl.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/converters/117hd/AABB.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/converters/117hd/HD117AreasConverter.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/converters/117hd/RegionBox.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/converters/Converter.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/converters/dreambot/DreamBotPathConverter.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/converters/osbot/OSBotAreasConverter.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/converters/osbot/OSBotConverter.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/converters/osbot/OSBotPathConverter.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/converters/runelite/RuneLiteAreasConverter.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/converters/runelite/RuneLitePathConverter.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/leaflet.d.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/model/Area.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/model/Areas.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/model/Path.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/model/PolyArea.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/model/Position.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/model/Region.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/map/utils/viewportCulling.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/navConfig.tsx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/sse/fetchSSE.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/sse/types.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/types/performance.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/utils.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/utils/filterCounts.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/utils/performance.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/utils/requestDeduplication.ts" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/next.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/next.config.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/postcss.config.mjs" beforeDir="false" afterPath="$PROJECT_DIR$/postcss.config.mjs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/public/updates/update-1.0.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tsconfig.json" beforeDir="false" afterPath="$PROJECT_DIR$/tsconfig.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/vercel.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/(app)/diff/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/(app)/diff/layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/api/cache-proxy/[...path]/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/api/cache-proxy/[...path]/route.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/cache-type-selector-card.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/cache-type-selector-card.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-config-archive-entity-view.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-config-archive-entity-view.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-config-archive-types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-config-archive-types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-config-archive-view.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-config-archive-view.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-config-content.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-config-content.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-config-table-search-index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-config-table-search-index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-config-view.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-config-view.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-constants.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-constants.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-gamevals-full-view.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-gamevals-full-view.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-inventory-view.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-inventory-view.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-openrune-archive-columns.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-openrune-archive-columns.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-openrune-archive-table-cell.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-openrune-archive-table-cell.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-search-toolbar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-search-toolbar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-sidebar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-sprites-view.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-sprites-view.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-textures-view.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-textures-view.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-type-icon.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-type-icon.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-unified-search-field.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-unified-search-field.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/gameval-items-search-bar.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/layout/app-shell.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/layout/app-shell.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/layout/sidebar-nav.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/layout/sidebar-nav.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/providers/app-providers.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/providers/app-providers.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/ui/RSSprite.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/RSSprite.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/context/cache-type-context.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/context/cache-type-context.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib/cache-proxy-client.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/cache-proxy-client.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib/cache-status.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/cache-status.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib/nav-config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/nav-config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib/sse/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/sse/types.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -214,39 +54,39 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "JavaScript Debug.Next.js: debug client-side.executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1": "true",
-    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "diff",
-    "ignore.virus.scanning.warn.message": "true",
-    "javascript.preferred.runtime.type.id": "node",
-    "js.debugger.nextJs.config.created.client": "true",
-    "js.debugger.nextJs.config.created.server": "true",
-    "junie.onboarding.icon.badge.shown": "true",
-    "last_opened_file_path": "D:/OpenRune/openrune.github.io",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_interpreter_path": "C:/Users/chris/AppData/Roaming/JetBrains/WebStorm2025.3/node/versions/24.13.1/node",
-    "nodejs_package_manager_path": "npm",
-    "npm.Next.js: server-side.executor": "Run",
-    "npm.build.executor": "Run",
-    "npm.lint.executor": "Run",
-    "npm.start.executor": "Run",
-    "settings.editor.selected.configurable": "settings.nodejs",
-    "to.speed.mode.migration.done": "true",
-    "ts.external.directory.path": "D:\\openrune.github.io\\node_modules\\typescript\\lib",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;JavaScript Debug.Next.js: debug client-side.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1&quot;: &quot;true&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;diff&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
+    &quot;js.debugger.nextJs.config.created.client&quot;: &quot;true&quot;,
+    &quot;js.debugger.nextJs.config.created.server&quot;: &quot;true&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/OpenRune/openrune.github.io&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_interpreter_path&quot;: &quot;C:/Users/chris/AppData/Roaming/JetBrains/WebStorm2025.3/node/versions/24.13.1/node&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;npm.Next.js: server-side.executor&quot;: &quot;Run&quot;,
+    &quot;npm.build.executor&quot;: &quot;Run&quot;,
+    &quot;npm.lint.executor&quot;: &quot;Run&quot;,
+    &quot;npm.start.executor&quot;: &quot;Run&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;settings.nodejs&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;D:\\OpenRune\\openrune.github.io\\node_modules\\typescript\\lib&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\openrune.github.io\app\spotanims" />
@@ -261,7 +101,7 @@
       <recent name="D:\openrune.github.io\components\map" />
     </key>
   </component>
-  <component name="RunManager" selected="npm.start">
+  <component name="RunManager" selected="npm.build">
     <configuration name="Next.js: debug client-side" type="JavascriptDebugType" uri="http://localhost:3000/">
       <method v="2" />
     </configuration>
@@ -307,8 +147,8 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="npm.start" />
         <item itemvalue="npm.build" />
+        <item itemvalue="npm.start" />
         <item itemvalue="npm.lint" />
       </list>
     </recent_temporary>
@@ -347,7 +187,8 @@
       <workItem from="1776414752467" duration="563000" />
       <workItem from="1776441251065" duration="8086000" />
       <workItem from="1776509422473" duration="9675000" />
-      <workItem from="1776661256708" duration="724000" />
+      <workItem from="1776661256708" duration="13749000" />
+      <workItem from="1776723962469" duration="4182000" />
     </task>
     <servers />
   </component>

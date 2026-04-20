@@ -188,11 +188,11 @@ export function DiffInventoryView({ diffViewMode, combinedRev, baseRev, rev }: D
       const keys = openruneInvArchiveColumnKeys(displayRows.length > 0 ? displayRows : [], revArg);
       return {
         colgroup: (
-          <>
+          <colgroup>
             {keys.map((colKey) => (
               <col key={colKey} className={colKey === "gameval" ? "min-w-[10rem]" : "min-w-[6rem]"} />
             ))}
-          </>
+          </colgroup>
         ),
         headerCellsAfterId: (
           <>

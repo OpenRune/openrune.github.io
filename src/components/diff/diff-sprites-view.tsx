@@ -25,10 +25,11 @@ import { conditionalJsonFetch } from "@/lib/openrune-idb-cache";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
 
-import { GAMEVAL_MIN_REVISION, SPRITE_PER_PAGE_OPTIONS } from "./diff-constants";
+import { DIFF_COMBINED_SEARCH_WRAP_CLASS, GAMEVAL_MIN_REVISION, SPRITE_PER_PAGE_OPTIONS } from "./diff-constants";
 import { DiffArchiveTable } from "./diff-archive-table";
 import { diffSearchModeTooltipHelp, pickDefaultArchiveTableSearchMode } from "./diff-search-modes";
 import { DiffSectionHeader } from "./diff-section-header";
+import { ZipArchiveDownloadButton } from "./zip-archive-download-button";
 import { DiffUnifiedSearchField } from "./diff-unified-search-field";
 import { DiffViewModeToggle } from "./diff-view-mode-toggle";
 import {
@@ -626,7 +627,7 @@ export function DiffSpritesView({
                 { value: "table", label: "Table" },
               ]}
             />
-          ) : undefined
+          ) : null
         }
       />
 
@@ -652,9 +653,10 @@ export function DiffSpritesView({
         </p>
       ) : null}
 
-      <div className="mb-3 flex min-w-0 flex-wrap items-start gap-2">
-        <div className="w-[min(100%,36rem)] max-w-full shrink-0 min-w-0">
+      <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2 justify-between">
+        <div className={cn(DIFF_COMBINED_SEARCH_WRAP_CLASS, "!mb-0")}>
           <DiffUnifiedSearchField
+            size="large"
             mode={spriteSearchMode}
             onModeChange={setSpriteSearchMode}
             disabledModes={spriteSearchDisabledModes}
@@ -696,6 +698,14 @@ export function DiffSpritesView({
             onChange={(v) => setSpriteDeltaFilterMode(v as ConfigFilterMode)}
           />
         ) : null}
+        <ZipArchiveDownloadButton
+          kind="sprites"
+          diffViewMode={diffViewMode}
+          combinedRev={combinedRev}
+          baseRev={baseRev}
+          rev={rev}
+          tableBase={COMBINED_SPRITE_BASE}
+        />
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">

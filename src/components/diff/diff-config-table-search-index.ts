@@ -153,6 +153,7 @@ function searchRowMatches(
     tableQuery: string;
     gamevalTags: SearchTag[];
     gamevalTextFragment: string;
+    searchFieldByMode?: Partial<Record<"name" | "regex", string>>;
   },
 ): boolean {
   if (opts.mode === "gameval") {
@@ -179,17 +180,22 @@ function searchRowMatches(
 
   if (opts.mode === "name") {
     const needle = query.toLowerCase();
+    const modeField = opts.searchFieldByMode?.name?.trim();
+    const modeHaystack = modeField ? String(row.entries[modeField] ?? "") : row.searchText;
+    const modeHaystackLower = modeHaystack.toLowerCase();
     if (looksLikeSpriteIdQueryText(query)) {
-      return idQueryMatchesNumericId(row.id, query) || row.searchText.includes(needle);
+      return idQueryMatchesNumericId(row.id, query) || modeHaystackLower.includes(needle);
     }
-    return row.searchText.includes(needle);
+    return modeHaystackLower.includes(needle);
   }
 
   if (opts.mode === "regex") {
+    const modeField = opts.searchFieldByMode?.regex?.trim();
+    const modeHaystack = modeField ? String(row.entries[modeField] ?? "") : row.searchText;
     if (looksLikeSpriteIdQueryText(query)) {
       return idQueryMatchesNumericId(row.id, query);
     }
-    return safeRegexTest(query, row.searchText);
+    return safeRegexTest(query, modeHaystack);
   }
 
   return true;
@@ -202,6 +208,7 @@ export function searchConfigArchiveTableIndex(
     tableQuery: string;
     gamevalTags: SearchTag[];
     gamevalTextFragment: string;
+    searchFieldByMode?: Partial<Record<"name" | "regex", string>>;
   },
 ): ConfigArchiveTableRow[] {
   return index.rows.filter((row) => searchRowMatches(row, opts)).map(({ searchText: _searchText, exactTerms: _exactTerms, filterId: _filterId, ...row }) => row);

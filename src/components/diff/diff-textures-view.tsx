@@ -12,6 +12,7 @@ import { useSettings } from "@/context/settings-context";
 import { onCopyApplyGamevalUppercaseSetting } from "@/lib/gameval-clipboard";
 import { cn } from "@/lib/utils";
 import { DiffConfigArchiveView } from "./diff-config-archive-view";
+import { ZipArchiveDownloadButton } from "./zip-archive-download-button";
 import { parsePackedHslValue } from "./diff-archive-table-utils";
 import { openruneColumnHeaderLabel, openruneTextureArchiveColumnKeys } from "./diff-openrune-archive-columns";
 import type {
@@ -484,6 +485,7 @@ export function DiffTexturesView({ diffViewMode, combinedRev, baseRev, rev }: Di
           gamevalFilterErrorVerb: "filter textures by gameval",
         }}
         tableSearch={{ disabledModes: tableSearchDisabledModes, modeTitles: tableSearchModeTitles }}
+
         gamevalAutocomplete={{
           type: SPRITETYPES,
           revUsesCombined: true,
@@ -498,9 +500,20 @@ export function DiffTexturesView({ diffViewMode, combinedRev, baseRev, rev }: Di
           readyWhenLoaded: SPRITETYPES,
         }}
         buildTablePlan={buildTablePlan}
+        tableSearchSize="large"
         TextLine={DiffTextureTextLine}
         textRowHeight={(s) => (s.suggestionDisplay.textures ? 40 : TEXTURE_TEXT_LINE_HEIGHT)}
         getTextLineShowInline={(s) => s.suggestionDisplay.textures}
+        searchRowTrailing={
+          <ZipArchiveDownloadButton
+            kind="textures"
+            diffViewMode={diffViewMode}
+            combinedRev={combinedRev}
+            baseRev={baseRev}
+            rev={rev}
+            tableBase={TABLE_BASE}
+          />
+        }
       />
 
       {textureModal != null ? (

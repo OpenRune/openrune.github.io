@@ -1,4 +1,5 @@
 import type { ConfigArchiveTableRow } from "./diff-config-archive-types";
+import { sectionPrefixForConfigType } from "./diff-constants";
 import type { ConfigLine } from "./diff-types";
 
 /** Normalize API line `type` strings to `ConfigLine` union (shared by text view + spotanim prefetch). */
@@ -204,6 +205,16 @@ function buildRefHoverText(group: string, name: string, id?: string, _value?: st
     .join("\n");
 }
 
+function normalizeGamevalDisplay(group: string, name: string, fallback = ""): string {
+  const normalizedGroup = group.trim().toLowerCase();
+  const normalizedName = name.trim();
+  if (!normalizedGroup && !normalizedName) return fallback;
+  if (!normalizedName) return normalizedGroup || fallback;
+  const prefixed = `${normalizedGroup}.`;
+  if (normalizedName.toLowerCase().startsWith(prefixed)) return normalizedName;
+  return `${normalizedGroup}.${normalizedName}`;
+}
+
 type RefRender = {
   display: string;
   hoverText?: string;
@@ -220,7 +231,7 @@ function renderValueWithRef(raw: unknown): RefRender | null {
   const name = typeof ref.name === "string" ? ref.name : "";
   const id = typeof ref.id === "number" || typeof ref.id === "string" ? String(ref.id) : "";
   const value = asText(obj.value).trim();
-  const display = [group, name].filter(Boolean).join(".").trim() || value;
+  const display = normalizeGamevalDisplay(group, name, value);
   if (!display) return null;
   const hover = buildRefHoverText(group, name, id || value, value || id);
   return { display, hoverText: hover || undefined };
@@ -357,18 +368,6 @@ export function configLinesArrayFromPayload(data: unknown): unknown[] {
   return [];
 }
 
-function sectionPrefixForType(rawType: string): string {
-  const t = rawType.trim().toLowerCase();
-  return (
-    {
-      items: "item",
-      npcs: "npc",
-      sequences: "sequence",
-      spotanims: "spotanim",
-    } as Record<string, string>
-  )[t] ?? t;
-}
-
 function asText(v: unknown): string {
   if (v == null) return "";
   if (typeof v === "string") return v;
@@ -455,6 +454,10 @@ function fieldLinesFromKeyValue(key: string, value: unknown): ExpandedFieldLine[
   const lowerKey = key.trim().toLowerCase();
   if (lowerKey === "params") {
     const expanded = expandParamsLines(value);
+    if (expanded.length > 0) return expanded;
+  }
+  if (lowerKey === "values") {
+    const expanded = expandEnumValuesLines(value);
     if (expanded.length > 0) return expanded;
   }
   {
@@ -551,10 +554,26 @@ function renderParamValue(raw: unknown): ParamRender | null {
   const name = typeof r.name === "string" ? r.name : "";
   const id = typeof r.id === "number" || typeof r.id === "string" ? String(r.id) : "";
   const rawValue = asText(value).trim();
-  const display = [group, name].filter(Boolean).join(".").trim() || rawValue;
+  const display = normalizeGamevalDisplay(group, name, rawValue);
   if (!display) return null;
   const hoverText = buildRefHoverText(group, name, id);
   return { display, hoverText: hoverText || undefined };
+}
+
+function renderEnumValue(raw: unknown): ParamRender | null {
+  return renderParamValue(raw);
+}
+
+function expandEnumValuesLines(value: unknown): ExpandedFieldLine[] {
+  const values = parseParamsObject(value);
+  if (!values) return [];
+  return Object.entries(values)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .flatMap(([key, raw], index) => {
+      const rendered = renderEnumValue(raw);
+      if (!rendered) return [];
+      return [{ line: `value${index + 1}=${key},${rendered.display}`, hoverText: rendered.hoverText } satisfies ExpandedFieldLine];
+    });
 }
 
 function expandParamsLines(value: unknown): ExpandedFieldLine[] {
@@ -569,6 +588,54 @@ function expandParamsLines(value: unknown): ExpandedFieldLine[] {
       if (!rendered) return [];
       return [{ line: `param=parm_${id}=${rendered.display}`, hoverText: rendered.hoverText } satisfies ExpandedFieldLine];
     });
+}
+
+function expandEnumValuesConfigLine(line: ConfigLine): ConfigLine[] {
+  const eq = line.line.indexOf("=");
+  if (eq <= 0) return [line];
+  const key = line.line.slice(0, eq).trim().toLowerCase();
+  if (key !== "values") return [line];
+
+  const rhs = line.line.slice(eq + 1).trim();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rhs);
+  } catch {
+    return [line];
+  }
+  const expanded = expandEnumValuesLines(parsed);
+  if (expanded.length === 0) return [line];
+
+  const beforeByIndex = new Map<number, ExpandedFieldLine>();
+  if (line.before) {
+    const beq = line.before.indexOf("=");
+    if (beq > 0 && line.before.slice(0, beq).trim().toLowerCase() === "values") {
+      const brhs = line.before.slice(beq + 1).trim();
+      try {
+        const bParsed = JSON.parse(brhs);
+        const bExpanded = expandEnumValuesLines(bParsed);
+        bExpanded.forEach((entry) => {
+          const m = /^value(\d+)=/.exec(entry.line);
+          const idx = m ? Number.parseInt(m[1]!, 10) : Number.NaN;
+          if (Number.isFinite(idx)) beforeByIndex.set(idx, entry);
+        });
+      } catch {
+        // Keep fallback before text when parse fails.
+      }
+    }
+  }
+
+  return expanded.map((entry) => {
+    const m = /^value(\d+)=/.exec(entry.line);
+    const idx = m ? Number.parseInt(m[1]!, 10) : Number.NaN;
+    const beforeRendered = Number.isFinite(idx) ? beforeByIndex.get(idx)?.line : undefined;
+    return {
+      ...line,
+      line: entry.line,
+      hoverText: entry.hoverText,
+      before: beforeRendered ? beforeRendered.split("=").slice(1).join("=") : line.before,
+    };
+  });
 }
 
 function parseOptionArrayLine(rawLine: string): ParsedOptionArrayLine | null {
@@ -796,7 +863,7 @@ function synthesizeLinesFromDiffPayload(data: unknown): ConfigLine[] {
   const changed = (o.changed && typeof o.changed === "object" ? (o.changed as Record<string, unknown>) : {}) ?? {};
   const removed = Array.isArray(o.removed) ? o.removed : [];
   const typeRaw = typeof o.type === "string" ? o.type : "config";
-  const sectionPrefix = sectionPrefixForType(typeRaw);
+  const sectionPrefix = sectionPrefixForConfigType(typeRaw);
   const rev = readOptionalFiniteNumber(o.rev);
   const base = readOptionalFiniteNumber(o.base);
 
@@ -898,6 +965,29 @@ function synthesizeLinesFromDiffPayload(data: unknown): ConfigLine[] {
             });
             return;
           }
+          if (k.trim().toLowerCase() === "values") {
+            const toExpanded = expandEnumValuesLines(e.to);
+            const fromExpanded = expandEnumValuesLines(e.from);
+            const fromByIndex = new Map<number, ExpandedFieldLine>();
+            fromExpanded.forEach((f) => {
+              const match = /^value(\d+)=/.exec(f.line);
+              const idx = match ? Number.parseInt(match[1]!, 10) : Number.NaN;
+              if (Number.isFinite(idx)) fromByIndex.set(idx, f);
+            });
+            toExpanded.forEach((t) => {
+              const match = /^value(\d+)=/.exec(t.line);
+              const idx = match ? Number.parseInt(match[1]!, 10) : Number.NaN;
+              const beforeRendered = Number.isFinite(idx) ? fromByIndex.get(idx)?.line : undefined;
+              pushNormalizedChangeLine(lines, {
+                line: t.line,
+                hoverText: t.hoverText,
+                type: "change",
+                changedInRev: rev,
+                before: beforeRendered ? beforeRendered.split("=").slice(1).join("=") : undefined,
+              });
+            });
+            return;
+          }
           if ((k.trim().toLowerCase() === "countobj" || k.trim().toLowerCase() === "countco") && Array.isArray(e.to)) {
             const lk = k.trim().toLowerCase();
             // countco is merged into countobj lines — skip it on its own
@@ -990,8 +1080,10 @@ export function configLinesFromDiffBody(data: unknown): ConfigLine[] {
       if (shouldDropConfigLine(normalizedLine)) continue;
       const expandedParams = expandParamsConfigLine(normalizedLine).map(normalizeExpandedChangeLine);
       for (const paramEntry of expandedParams) {
-        const expandedTransforms = expandTransformsConfigLine(paramEntry).map(normalizeExpandedChangeLine);
-        for (const transformEntry of expandedTransforms) {
+        const expandedEnumValues = expandEnumValuesConfigLine(paramEntry).map(normalizeExpandedChangeLine);
+        for (const enumValuesEntry of expandedEnumValues) {
+          const expandedTransforms = expandTransformsConfigLine(enumValuesEntry).map(normalizeExpandedChangeLine);
+          for (const transformEntry of expandedTransforms) {
           const expandedSubOps = expandSubOpsConfigLine(transformEntry).map(normalizeExpandedChangeLine);
           for (const subOpEntry of expandedSubOps) {
             const expandedCountObj = expandCountObjConfigLine(subOpEntry).map(normalizeExpandedChangeLine);
@@ -999,6 +1091,7 @@ export function configLinesFromDiffBody(data: unknown): ConfigLine[] {
               out.push(...expandOptionArrayConfigLine(countObjEntry).map(normalizeExpandedChangeLine));
             }
           }
+        }
         }
       }
     }
@@ -1047,7 +1140,7 @@ export function configLinesFromCachePayload(
 
   if (!snapshots) return [];
 
-  const sectionPrefix = sectionPrefixForType(configType);
+  const sectionPrefix = sectionPrefixForConfigType(configType);
   const ids = Object.keys(snapshots)
     .map((k) => Number.parseInt(k, 10))
     .filter((n) => Number.isFinite(n))

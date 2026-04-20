@@ -20,6 +20,10 @@ export function diffRevisionsUrl() {
   return "/api/cache-proxy/diff/revisions";
 }
 
+export function diffSupportManifestUrl(rev: number) {
+  return `/api/cache-proxy/diff/support/manifest?rev=${rev}`;
+}
+
 /**
  * Normalize cache-server diff revisions JSON to sorted unique numeric revisions.
  * Accepts a raw number array, common object shapes, or `revisionOptions` string lists.
@@ -136,7 +140,9 @@ export function diffSpriteResolveUrl(spriteId: number, params: { base: number; r
 
 /** Normalize internal section names to the backend API type parameter. */
 function normalizeConfigTypeForApi(configType: string): string {
-  if (configType.trim().toLowerCase() === "spotanim") return "spotanims";
+  const normalized = configType.trim().toLowerCase();
+  if (normalized === "spotanim") return "spotanims";
+  if (normalized === "param") return "params";
   return configType;
 }
 
@@ -155,12 +161,24 @@ export function diffConfigTableUrl(
   return `/api/cache-proxy/diff/config/${encodeURIComponent(normalizeConfigTypeForApi(configType))}/table?${search.toString()}`;
 }
 
+export function diffConfigTableAllUrl(configType: string, params: { base: number; rev: number }) {
+  const search = new URLSearchParams({
+    base: String(params.base),
+    rev: String(params.rev),
+  });
+  return `/api/diff/config/${encodeURIComponent(normalizeConfigTypeForApi(configType))}/table-all?${search.toString()}`;
+}
+
 export function diffConfigContentUrl(configType: string, params: { base: number; rev: number }) {
   const search = new URLSearchParams({
     base: String(params.base),
     rev: String(params.rev),
   });
   return `/api/cache-proxy/diff/config/${encodeURIComponent(normalizeConfigTypeForApi(configType))}/content?${search.toString()}`;
+}
+
+export function diffConfigSchemaUrl(configType: string) {
+  return `/api/cache-proxy/diff/config/${encodeURIComponent(normalizeConfigTypeForApi(configType))}/props`;
 }
 
 export function diffSpriteImageUrl(
