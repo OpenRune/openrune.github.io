@@ -17,6 +17,7 @@ import { useCacheType } from "@/context/cache-type-context";
 import { useShellPreferences } from "@/context/shell-preferences-context";
 import { useSettings } from "@/context/settings-context";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { ServerStatus } from "@/lib/cache-status";
 import { cn } from "@/lib/utils";
 import {
   Sheet,
@@ -50,6 +51,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const selectedStatus = cacheStatuses.get(selectedCacheType.id);
   const selectedStatusChecking = checkingStatuses.has(selectedCacheType.id);
   const isOnline = selectedStatus?.isOnline === true;
+  const selectedServerStatus = selectedStatus?.status;
   const selectedStatusResolved = !selectedStatusChecking;
   const currentPage = React.useMemo(() => findLeafNavPageByPath(pathname), [pathname]);
   const shouldForceCacheSelection = Boolean(
@@ -57,15 +59,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   const wentOfflineRef = React.useRef(false);
+  const reloadingRef = React.useRef(false);
   React.useEffect(() => {
-    if (!isOnline && selectedStatusResolved) {
+    const isHardOffline =
+      selectedStatusResolved &&
+      (!selectedStatus || selectedServerStatus === ServerStatus.ERROR);
+
+    if (isHardOffline) {
       wentOfflineRef.current = true;
     }
-    if (isOnline && wentOfflineRef.current && currentPage && !canUsePageOffline(currentPage)) {
+
+    if (
+      selectedServerStatus === ServerStatus.LIVE &&
+      wentOfflineRef.current &&
+      !reloadingRef.current &&
+      currentPage &&
+      !canUsePageOffline(currentPage)
+    ) {
+      reloadingRef.current = true;
       wentOfflineRef.current = false;
       window.location.reload();
     }
-  }, [isOnline, selectedStatusResolved, currentPage]);
+  }, [currentPage, selectedServerStatus, selectedStatus, selectedStatusResolved]);
 
   return (
     <div className="flex min-h-dvh w-full">
