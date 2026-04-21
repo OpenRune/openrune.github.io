@@ -309,7 +309,9 @@ export function SidebarNav({
   const [openGroups, setOpenGroups] = React.useState<string[]>([]);
   const selectedStatus = cacheStatuses.get(selectedCacheType.id);
   const selectedStatusChecking = checkingStatuses.has(selectedCacheType.id);
-  const isOnline = selectedStatus?.isOnline === true || selectedStatusChecking;
+  const isOnline = selectedStatus?.isOnline === true;
+  const isOnlineForNav = isOnline || (selectedStatusChecking && !selectedStatus);
+  const showOfflineBanner = !isOnline && (!selectedStatusChecking || !!selectedStatus);
 
   const handleGroupOpenChange = React.useCallback(
     (groupLabel: string, open: boolean) => {
@@ -328,7 +330,7 @@ export function SidebarNav({
     <div className="flex min-h-0 flex-1 flex-col">
       <ScrollArea className="min-h-0 flex-1 px-2">
         <nav className="flex flex-col gap-1 pt-2 pb-2">
-          {!selectedStatusChecking && !isOnline ? (
+          {showOfflineBanner ? (
             <div className="mb-1 flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1.5 text-xs text-destructive">
               <AlertCircle className="size-3.5 shrink-0" />
               {!collapsed ? (
@@ -365,7 +367,7 @@ export function SidebarNav({
                 page={page}
                 pathname={pathname}
                 collapsed={collapsed}
-                isOnline={isOnline}
+                isOnline={isOnlineForNav}
                 itemSize={settings.navItemSize}
                 isOpen={openGroups.includes(page.label)}
                 onOpenChange={handleGroupOpenChange}
@@ -377,7 +379,7 @@ export function SidebarNav({
                 page={page}
                 pathname={pathname}
                 collapsed={collapsed}
-                isOnline={isOnline}
+                isOnline={isOnlineForNav}
                 itemSize={settings.navItemSize}
                 onNavigate={onNavigate}
               />

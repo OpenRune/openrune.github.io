@@ -51,9 +51,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const selectedStatusChecking = checkingStatuses.has(selectedCacheType.id);
   const currentPage = React.useMemo(() => findLeafNavPageByPath(pathname), [pathname]);
   const [requestForcedCacheSelection, setRequestForcedCacheSelection] = React.useState(false);
+  const requestForcedRef = React.useRef(false);
   const shouldForceCacheSelection = Boolean(
     requestForcedCacheSelection && currentPage && !canUsePageOffline(currentPage),
   );
+
+  React.useEffect(() => {
+    requestForcedRef.current = requestForcedCacheSelection;
+  }, [requestForcedCacheSelection]);
 
   React.useEffect(() => {
     const originalFetch = window.fetch.bind(window);
@@ -70,10 +75,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
 
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      const response = await originalFetch(input, init);
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
       const lowerUrl = url.toLowerCase();
       const isApiRequest = lowerUrl.includes("/api/");
+      const isStatusRequest = lowerUrl.includes("/api/status");
+
+      if (
+        requestForcedRef.current &&
+        isApiRequest &&
+        !isStatusRequest &&
+        !shouldIgnoreAsImageRequest(input, init)
+      ) {
+        return new Response(
+          JSON.stringify({ error: "cache-selection-required", message: "Select an online cache server to continue." }),
+          {
+            status: 503,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      }
+
+      const response = await originalFetch(input, init);
       const failed = response.status === 502 || response.status === 503;
 
       if (isApiRequest && failed && !shouldIgnoreAsImageRequest(input, init)) {

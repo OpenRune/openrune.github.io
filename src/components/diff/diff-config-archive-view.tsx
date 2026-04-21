@@ -1601,11 +1601,39 @@ export function DiffConfigArchiveView({
   const totalPages = Math.max(1, Math.ceil(displayTotal / perPage));
   const safePage = Math.min(Math.max(1, page), totalPages);
 
+  const indexedDisplayRows = React.useMemo(() => {
+    if (!indexedClientPageActive || !indexedSearchResult) return null;
+    if (safePage === page) return indexedSearchResult.rows;
+
+    const safeOffset = Math.max(0, (safePage - 1) * perPage);
+    return searchConfigArchiveTableIndexPage(tableSearchIndex!, {
+      mode: tableSearchMode,
+      tableQuery: debouncedTableQuery,
+      gamevalTags,
+      gamevalTextFragment: debouncedGamevalTextFragment,
+      searchFieldByMode: tableSearch.searchFieldByMode,
+      offset: safeOffset,
+      limit: perPage,
+    }).rows;
+  }, [
+    indexedClientPageActive,
+    indexedSearchResult,
+    safePage,
+    page,
+    perPage,
+    tableSearchIndex,
+    tableSearchMode,
+    debouncedTableQuery,
+    gamevalTags,
+    debouncedGamevalTextFragment,
+    tableSearch.searchFieldByMode,
+  ]);
+
   const displayRows = React.useMemo(() => {
     if (viewMode === "table" && clientSidePagination) {
       const start = (safePage - 1) * perPage;
       const end = safePage * perPage;
-      if (indexedClientPageActive) return indexedSearchResult!.rows;
+      if (indexedClientPageActive) return indexedDisplayRows ?? [];
       if (clientPageActive) return clientFilteredRows!.slice(start, end);
       return [];
     }
@@ -1616,7 +1644,7 @@ export function DiffConfigArchiveView({
     safePage,
     perPage,
     indexedClientPageActive,
-    indexedSearchResult,
+    indexedDisplayRows,
     clientPageActive,
     clientFilteredRows,
     tableRows,
