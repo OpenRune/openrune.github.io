@@ -160,7 +160,19 @@ export function CacheTypeSelectorCard({
     availableCacheTypes,
     cacheStatuses,
     checkingStatuses,
+    refreshCacheStatuses,
+    setStatusLiveUpdatesEnabled,
   } = useCacheType();
+
+  React.useEffect(() => {
+    void refreshCacheStatuses();
+  }, [refreshCacheStatuses]);
+
+  React.useEffect(() => {
+    setStatusLiveUpdatesEnabled(true);
+    return () => setStatusLiveUpdatesEnabled(false);
+  }, [setStatusLiveUpdatesEnabled]);
+
   const selectedStatus = cacheStatuses.get(selectedCacheType.id);
   const selectedChecking = checkingStatuses.has(selectedCacheType.id);
   const selectedUnavailable = !selectedChecking && !(selectedStatus?.isOnline === true);

@@ -18,6 +18,8 @@ import {
   isStatusOnline,
   limitConcurrency,
 } from "@/lib/cache-status";
+import { fetchSSE, type SseConnection } from "@/lib/sse/fetch-sse";
+import { SseEventType } from "@/lib/sse/types";
 
 function buildCacheStatusInfo(statusResponse: StatusResponse | null): Omit<CacheStatusInfo, "lastChecked"> {
   const status = statusResponse?.status ?? ServerStatus.ERROR;
@@ -46,8 +48,6 @@ function cacheStatusMeaningfullyChanged(
     (a.statusMessage ?? "") !== (b.statusMessage ?? "")
   );
 }
-import { fetchSSE, type SseConnection } from "@/lib/sse/fetch-sse";
-import { SseEventType } from "@/lib/sse/types";
 
 type CacheTypeContextValue = {
   cacheTypes: CacheType[];
@@ -58,6 +58,7 @@ type CacheTypeContextValue = {
   cacheStatuses: Map<string, CacheStatusInfo>;
   checkingStatuses: Set<string>;
   refreshCacheStatuses: (options?: { silent?: boolean }) => Promise<void>;
+  setStatusLiveUpdatesEnabled: (enabled: boolean) => void;
   manuallySelected: boolean;
 };
 
@@ -99,6 +100,7 @@ export function CacheTypeProvider({ children }: { children: React.ReactNode }) {
   const [checkingStatuses, setCheckingStatuses] = React.useState<Set<string>>(
     () => new Set(cacheTypes.map((cacheType) => cacheType.id)),
   );
+  const [statusLiveUpdatesEnabled, setStatusLiveUpdatesEnabled] = React.useState(false);
 
   const applyStatusUpdate = React.useCallback(
     (cacheTypeId: string, statusResponse: StatusResponse | null) => {
@@ -164,15 +166,11 @@ export function CacheTypeProvider({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     void refreshCacheStatuses();
-
-    const intervalId = window.setInterval(() => {
-      void refreshCacheStatuses({ silent: true });
-    }, 60_000);
-
-    return () => window.clearInterval(intervalId);
   }, [refreshCacheStatuses]);
 
   React.useEffect(() => {
+    if (!statusLiveUpdatesEnabled) return;
+
     const connections: SseConnection[] = [];
 
     for (const cacheType of cacheTypes) {
@@ -183,7 +181,7 @@ export function CacheTypeProvider({ children }: { children: React.ReactNode }) {
           applyStatusUpdate(cacheType.id, event);
         },
         () => {
-          // Keep polling fallback as source of truth during temporary SSE failures.
+          // Selector view will still work with manual refresh if SSE drops.
         },
         backendUrl,
       );
@@ -198,7 +196,7 @@ export function CacheTypeProvider({ children }: { children: React.ReactNode }) {
         connection.close();
       }
     };
-  }, [applyStatusUpdate, cacheTypes]);
+  }, [applyStatusUpdate, cacheTypes, statusLiveUpdatesEnabled]);
 
   const setSelectedCacheType = React.useCallback((cacheType: CacheType) => {
     if (!cacheTypes.some((entry) => entry.id === cacheType.id)) {
@@ -244,6 +242,7 @@ export function CacheTypeProvider({ children }: { children: React.ReactNode }) {
       cacheStatuses,
       checkingStatuses,
       refreshCacheStatuses,
+      setStatusLiveUpdatesEnabled,
       manuallySelected,
     }),
     [
@@ -255,6 +254,7 @@ export function CacheTypeProvider({ children }: { children: React.ReactNode }) {
       selectedCacheType,
       setSelectedCacheType,
       setSelectedCacheTypeById,
+      setStatusLiveUpdatesEnabled,
     ],
   );
 

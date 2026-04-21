@@ -44,7 +44,7 @@ function parseTargetFromHeaderOrCookie(request: NextRequest, fallback: CacheTarg
 
 const PAGE_SIZE = 500;
 const MAX_ROWS = 100_000;
-const PAGE_TIMEOUT_MS = 10_000;
+const PAGE_TIMEOUT_MS = 30_000;
 
 type TablePageRow = Record<string, unknown>;
 
@@ -80,7 +80,7 @@ export async function GET(
   let offset = 0;
 
   while (offset < serverTotal && allRows.length < MAX_ROWS) {
-    const search = new URLSearchParams({ base, rev, offset: String(offset), limit: String(PAGE_SIZE), mode: "id" });
+    const search = new URLSearchParams({ base, rev, offset: String(offset), limit: String(PAGE_SIZE) });
     const upstreamUrl = `http://${target.ip}:${target.port}/diff/config/${encodeURIComponent(type)}/table?${search.toString()}`;
 
     const controller = new AbortController();

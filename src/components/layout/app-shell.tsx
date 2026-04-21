@@ -17,7 +17,6 @@ import { useCacheType } from "@/context/cache-type-context";
 import { useShellPreferences } from "@/context/shell-preferences-context";
 import { useSettings } from "@/context/settings-context";
 import { useIsMobile } from "@/hooks/use-is-mobile";
-import { ServerStatus } from "@/lib/cache-status";
 import { cn } from "@/lib/utils";
 import {
   Sheet,
@@ -50,37 +49,51 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const selectedStatus = cacheStatuses.get(selectedCacheType.id);
   const selectedStatusChecking = checkingStatuses.has(selectedCacheType.id);
-  const isOnline = selectedStatus?.isOnline === true;
-  const selectedServerStatus = selectedStatus?.status;
-  const selectedStatusResolved = !selectedStatusChecking;
   const currentPage = React.useMemo(() => findLeafNavPageByPath(pathname), [pathname]);
+  const [requestForcedCacheSelection, setRequestForcedCacheSelection] = React.useState(false);
   const shouldForceCacheSelection = Boolean(
-    currentPage && selectedStatusResolved && !canUsePageOffline(currentPage) && !isOnline,
+    requestForcedCacheSelection && currentPage && !canUsePageOffline(currentPage),
   );
 
-  const wentOfflineRef = React.useRef(false);
-  const reloadingRef = React.useRef(false);
   React.useEffect(() => {
-    const isHardOffline =
-      selectedStatusResolved &&
-      (!selectedStatus || selectedServerStatus === ServerStatus.ERROR);
+    const originalFetch = window.fetch.bind(window);
 
-    if (isHardOffline) {
-      wentOfflineRef.current = true;
-    }
+    const shouldIgnoreAsImageRequest = (input: RequestInfo | URL, init?: RequestInit): boolean => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      const lowerUrl = url.toLowerCase();
+      if (lowerUrl.endsWith(".png") || lowerUrl.includes("/sprite/")) return true;
 
-    if (
-      selectedServerStatus === ServerStatus.LIVE &&
-      wentOfflineRef.current &&
-      !reloadingRef.current &&
-      currentPage &&
-      !canUsePageOffline(currentPage)
-    ) {
-      reloadingRef.current = true;
-      wentOfflineRef.current = false;
-      window.location.reload();
+      const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+      const accept = (headers.get("accept") ?? "").toLowerCase();
+      if (accept.includes("image/")) return true;
+      return false;
+    };
+
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const response = await originalFetch(input, init);
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      const lowerUrl = url.toLowerCase();
+      const isApiRequest = lowerUrl.includes("/api/");
+      const failed = response.status === 502 || response.status === 503;
+
+      if (isApiRequest && failed && !shouldIgnoreAsImageRequest(input, init)) {
+        setRequestForcedCacheSelection(true);
+      }
+
+      return response;
+    };
+
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!requestForcedCacheSelection) return;
+    if (!selectedStatusChecking && selectedStatus?.isOnline) {
+      setRequestForcedCacheSelection(false);
     }
-  }, [currentPage, selectedServerStatus, selectedStatus, selectedStatusResolved]);
+  }, [requestForcedCacheSelection, selectedStatusChecking, selectedStatus]);
 
   return (
     <div className="flex min-h-dvh w-full">
@@ -162,6 +175,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <CacheTypeSelectorCard
               showUnavailableBanner={false}
               showGoHomeButton
+              onSelect={() => {
+                setRequestForcedCacheSelection(false);
+                window.location.reload();
+              }}
             />
           </div>
         </div>

@@ -39,7 +39,7 @@ import { matchesSpriteGamevalTags, spriteMatchesSubstringName } from "./diff-spr
 import { idQueryMatchesNumericId, looksLikeSpriteIdQueryText } from "./diff-id-search";
 import {
   buildConfigArchiveTableSearchIndex,
-  searchConfigArchiveTableIndex,
+  searchConfigArchiveTableIndexPage,
   type ConfigArchiveTableSearchIndex,
 } from "./diff-config-table-search-index";
 import type {
@@ -762,18 +762,23 @@ export function DiffConfigArchiveView({
     gvReadyForBulk,
   ]);
 
-  const indexedFilteredRows = React.useMemo(() => {
+  const indexedSearchResult = React.useMemo(() => {
     if (!indexedQueryActive || !tableSearchIndex) return null;
-    return searchConfigArchiveTableIndex(tableSearchIndex, {
+    const safeOffset = Math.max(0, (page - 1) * perPage);
+    return searchConfigArchiveTableIndexPage(tableSearchIndex, {
       mode: tableSearchMode,
       tableQuery: debouncedTableQuery,
       gamevalTags,
       gamevalTextFragment: debouncedGamevalTextFragment,
       searchFieldByMode: tableSearch.searchFieldByMode,
+      offset: safeOffset,
+      limit: perPage,
     });
   }, [
     indexedQueryActive,
     tableSearchIndex,
+    page,
+    perPage,
     tableSearchMode,
     debouncedTableQuery,
     gamevalTags,
@@ -782,7 +787,7 @@ export function DiffConfigArchiveView({
   ]);
 
   const indexedClientPageActive =
-    viewMode === "table" && indexedQueryActive && indexedFilteredRows !== null && tableSearchIndexStatus === "ready";
+    viewMode === "table" && indexedQueryActive && indexedSearchResult !== null && tableSearchIndexStatus === "ready";
 
   const serverMode = tableSearchMode === "gameval" ? "id" : tableSearchMode;
   const serverQ =
@@ -1578,7 +1583,7 @@ export function DiffConfigArchiveView({
 
   const displayTotal = React.useMemo(() => {
     if (viewMode === "table" && clientSidePagination) {
-      if (indexedClientPageActive) return indexedFilteredRows!.length;
+      if (indexedClientPageActive) return indexedSearchResult!.total;
       if (clientPageActive) return clientFilteredRows!.length;
       return 0;
     }
@@ -1587,7 +1592,7 @@ export function DiffConfigArchiveView({
     viewMode,
     clientSidePagination,
     indexedClientPageActive,
-    indexedFilteredRows,
+    indexedSearchResult,
     clientPageActive,
     clientFilteredRows,
     tableTotal,
@@ -1600,7 +1605,7 @@ export function DiffConfigArchiveView({
     if (viewMode === "table" && clientSidePagination) {
       const start = (safePage - 1) * perPage;
       const end = safePage * perPage;
-      if (indexedClientPageActive) return indexedFilteredRows!.slice(start, end);
+      if (indexedClientPageActive) return indexedSearchResult!.rows;
       if (clientPageActive) return clientFilteredRows!.slice(start, end);
       return [];
     }
@@ -1611,7 +1616,7 @@ export function DiffConfigArchiveView({
     safePage,
     perPage,
     indexedClientPageActive,
-    indexedFilteredRows,
+    indexedSearchResult,
     clientPageActive,
     clientFilteredRows,
     tableRows,

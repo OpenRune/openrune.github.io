@@ -44,7 +44,7 @@ function parseTargetFromHeaderOrCookie(request: NextRequest, fallback: CacheTarg
 
 const PAGE_SIZE = 500;
 const MAX_ROWS = 100_000;
-const PAGE_TIMEOUT_MS = 10_000;
+const PAGE_TIMEOUT_MS = 30_000;
 
 type TablePagePayload = {
   total?: unknown;
@@ -83,7 +83,6 @@ export async function GET(
       rev,
       offset: String(offset),
       limit: String(PAGE_SIZE),
-      mode: "id",
     });
 
     const upstreamUrl = `http://${target.ip}:${target.port}/diff/config/${encodeURIComponent(type)}/table?${search.toString()}`;

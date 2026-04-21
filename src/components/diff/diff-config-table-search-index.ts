@@ -213,3 +213,35 @@ export function searchConfigArchiveTableIndex(
 ): ConfigArchiveTableRow[] {
   return index.rows.filter((row) => searchRowMatches(row, opts)).map(({ searchText: _searchText, exactTerms: _exactTerms, filterId: _filterId, ...row }) => row);
 }
+
+export function searchConfigArchiveTableIndexPage(
+  index: ConfigArchiveTableSearchIndex,
+  opts: {
+    mode: DiffSearchFieldMode;
+    tableQuery: string;
+    gamevalTags: SearchTag[];
+    gamevalTextFragment: string;
+    searchFieldByMode?: Partial<Record<"name" | "regex", string>>;
+    offset: number;
+    limit: number;
+  },
+): { rows: ConfigArchiveTableRow[]; total: number } {
+  const out: ConfigArchiveTableRow[] = [];
+  const start = Math.max(0, opts.offset);
+  const endExclusive = start + Math.max(0, opts.limit);
+
+  let matched = 0;
+
+  for (const row of index.rows) {
+    if (!searchRowMatches(row, opts)) continue;
+
+    if (matched >= start && matched < endExclusive) {
+      const { searchText: _searchText, exactTerms: _exactTerms, filterId: _filterId, ...plain } = row;
+      out.push(plain);
+    }
+
+    matched++;
+  }
+
+  return { rows: out, total: matched };
+}
