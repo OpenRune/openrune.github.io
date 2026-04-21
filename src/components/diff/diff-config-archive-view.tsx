@@ -494,16 +494,9 @@ export function DiffConfigArchiveView({
     return parts.join(" ").trim();
   }, [gamevalTags, debouncedGamevalTextFragment]);
 
-  const gamevalClientFilterActive =
-    tableSearchMode === "gameval" && (gamevalTags.length > 0 || debouncedGamevalTextFragment.length > 0);
-
-  /** Sprite-style id syntax (`10` matches `110`, `10+20` ranges, etc.) — server table API may not; bulk-fetch and filter client-side. */
-  const syntaxDrivenClientTableActive =
-    isCombined &&
-    viewMode === "table" &&
-    (tableSearchMode === "id" || tableSearchMode === "name" || tableSearchMode === "regex") &&
-    debouncedTableQuery.trim().length > 0 &&
-    looksLikeSpriteIdQueryText(debouncedTableQuery);
+  // Server-side search handles id/name/regex/gameval and id-range queries now.
+  const gamevalClientFilterActive = false;
+  const syntaxDrivenClientTableActive = false;
 
   React.useEffect(() => {
     const supported = combinedRev >= GAMEVAL_MIN_REVISION;
@@ -660,12 +653,8 @@ export function DiffConfigArchiveView({
     return `diff:config:table-search:${cacheTypeId}:${configType}:${tableBase}:${combinedRev}:${bulkKey}`;
   }, [isCombined, cacheTypeId, configType, tableBase, combinedRev, gvReadyForBulk, gamevalBulkFilter?.filterGamevalType]);
 
-  const indexedQueryActive =
-    isCombined &&
-    viewMode === "table" &&
-    ((tableSearchMode === "gameval" && (gamevalTags.length > 0 || debouncedGamevalTextFragment.length > 0)) ||
-      ((tableSearchMode === "id" || tableSearchMode === "name" || tableSearchMode === "regex") &&
-        debouncedTableQuery.trim().length > 0));
+  // Server-side search replaces client-side full-table indexing in combined mode.
+  const indexedQueryActive = false;
 
   // When search becomes active, latch this key so we don't abort a started fetch.
   React.useEffect(() => {
@@ -789,10 +778,11 @@ export function DiffConfigArchiveView({
   const indexedClientPageActive =
     viewMode === "table" && indexedQueryActive && indexedSearchResult !== null && tableSearchIndexStatus === "ready";
 
-  const serverMode = tableSearchMode === "gameval" ? "id" : tableSearchMode;
+  const serverMode = tableSearchMode;
   const serverQ =
-    (tableSearchMode === "id" || tableSearchMode === "name" || tableSearchMode === "regex") &&
-    debouncedTableQuery.length > 0
+    tableSearchMode === "gameval"
+      ? gamevalApiQuery || undefined
+      : debouncedTableQuery.length > 0
       ? debouncedTableQuery
       : undefined;
 

@@ -157,7 +157,10 @@ export function diffConfigTableUrl(
     limit: String(params.limit),
   });
   if (params.q != null && params.q !== "") search.set("q", params.q);
-  if (params.mode != null && params.mode !== "") search.set("mode", params.mode);
+  if (params.mode != null && params.mode !== "") {
+    search.set("mode", params.mode);
+    search.set("queryType", params.mode);
+  }
   return `/api/cache-proxy/diff/config/${encodeURIComponent(normalizeConfigTypeForApi(configType))}/table?${search.toString()}`;
 }
 
