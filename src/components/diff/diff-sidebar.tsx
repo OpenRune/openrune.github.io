@@ -258,9 +258,7 @@ export function DiffSidebar({
           if (archiveDisabled) {
             return (
               <Tooltip key={id}>
-                <TooltipTrigger>
-                  <span className="mt-0.5 block w-full">{archiveButton}</span>
-                </TooltipTrigger>
+                <TooltipTrigger render={<span className="mt-0.5 block w-full">{archiveButton}</span>} />
                 <TooltipContent opaque side="right" className="text-xs">
                   {unsupportedByRevision
                     ? "Not supported for the selected revision."
@@ -308,9 +306,7 @@ export function DiffSidebar({
           if (unsupportedByRevision) {
             return (
               <Tooltip key={id}>
-                <TooltipTrigger>
-                  <span className="mt-0.5 block w-full">{configButton}</span>
-                </TooltipTrigger>
+                <TooltipTrigger render={<span className="mt-0.5 block w-full">{configButton}</span>} />
                 <TooltipContent opaque side="right" className="text-xs">
                   Not supported for the selected revision.
                 </TooltipContent>

@@ -166,7 +166,7 @@ export function diffConfigTableAllUrl(configType: string, params: { base: number
     base: String(params.base),
     rev: String(params.rev),
   });
-  return `/api/diff/config/${encodeURIComponent(normalizeConfigTypeForApi(configType))}/table-all?${search.toString()}`;
+  return `/api/cache-proxy/diff/config/${encodeURIComponent(normalizeConfigTypeForApi(configType))}/table-all?${search.toString()}`;
 }
 
 export function diffConfigContentUrl(configType: string, params: { base: number; rev: number }) {
