@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 export type GamevalSearchAutocompleteConfig = {
   type: GamevalType;
-  rev: number;
+  rev: number | "latest";
   enabled: boolean;
   /**
    * When `undefined`, no id filter (e.g. sprites). When `null`, combined index not ready — return no suggestions.
