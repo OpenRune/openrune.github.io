@@ -1,4 +1,5 @@
 import type { CacheType } from "@/lib/cache-types";
+import { cacheServerUrl } from "@/lib/cache-api-client";
 
 export enum ServerStatus {
   BOOTING = "BOOTING",
@@ -37,16 +38,8 @@ export async function checkCacheStatus(
   const timeoutId = setTimeout(() => controller.abort(), 12_000);
 
   try {
-    const cacheTypeHeader = JSON.stringify({
-      ip: cacheType.ip,
-      port: cacheType.port,
-    });
-
-    const response = await fetch("/api/status", {
+    const response = await fetch(cacheServerUrl(cacheType, "/status"), {
       method: "GET",
-      headers: {
-        "x-cache-type": cacheTypeHeader,
-      },
       cache: "no-store",
       signal: controller.signal,
     });

@@ -3,7 +3,7 @@
 import * as React from "react";
 
 import { useCacheType } from "@/context/cache-type-context";
-import { cacheProxyHeaders, diffConfigContentUrl } from "@/lib/cache-proxy-client";
+import { diffConfigContentUrl } from "@/lib/cache-api-client";
 
 import {
   configLinesFromContentPayload,
@@ -28,11 +28,8 @@ export function useSpotanimSequenceTicks(enabled: boolean, base: number, rev: nu
 
     void (async () => {
       try {
-        const url = diffConfigContentUrl("sequences", { base, rev });
-        const response = await fetch(url, {
-          cache: "no-store",
-          headers: cacheProxyHeaders(selectedCacheType),
-        });
+        const url = diffConfigContentUrl(selectedCacheType, "sequences", { base, rev });
+        const response = await fetch(url, { cache: "no-store" });
         if (cancelled) return;
         if (!response.ok) {
           setTicksById({});

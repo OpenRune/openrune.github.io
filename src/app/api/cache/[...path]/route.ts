@@ -1,50 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 
-type CacheTarget = {
-  ip: string;
-  port: number;
-};
+import {
+  cacheServerOrigin,
+  parseCacheTarget,
+  stripCacheRoutingParams,
+  type CacheTarget,
+} from "@/lib/cache-api-target";
 
-const DEFAULT_TARGET: CacheTarget = {
-  ip: "localhost",
-  port: 8090,
-};
+const DEFAULT_TARGET: CacheTarget = { ip: "localhost", port: 8090 };
 
-function parseTargetFromEnv(): CacheTarget {
-  const raw = process.env.API_PROXY_DESTINATION;
-  if (!raw) return DEFAULT_TARGET;
-
-  try {
-    const url = new URL(raw);
-    const parsedPort = Number(url.port || "8090");
-    if (!Number.isFinite(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
-      return DEFAULT_TARGET;
-    }
-    return { ip: url.hostname, port: parsedPort };
-  } catch {
-    return DEFAULT_TARGET;
-  }
-}
-
-function parseTargetFromHeaderOrCookie(
-  request: NextRequest,
-  fallback: CacheTarget,
-): CacheTarget {
-  const rawHeader = request.headers.get("x-cache-type");
-  const rawCookie = request.cookies.get("cache-type")?.value;
-  const raw = rawHeader ?? rawCookie;
-  if (!raw) return fallback;
-
-  try {
-    const parsed = JSON.parse(raw) as Partial<CacheTarget>;
-    const ip = typeof parsed.ip === "string" ? parsed.ip.trim() : "";
-    const port = Number(parsed.port);
-    const validPort = Number.isFinite(port) && port >= 1 && port <= 65535;
-    if (!ip || !validPort) return fallback;
-    return { ip, port };
-  } catch {
-    return fallback;
-  }
+function resolveTarget(request: NextRequest): CacheTarget {
+  return (
+    parseCacheTarget(
+      request.nextUrl.searchParams,
+      request.headers.get("x-cache-type"),
+      request.cookies.get("cache-type")?.value,
+    ) ?? DEFAULT_TARGET
+  );
 }
 
 function buildDestination(
@@ -53,15 +25,14 @@ function buildDestination(
   target: CacheTarget,
 ): string {
   const path = pathParts.join("/");
-  const query = request.nextUrl.searchParams.toString();
-  return `http://${target.ip}:${target.port}/${path}${query ? `?${query}` : ""}`;
+  const query = stripCacheRoutingParams(request.nextUrl.searchParams).toString();
+  return `${cacheServerOrigin(target)}/${path}${query ? `?${query}` : ""}`;
 }
 
 function isZipDownloadPath(pathParts: string[]): boolean {
   return pathParts.length >= 2 && pathParts[0] === "zip" && pathParts[1] === "download";
 }
 
-/** Zip routes can take a long time (build + large binary); avoid short proxy aborts. */
 function proxyTimeoutMsForPath(pathParts: string[]): number {
   if (pathParts[0] === "zip") {
     return isZipDownloadPath(pathParts) ? 0 : 120_000;
@@ -73,16 +44,16 @@ async function proxyToCache(
   request: NextRequest,
   pathParts: string[],
 ): Promise<NextResponse> {
-  const envTarget = parseTargetFromEnv();
-  const target = parseTargetFromHeaderOrCookie(request, envTarget);
+  const target = resolveTarget(request);
   const destination = buildDestination(request, pathParts, target);
   const isStatusRequest = pathParts.join("/") === "status";
   const zipDownload = isZipDownloadPath(pathParts);
   const proxyTimeoutMs = proxyTimeoutMsForPath(pathParts);
 
   const headers = new Headers(request.headers);
-  headers.set("host", `${target.ip}:${target.port}`);
+  headers.delete("host");
   headers.delete("content-length");
+  headers.delete("x-cache-type");
 
   const controller = proxyTimeoutMs > 0 ? new AbortController() : null;
   const timeoutId =
@@ -118,7 +89,6 @@ async function proxyToCache(
     }
 
     const status = upstream.status;
-    // Fetch/Response forbids a body for null-body statuses (304 etc.); NextResponse must use null.
     const nullBodyStatus = status === 204 || status === 205 || status === 304;
     if (nullBodyStatus) {
       await upstream.arrayBuffer();
@@ -151,14 +121,9 @@ async function proxyToCache(
       }
     });
 
-    // Preserve upstream Cache-Control / ETag (do not force no-store): JSON routes already
-    // send no-store from the cache server; sprites rely on browser cache + If-None-Match.
-
     return response;
   } catch (error) {
     if (isStatusRequest) {
-      // Return a stable 200 response for status polling to avoid noisy
-      // browser console network errors while still reporting the backend as offline.
       return NextResponse.json(
         {
           status: "ERROR",

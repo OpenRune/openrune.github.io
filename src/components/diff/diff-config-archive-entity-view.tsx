@@ -27,7 +27,7 @@ import {
   useGamevals,
 } from "@/context/gameval-context";
 import type { AppSettings } from "@/context/settings-context";
-import { cacheProxyHeaders, diffConfigSchemaUrl, diffSpriteResolveUrl } from "@/lib/cache-proxy-client";
+import { cacheDataUrl, diffConfigSchemaUrl, diffSpriteResolveUrl } from "@/lib/cache-api-client";
 import { conditionalJsonFetch } from "@/lib/openrune-idb-cache";
 import { cn } from "@/lib/utils";
 import { RsColorBox } from "@/components/ui/rs-color-box";
@@ -459,14 +459,12 @@ function EnumRowDialog({
       id: String(state.row.id),
       rev: String(combinedRev),
     });
-    const url = `/api/cache-proxy/cache?${params.toString()}`;
+    const url = cacheDataUrl(selectedCacheType, params);
     const cacheKey = `cache:enum-dialog:${selectedCacheType.id}:${state.row.id}:${combinedRev}`;
 
     void (async () => {
       try {
-        const { data } = await conditionalJsonFetch<unknown>(cacheKey, url, {
-          headers: cacheProxyHeaders(selectedCacheType),
-        });
+        const { data } = await conditionalJsonFetch<unknown>(cacheKey, url);
         if (cancelled) return;
         setDialogLines(configLinesFromCachePayload(data, "enum", { includeCommentWithoutHeaderLabel: false }) ?? []);
       } catch {
@@ -621,7 +619,7 @@ function GamevalReferenceDialog({
   const isObjectRef = displayRef?.ref.type === OBJTYPES;
   const isInterfaceRef = displayRef?.ref.type === IFTYPES;
   const spritePreviewUrl =
-    isSpriteRef && displayRef ? diffSpriteResolveUrl(displayRef.id, { base: TABLE_BASE, rev: combinedRev }) : null;
+    isSpriteRef && displayRef ? diffSpriteResolveUrl(selectedCacheType, displayRef.id, { base: TABLE_BASE, rev: combinedRev }) : null;
   const extra = displayRef ? getGamevalExtra(displayRef.ref.type, displayRef.id, combinedRev) : undefined;
   const displayName = displayRef ? (lookupGameval(displayRef.ref.type, displayRef.id, combinedRev) ?? displayRef.ref.name) : "";
   const subEntries = React.useMemo(
@@ -669,14 +667,12 @@ function GamevalReferenceDialog({
       id: String(openRef.id),
       rev: String(combinedRev),
     });
-    const url = `/api/cache-proxy/cache?${params.toString()}`;
+    const url = cacheDataUrl(selectedCacheType, params);
     const cacheKey = `cache:config:dialog:${selectedCacheType.id}:${configType}:${openRef.id}:${combinedRev}`;
 
     const run = async () => {
       try {
-        const { data } = await conditionalJsonFetch<unknown>(cacheKey, url, {
-          headers: cacheProxyHeaders(selectedCacheType),
-        });
+        const { data } = await conditionalJsonFetch<unknown>(cacheKey, url);
         if (cancelled) return;
         const lines = configLinesFromCachePayload(data, configType, {
           headerLabelForId: (id) => lookupGameval(openRef.ref.type, id, combinedRev),
@@ -1426,14 +1422,12 @@ export function DiffConfigArchiveEntityView({
   React.useEffect(() => {
     let cancelled = false;
     const configType = section;
-    const url = diffConfigSchemaUrl(configType);
+    const url = diffConfigSchemaUrl(selectedCacheType, configType);
     const cacheKey = `diff:config:schema:${selectedCacheType.id}:${configType}`;
 
     const run = async () => {
       try {
-        const { data } = await conditionalJsonFetch<unknown>(cacheKey, url, {
-          headers: cacheProxyHeaders(selectedCacheType),
-        });
+        const { data } = await conditionalJsonFetch<unknown>(cacheKey, url);
         if (cancelled) return;
         const parsed = parseFieldRenderSchemaPayload(data);
         setFieldRenderSchemaByField(parsed.fields);

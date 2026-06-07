@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { cacheServerOrigin } from "@/lib/cache-api-target";
+
 export const dynamic = "force-dynamic";
 
 type CacheTarget = {
@@ -12,34 +14,13 @@ const DEFAULT_TARGET: CacheTarget = {
   port: 8090,
 };
 
-function parseTargetFromEnv(): CacheTarget {
-  const raw = process.env.API_PROXY_DESTINATION;
-  if (!raw) return DEFAULT_TARGET;
-  try {
-    const url = new URL(raw);
-    const parsedPort = Number(url.port || "8090");
-    if (!Number.isFinite(parsedPort) || parsedPort < 1 || parsedPort > 65535) return DEFAULT_TARGET;
-    return { ip: url.hostname, port: parsedPort };
-  } catch {
-    return DEFAULT_TARGET;
-  }
-}
-
-function parseTargetFromHeaderOrCookie(request: NextRequest, fallback: CacheTarget): CacheTarget {
-  const rawHeader = request.headers.get("x-cache-type");
-  const rawCookie = request.cookies.get("cache-type")?.value;
-  const raw = rawHeader ?? rawCookie;
-  if (!raw) return fallback;
-  try {
-    const parsed = JSON.parse(raw) as Partial<CacheTarget>;
-    const ip = typeof parsed.ip === "string" ? parsed.ip.trim() : "";
-    const port = Number(parsed.port);
-    const validPort = Number.isFinite(port) && port >= 1 && port <= 65535;
-    if (!ip || !validPort) return fallback;
-    return { ip, port };
-  } catch {
-    return fallback;
-  }
+function parseTargetFromQuery(request: NextRequest): CacheTarget | null {
+  const ip = request.nextUrl.searchParams.get("ip")?.trim();
+  const portRaw = request.nextUrl.searchParams.get("port");
+  if (!ip || !portRaw) return null;
+  const port = Number(portRaw);
+  if (!Number.isFinite(port) || port < 1 || port > 65535) return null;
+  return { ip, port };
 }
 
 const PAGE_SIZE = 500;
@@ -68,12 +49,7 @@ export async function GET(
     return NextResponse.json({ error: "Missing or invalid base/rev params" }, { status: 400 });
   }
 
-  const envTarget = parseTargetFromEnv();
-  const target = parseTargetFromHeaderOrCookie(request, envTarget);
-
-  const forwardHeaders = new Headers();
-  const xCacheType = request.headers.get("x-cache-type");
-  if (xCacheType) forwardHeaders.set("x-cache-type", xCacheType);
+  const target = parseTargetFromQuery(request) ?? DEFAULT_TARGET;
 
   const allRows: TablePageRow[] = [];
   let serverTotal = Number.POSITIVE_INFINITY;
@@ -81,7 +57,7 @@ export async function GET(
 
   while (offset < serverTotal && allRows.length < MAX_ROWS) {
     const search = new URLSearchParams({ base, rev, offset: String(offset), limit: String(PAGE_SIZE) });
-    const upstreamUrl = `http://${target.ip}:${target.port}/diff/config/${encodeURIComponent(type)}/table?${search.toString()}`;
+    const upstreamUrl = `${cacheServerOrigin(target)}/diff/config/${encodeURIComponent(type)}/table?${search.toString()}`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), PAGE_TIMEOUT_MS);
@@ -89,7 +65,6 @@ export async function GET(
     let data: TablePagePayload;
     try {
       const resp = await fetch(upstreamUrl, {
-        headers: forwardHeaders,
         signal: controller.signal,
         cache: "no-store",
       });

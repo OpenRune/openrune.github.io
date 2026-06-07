@@ -13,7 +13,7 @@ import { RspLoadingSlot } from "@/components/ui/rsp-loading-slot";
 import { RSSprite } from "@/components/ui/RSSprite";
 import { useCacheType } from "@/context/cache-type-context";
 import { SPRITETYPES, useGamevals } from "@/context/gameval-context";
-import { cacheProxyHeaders, cacheTexturesSnapshotUrl, diffSpriteResolveUrl, texturesProxyUrl } from "@/lib/cache-proxy-client";
+import { cacheTexturesSnapshotUrl, diffSpriteResolveUrl, texturesProxyUrl } from "@/lib/cache-api-client";
 import { conditionalJsonFetch } from "@/lib/openrune-idb-cache";
 import { cn } from "@/lib/utils";
 
@@ -109,11 +109,9 @@ export function RSTexture(props: RSTextureProps) {
     const run = async () => {
       try {
         // Fetch the full texture definitions snapshot for this revision, then pick out the fileId.
-        const url = cacheTexturesSnapshotUrl(Number(rev));
+        const url = cacheTexturesSnapshotUrl(selectedCacheType, Number(rev));
         const cacheKey = `cache:textures:snapshot:${selectedCacheType.id}:${rev}`;
-        const { data } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url, {
-          headers: cacheProxyHeaders(selectedCacheType),
-        });
+        const { data } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url);
 
         if (cancelled) return;
 
@@ -176,7 +174,7 @@ export function RSTexture(props: RSTextureProps) {
 
   if (combinedDiffSprite && typeof rev === "number" && Number.isFinite(resolvedSpriteId)) {
     const spriteId = Number(resolvedSpriteId);
-    const spriteUrl = diffSpriteResolveUrl(spriteId, { base: base ?? 1, rev });
+    const spriteUrl = diffSpriteResolveUrl(selectedCacheType, spriteId, { base: base ?? 1, rev });
     return (
       <RSSprite
         id={spriteId}
@@ -311,7 +309,7 @@ function RSTextureFromArchive({
 
   const fullSizeTextureUrl = React.useMemo(() => {
     if (fullSizeImageUrlOverride) return fullSizeImageUrlOverride;
-    return texturesProxyUrl({
+    return texturesProxyUrl(selectedCacheType, {
       id,
       width: 512,
       height: 512,
@@ -375,8 +373,8 @@ function RSTextureFromArchive({
     setDecodeError(false);
     setError(null);
 
-    const url = texturesProxyUrl({ id, width, height, keepAspectRatio, rev, base });
-    fetch(url, { headers: cacheProxyHeaders(selectedCacheType), cache: "no-store" })
+    const url = texturesProxyUrl(selectedCacheType, { id, width, height, keepAspectRatio, rev, base });
+    fetch(url, { cache: "no-store" })
       .then((response) => {
         if (!response.ok) throw new Error(`Failed to load texture ${id}`);
         const ct = response.headers.get("content-type") ?? "";

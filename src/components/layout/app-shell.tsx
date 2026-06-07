@@ -17,6 +17,7 @@ import { useCacheType } from "@/context/cache-type-context";
 import { useShellPreferences } from "@/context/shell-preferences-context";
 import { useSettings } from "@/context/settings-context";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { isCacheServerRequestUrl } from "@/lib/cache-api-client";
 import { cn } from "@/lib/utils";
 import {
   Sheet,
@@ -77,12 +78,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
       const lowerUrl = url.toLowerCase();
-      const isApiRequest = lowerUrl.includes("/api/");
-      const isStatusRequest = lowerUrl.includes("/api/status");
+      const isCacheRequest =
+        isCacheServerRequestUrl(url) || lowerUrl.includes("/api/diff/");
+      const isStatusRequest = lowerUrl.includes("/status");
 
       if (
         requestForcedRef.current &&
-        isApiRequest &&
+        isCacheRequest &&
         !isStatusRequest &&
         !shouldIgnoreAsImageRequest(input, init)
       ) {
@@ -98,7 +100,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       const response = await originalFetch(input, init);
       const failed = response.status === 502 || response.status === 503;
 
-      if (isApiRequest && failed && !shouldIgnoreAsImageRequest(input, init)) {
+      if (isCacheRequest && failed && !shouldIgnoreAsImageRequest(input, init)) {
         setRequestForcedCacheSelection(true);
       }
 

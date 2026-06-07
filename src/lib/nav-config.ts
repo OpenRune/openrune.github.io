@@ -1,4 +1,6 @@
-/** Represents one entry in the diff sidebar nav (archive or config section). */
+import type { CacheType } from "@/lib/cache-types";
+import { cacheServerUrl } from "@/lib/cache-api-client";
+
 export type NavSection = {
   /** Frontend section / URL key. */
   id: string;
@@ -54,12 +56,12 @@ export type GamevalGroup = {
   minRevision: number;
 };
 
-export function cacheNavUrl(): string {
-  return "/api/cache-proxy/cache/nav";
+export function cacheNavUrl(cacheType: Pick<CacheType, "ip" | "port">): string {
+  return cacheServerUrl(cacheType, "/cache/nav");
 }
 
-export function cacheGamevalGroupsUrl(): string {
-  return "/api/cache-proxy/cache/gameval/groups";
+export function cacheGamevalGroupsUrl(cacheType: Pick<CacheType, "ip" | "port">): string {
+  return cacheServerUrl(cacheType, "/cache/gameval/groups");
 }
 
 export function parseNavConfig(data: unknown): NavConfig | null {

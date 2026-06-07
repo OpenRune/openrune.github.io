@@ -14,7 +14,7 @@ export const BASE_CACHE_TYPES: CacheType[] = [
   {
     id: "osrs",
     name: "OSRS",
-    ip: "150.107.201.110",
+    ip: "osrs.openrune.dev",
     port: 8090,
     image: "/cache-osrs.png",
     description: "Old School RuneScape cache server",
@@ -22,7 +22,7 @@ export const BASE_CACHE_TYPES: CacheType[] = [
   {
     id: "rs3",
     name: "RS3",
-    ip: "150.107.201.110",
+    ip: "rs3.openrune.dev",
     port: 8092,
     image: "/cache-rs3.png",
     description: "RuneScape 3 cache server",
