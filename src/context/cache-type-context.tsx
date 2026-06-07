@@ -9,7 +9,6 @@ import {
   STORAGE_KEY,
   type CacheType,
 } from "@/lib/cache-types";
-import { syncCacheTypeCookie } from "@/lib/cache-proxy-client";
 import {
   CacheStatusInfo,
   ServerStatus,
@@ -174,7 +173,6 @@ export function CacheTypeProvider({ children }: { children: React.ReactNode }) {
     const connections: SseConnection[] = [];
 
     for (const cacheType of cacheTypes) {
-      const backendUrl = `http://${cacheType.ip}:${cacheType.port}`;
       const connection = fetchSSE(
         SseEventType.STATUS,
         (event) => {
@@ -183,7 +181,7 @@ export function CacheTypeProvider({ children }: { children: React.ReactNode }) {
         () => {
           // Selector view will still work with manual refresh if SSE drops.
         },
-        backendUrl,
+        cacheType,
       );
 
       if (connection) {
@@ -227,10 +225,6 @@ export function CacheTypeProvider({ children }: { children: React.ReactNode }) {
       cacheTypes.find((cacheType) => cacheType.id === selectedId) ?? cacheTypes[0]
     );
   }, [cacheTypes, selectedId]);
-
-  React.useEffect(() => {
-    syncCacheTypeCookie(selectedCacheType);
-  }, [selectedCacheType]);
 
   const value = React.useMemo(
     () => ({

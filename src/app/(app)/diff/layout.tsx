@@ -35,14 +35,13 @@ import { isArchiveEntitySection } from "@/components/diff/diff-openrune-archive-
 import type { GamevalType } from "@/context/gameval-context";
 import { useCacheType } from "@/context/cache-type-context";
 import {
-  cacheProxyHeaders,
   diffCacheOrderedPair,
   diffDeltaSpritesSummaryUrl,
   diffDeltaSummaryUrl,
   diffRevisionsUrl,
   diffSupportManifestUrl,
   parseDiffRevisionsResponse,
-} from "@/lib/cache-proxy-client";
+} from "@/lib/cache-api-client";
 import { mergeDeltaBadgeMaps, type DeltaBadgeMap } from "@/lib/diff-delta-merge";
 import { conditionalJsonFetch } from "@/lib/openrune-idb-cache";
 import { cacheGamevalGroupsUrl, cacheNavUrl, parseGamevalGroups, parseNavConfig, type GamevalGroup, type NavConfig } from "@/lib/nav-config";
@@ -206,14 +205,8 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
     async function loadNav() {
       try {
         const [navRes, groupRes] = await Promise.all([
-          fetch(cacheNavUrl(), {
-            cache: "no-store",
-            headers: cacheProxyHeaders(selectedCacheType),
-          }),
-          fetch(cacheGamevalGroupsUrl(), {
-            cache: "no-store",
-            headers: cacheProxyHeaders(selectedCacheType),
-          }),
+          fetch(cacheNavUrl(selectedCacheType), { cache: "no-store" }),
+          fetch(cacheGamevalGroupsUrl(selectedCacheType), { cache: "no-store" }),
         ]);
         if (navRes.ok) {
           const parsed = parseNavConfig(await navRes.json());
@@ -240,8 +233,7 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
       try {
         const { data } = await conditionalJsonFetch<unknown>(
           key,
-          diffSupportManifestUrl(targetRev),
-          { headers: cacheProxyHeaders(selectedCacheType) },
+          diffSupportManifestUrl(selectedCacheType, targetRev),
         );
         const parsed = parseSectionSupportManifest(data);
         setSectionSupport(parsed);
@@ -389,10 +381,7 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
       setRevisionsLoading(true);
       setRevisionsError(null);
       try {
-        const response = await fetch(diffRevisionsUrl(), {
-          cache: "no-store",
-          headers: cacheProxyHeaders(selectedCacheType),
-        });
+        const response = await fetch(diffRevisionsUrl(selectedCacheType), { cache: "no-store" });
         if (seq !== revisionsFetchSeq.current) return;
         if (!response.ok) {
           let message = `HTTP ${response.status}`;
@@ -452,13 +441,11 @@ function DiffLayoutWithSearchParams({ children }: { children: React.ReactNode })
         const [cfg, spr] = await Promise.all([
           conditionalJsonFetch<{ configs?: Record<string, { added?: number; changed?: number; removed?: number }> }>(
             cfgKey,
-            diffDeltaSummaryUrl(params),
-            { headers: cacheProxyHeaders(selectedCacheType) },
+            diffDeltaSummaryUrl(selectedCacheType, params),
           ),
           conditionalJsonFetch<{ added?: number; changed?: number; removed?: number }>(
             sprKey,
-            diffDeltaSpritesSummaryUrl(params),
-            { headers: cacheProxyHeaders(selectedCacheType) },
+            diffDeltaSpritesSummaryUrl(selectedCacheType, params),
           ),
         ]);
         if (seq !== deltaFetchSeq.current) return;

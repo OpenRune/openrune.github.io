@@ -1,36 +1,37 @@
 import type { CacheType } from "@/lib/cache-types";
-import { syncCacheTypeCookie } from "@/lib/cache-proxy-client";
+import { cacheServerUrl } from "@/lib/cache-api-client";
 
 export type ZipArchiveKind = "sprites" | "textures";
 
 /** Server `ZipType` enum is uppercase; query accepts either. */
-export function zipCreateUrl(params: {
-  type: ZipArchiveKind;
-  base: number;
-  rev: number;
-}): string {
+export function zipCreateUrl(
+  cacheType: Pick<CacheType, "ip" | "port">,
+  params: {
+    type: ZipArchiveKind;
+    base: number;
+    rev: number;
+  },
+): string {
   const search = new URLSearchParams({
     type: params.type,
     base: String(params.base),
     rev: String(params.rev),
   });
-  return `/api/cache-proxy/zip/create?${search.toString()}`;
+  return cacheServerUrl(cacheType, `/zip/create?${search.toString()}`);
 }
 
-export function zipProgressUrl(jobId: string): string {
-  return `/api/cache-proxy/zip/progress/${encodeURIComponent(jobId)}`;
+export function zipProgressUrl(cacheType: Pick<CacheType, "ip" | "port">, jobId: string): string {
+  return cacheServerUrl(cacheType, `/zip/progress/${encodeURIComponent(jobId)}`);
 }
 
-/** Map server-relative `/zip/download/...` to the Next cache-proxy URL. */
-export function zipDownloadProxyUrl(serverDownloadPath: string): string {
+export function zipDownloadUrl(cacheType: Pick<CacheType, "ip" | "port">, serverDownloadPath: string): string {
   const trimmed = serverDownloadPath.trim();
-  if (trimmed.startsWith("/api/cache-proxy/")) return trimmed;
-  if (trimmed.startsWith("/")) return `/api/cache-proxy${trimmed}`;
-  return `/api/cache-proxy/${trimmed}`;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  return cacheServerUrl(cacheType, trimmed.startsWith("/") ? trimmed : `/${trimmed}`);
 }
 
-export function zipCancelUrl(jobId: string): string {
-  return `/api/cache-proxy/zip/${encodeURIComponent(jobId)}`;
+export function zipCancelUrl(cacheType: Pick<CacheType, "ip" | "port">, jobId: string): string {
+  return cacheServerUrl(cacheType, `/zip/${encodeURIComponent(jobId)}`);
 }
 
 export type ZipCreateResponse =
@@ -89,10 +90,12 @@ export function defaultZipFilename(jobId: string): string {
   return `${jobId}.zip`;
 }
 
-/** Trigger a file download via the cache proxy (relies on `cache-type` cookie). */
-export function triggerZipDownload(cacheType: Pick<CacheType, "ip" | "port">, serverDownloadPath: string, filename: string): void {
-  syncCacheTypeCookie(cacheType);
-  const url = zipDownloadProxyUrl(serverDownloadPath);
+export function triggerZipDownload(
+  cacheType: Pick<CacheType, "ip" | "port">,
+  serverDownloadPath: string,
+  filename: string,
+): void {
+  const url = zipDownloadUrl(cacheType, serverDownloadPath);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;

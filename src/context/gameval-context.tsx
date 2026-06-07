@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { useCacheType } from "@/context/cache-type-context";
+import { gamevalUrl } from "@/lib/cache-api-client";
 import { conditionalJsonFetch } from "@/lib/openrune-idb-cache";
 
 export const GAMEVAL_TYPE_MAP = {
@@ -207,16 +208,9 @@ export function GamevalProvider({ children }: { children: React.ReactNode }) {
             includeExtras: "true",
           });
 
-          const url = `/api/cache-proxy/gameval/${type}?${params.toString()}`;
+          const url = gamevalUrl(selectedCacheType, type, params);
           const cacheKey = `gameval:json:${selectedCacheType.id}:${type}:${params.toString()}`;
-          const { data: raw } = await conditionalJsonFetch<unknown>(cacheKey, url, {
-            headers: {
-              "x-cache-type": JSON.stringify({
-                ip: selectedCacheType.ip,
-                port: selectedCacheType.port,
-              }),
-            },
-          });
+          const { data: raw } = await conditionalJsonFetch<unknown>(cacheKey, url);
 
           const parsed = parseGamevalPayload(raw);
           const derived = buildDerived(parsed.values, parsed.gameval);

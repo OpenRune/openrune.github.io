@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GAMEVAL_MIN_REVISION } from "@/components/diff/diff-constants";
 import { useCacheType } from "@/context/cache-type-context";
 import { SPRITETYPES, useGamevals } from "@/context/gameval-context";
-import { cacheProxyHeaders, spritesProxyUrl } from "@/lib/cache-proxy-client";
+import { spritesProxyUrl } from "@/lib/cache-api-client";
 import { conditionalBlobFetch } from "@/lib/openrune-idb-cache";
 import { RspLoadingSlot } from "@/components/ui/rsp-loading-slot";
 import { cn } from "@/lib/utils";
@@ -150,7 +150,7 @@ export function RSSprite({
 
   const fullSizeSpriteUrl = React.useMemo(() => {
     if (fullSizeImageUrlOverride) return fullSizeImageUrlOverride;
-    return spritesProxyUrl({ id, base, rev });
+    return spritesProxyUrl(selectedCacheType, { id, base, rev });
   }, [id, rev, base, fullSizeImageUrlOverride]);
 
   /** When thumb URL === modal URL (diff sprites), reuse fetched data URL so the modal does not refetch. */
@@ -175,11 +175,9 @@ export function RSSprite({
     try {
       const spriteCount = extraData?.count ?? 0;
       if (spriteCount > 1) {
-        const headers = cacheProxyHeaders(selectedCacheType);
         const results = await Promise.all(
           Array.from({ length: spriteCount }, (_, index) =>
-            fetch(spritesProxyUrl({ id, indexed: index, width: 128, height: 128, keepAspectRatio: true }), {
-              headers,
+            fetch(spritesProxyUrl(selectedCacheType, { id, indexed: index, width: 128, height: 128, keepAspectRatio: true }), {
               cache: "no-store",
             })
               .then(async (response) => {
@@ -216,8 +214,7 @@ export function RSSprite({
     setImageSrc(null);
     setUrlLoaded(false);
 
-    const init = { headers: cacheProxyHeaders(selectedCacheType) };
-    void conditionalBlobFetch(cacheKey, imageUrlOverride, init, {
+    void conditionalBlobFetch(cacheKey, imageUrlOverride, undefined, {
       onBackgroundBlob: (nb) => {
         if (cancelled) return;
         const objectUrl = URL.createObjectURL(nb);
@@ -281,9 +278,8 @@ export function RSSprite({
     setDecodeError(false);
     setError(null);
 
-    const url = spritesProxyUrl({ id, width, height, keepAspectRatio, base, rev });
-    const init = { headers: cacheProxyHeaders(selectedCacheType) };
-    void conditionalBlobFetch(cacheKey, url, init, {
+    const url = spritesProxyUrl(selectedCacheType, { id, width, height, keepAspectRatio, base, rev });
+    void conditionalBlobFetch(cacheKey, url, undefined, {
       onBackgroundBlob: (nb) => {
         if (cancelled) return;
         const objectUrl = URL.createObjectURL(nb);
@@ -513,7 +509,7 @@ export function RSSprite({
                     ) : (
                       <div className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-3 md:grid-cols-4">
                         {subsprites.map((sub) => {
-                          const url = spritesProxyUrl({
+                          const url = spritesProxyUrl(selectedCacheType, {
                             id,
                             indexed: sub.index,
                             width: 128,

@@ -15,12 +15,11 @@ import { useCacheType } from "@/context/cache-type-context";
 import { useSettings } from "@/context/settings-context";
 import { SPRITETYPES, useGamevals } from "@/context/gameval-context";
 import {
-  cacheProxyHeaders,
   combinedSpritesUrl,
   diffCacheOrderedPair,
   diffDeltaSpritesUrl,
   diffSpriteImageUrl,
-} from "@/lib/cache-proxy-client";
+} from "@/lib/cache-api-client";
 import { conditionalJsonFetch } from "@/lib/openrune-idb-cache";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
@@ -199,11 +198,9 @@ export function DiffSpritesView({
 
     const run = async () => {
       try {
-        const url = combinedSpritesUrl(combinedRev, COMBINED_SPRITE_BASE);
+        const url = combinedSpritesUrl(selectedCacheType, combinedRev, COMBINED_SPRITE_BASE);
         const cacheKey = `diff:combined:sprites:${selectedCacheType.id}:${COMBINED_SPRITE_BASE}:${combinedRev}`;
-        const { data: rawData } = await conditionalJsonFetch<unknown>(cacheKey, url, {
-          headers: cacheProxyHeaders(selectedCacheType),
-        });
+        const { data: rawData } = await conditionalJsonFetch<unknown>(cacheKey, url);
 
         const data = rawData as {
           status?: string;
@@ -262,14 +259,12 @@ export function DiffSpritesView({
     setDeltaStatus("loading");
     setDeltaError(null);
 
-    const url = diffDeltaSpritesUrl(spriteDiffApi);
+    const url = diffDeltaSpritesUrl(selectedCacheType, spriteDiffApi);
     const cacheKey = `diff:delta:sprites:${selectedCacheType.id}:${spriteDiffApi.base}:${spriteDiffApi.rev}`;
 
     void (async () => {
       try {
-        const { data: raw } = await conditionalJsonFetch<unknown>(cacheKey, url, {
-          headers: cacheProxyHeaders(selectedCacheType),
-        });
+        const { data: raw } = await conditionalJsonFetch<unknown>(cacheKey, url);
         if (requestId !== deltaRequestRef.current) return;
         if (isDecodePayload(raw)) {
           setDeltaEntries([]);
@@ -349,7 +344,7 @@ export function DiffSpritesView({
   const modalSpriteSrc = React.useMemo(() => {
     if (spriteModalId == null) return "";
     const source = sourceRevById[spriteModalId] ?? combinedRev;
-    return diffSpriteImageUrl(spriteModalId, {
+    return diffSpriteImageUrl(selectedCacheType,spriteModalId, {
       base: COMBINED_SPRITE_BASE,
       rev: combinedRev,
       source,
@@ -597,11 +592,11 @@ export function DiffSpritesView({
     const before =
       compare.kind === "added"
         ? null
-        : diffSpriteImageUrl(compare.id, { ...spriteDiffApi, source: spriteOlderRev });
+        : diffSpriteImageUrl(selectedCacheType,compare.id, { ...spriteDiffApi, source: spriteOlderRev });
     const after =
       compare.kind === "removed"
         ? null
-        : diffSpriteImageUrl(compare.id, {
+        : diffSpriteImageUrl(selectedCacheType,compare.id, {
             ...spriteDiffApi,
             source:
               compare.kind === "added"
@@ -774,7 +769,7 @@ export function DiffSpritesView({
               ) : null}
               {(pagedRows as number[]).map((id) => {
                 const source = sourceRevById[id] ?? combinedRev;
-                const src = diffSpriteImageUrl(id, {
+                const src = diffSpriteImageUrl(selectedCacheType,id, {
                   base: COMBINED_SPRITE_BASE,
                   rev: combinedRev,
                   source,
@@ -834,7 +829,7 @@ export function DiffSpritesView({
                 ) : null}
                 {(pagedRows as number[]).map((id) => {
                   const source = sourceRevById[id] ?? combinedRev;
-                  const src = diffSpriteImageUrl(id, {
+                  const src = diffSpriteImageUrl(selectedCacheType,id, {
                     base: COMBINED_SPRITE_BASE,
                     rev: combinedRev,
                     source,
@@ -902,7 +897,7 @@ export function DiffSpritesView({
                 deltaAddedInRev,
                 deltaChangedInRev,
               );
-              const src = diffSpriteImageUrl(entry.id, { ...spriteDiffApi, source });
+              const src = diffSpriteImageUrl(selectedCacheType,entry.id, { ...spriteDiffApi, source });
               const gv = spriteGamevalSupported ? lookupGameval(SPRITETYPES, entry.id, source) : null;
               const tipAdded = deltaAddedInRev[entry.id] ?? spriteNewerRev;
               const tipChanged = deltaChangedInRev[entry.id] ?? spriteNewerRev;
@@ -965,7 +960,7 @@ export function DiffSpritesView({
                         <span className="text-xs font-medium">Added in rev {tipAdded}</span>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={diffSpriteImageUrl(entry.id, {
+                          src={diffSpriteImageUrl(selectedCacheType,entry.id, {
                             ...spriteDiffApi,
                             source: tipAdded,
                           })}
@@ -983,7 +978,7 @@ export function DiffSpritesView({
                           <span className="text-xs font-medium">Before ({spriteOlderRev})</span>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={diffSpriteImageUrl(entry.id, { ...spriteDiffApi, source: spriteOlderRev })}
+                            src={diffSpriteImageUrl(selectedCacheType,entry.id, { ...spriteDiffApi, source: spriteOlderRev })}
                             alt=""
                             className="max-h-24 w-auto rounded border bg-muted/50 object-contain"
                             style={{ imageRendering: "pixelated" }}
@@ -994,7 +989,7 @@ export function DiffSpritesView({
                           <span className="text-xs font-medium">After ({tipChanged})</span>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={diffSpriteImageUrl(entry.id, { ...spriteDiffApi, source: tipChanged })}
+                            src={diffSpriteImageUrl(selectedCacheType,entry.id, { ...spriteDiffApi, source: tipChanged })}
                             alt=""
                             className="max-h-24 w-auto rounded border bg-muted/50 object-contain"
                             style={{ imageRendering: "pixelated" }}
@@ -1009,7 +1004,7 @@ export function DiffSpritesView({
                         </span>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={diffSpriteImageUrl(entry.id, { ...spriteDiffApi, source: spriteOlderRev })}
+                          src={diffSpriteImageUrl(selectedCacheType,entry.id, { ...spriteDiffApi, source: spriteOlderRev })}
                           alt=""
                           className="max-h-24 w-auto rounded border object-contain"
                           style={{ imageRendering: "pixelated" }}

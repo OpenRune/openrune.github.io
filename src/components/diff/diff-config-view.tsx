@@ -11,7 +11,7 @@ import { useCacheType } from "@/context/cache-type-context";
 import type { GamevalType } from "@/context/gameval-context";
 import type { AppSettings } from "@/context/settings-context";
 import { useSettings } from "@/context/settings-context";
-import { cacheProxyHeaders, diffCacheOrderedPair, diffConfigContentUrl } from "@/lib/cache-proxy-client";
+import { diffCacheOrderedPair, diffConfigContentUrl } from "@/lib/cache-api-client";
 import { onCopyApplyGamevalUppercaseSetting } from "@/lib/gameval-clipboard";
 import { conditionalJsonFetch } from "@/lib/openrune-idb-cache";
 import { cn } from "@/lib/utils";
@@ -156,14 +156,12 @@ export function DiffConfigView({ section, sectionLabel, diffViewMode, combinedRe
     setRemoteDiffError(null);
 
     const pair = diffCacheOrderedPair(baseRev, rev);
-    const url = diffConfigContentUrl(section, pair);
+    const url = diffConfigContentUrl(selectedCacheType, section, pair);
     const cacheKey = `diff:config:content:${selectedCacheType.id}:${section}:${pair.base}:${pair.rev}`;
 
     void (async () => {
       try {
-        const { data: raw } = await conditionalJsonFetch<unknown>(cacheKey, url, {
-          headers: cacheProxyHeaders(selectedCacheType),
-        });
+        const { data: raw } = await conditionalJsonFetch<unknown>(cacheKey, url);
         if (requestId !== diffFetchRef.current) return;
         if (isDecodePayload(raw)) {
           setRemoteDiffLines([]);

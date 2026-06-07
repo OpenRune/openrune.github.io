@@ -1,5 +1,6 @@
 "use client";
 
+import { cacheServerOrigin, type CacheTarget } from "@/lib/cache-api-target";
 import type { SseEvent, SseEventDataMap, SseEventType } from "@/lib/sse/types";
 
 export type SseEventCallback<T extends SseEventType> = (
@@ -12,22 +13,11 @@ export interface SseConnection {
   readyState: () => number;
 }
 
-function buildSseUrl(type: SseEventType, backendUrl?: string): string {
+function buildSseUrl(type: SseEventType, cacheType?: CacheTarget): string | null {
+  if (!cacheType) return null;
+
   const search = new URLSearchParams({ type });
-  if (!backendUrl) {
-    return `/api/server/sse?${search.toString()}`;
-  }
-
-  try {
-    const parsed = new URL(backendUrl);
-    const port = parsed.port || (parsed.protocol === "https:" ? "443" : "80");
-    search.set("ip", parsed.hostname);
-    search.set("port", port);
-  } catch {
-    // ignore invalid URL and let proxy resolve from cookie/header target
-  }
-
-  return `/api/server/sse?${search.toString()}`;
+  return `${cacheServerOrigin(cacheType)}/sse?${search.toString()}`;
 }
 
 function parseSsePayload<T extends SseEventType>(
@@ -53,11 +43,12 @@ export function fetchSSE<T extends SseEventType>(
   type: T,
   onEvent: SseEventCallback<T>,
   onError?: SseErrorCallback,
-  backendUrl?: string,
+  cacheType?: CacheTarget,
 ): SseConnection | null {
   if (typeof window === "undefined") return null;
 
-  const sseUrl = buildSseUrl(type, backendUrl);
+  const sseUrl = buildSseUrl(type, cacheType);
+  if (!sseUrl) return null;
 
   try {
     const source = new EventSource(sseUrl);

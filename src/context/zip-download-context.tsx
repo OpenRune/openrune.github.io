@@ -6,7 +6,7 @@ import { ChevronDown, ChevronUp, Download, GripVertical, Loader2, X } from "luci
 
 import { Button } from "@/components/ui/button";
 import { useCacheType } from "@/context/cache-type-context";
-import { cacheProxyHeaders, diffCacheOrderedPair } from "@/lib/cache-proxy-client";
+import { cacheServerUrl, diffCacheOrderedPair } from "@/lib/cache-api-client";
 import { SseEventType } from "@/lib/sse/types";
 import type { ZipProgressSsePayload } from "@/lib/sse/types";
 import {
@@ -198,7 +198,7 @@ export function ZipDownloadProvider({ children }: { children: React.ReactNode })
       if (pollMap.current.has(id)) return;
       const pollFn = async () => {
         try {
-          const res = await fetch(zipProgressUrl(jobId), { headers: cacheProxyHeaders(cacheType), cache: "no-store" });
+          const res = await fetch(zipProgressUrl(cacheType, jobId), { cache: "no-store" });
           if (!res.ok) return;
           const d = (await res.json()) as { progress?: number; message?: string; downloadUrl?: string | null };
           applyProgress(id, jobId, d.progress ?? 0, d.message ?? "", d.downloadUrl ?? null, cacheType);
@@ -212,16 +212,7 @@ export function ZipDownloadProvider({ children }: { children: React.ReactNode })
 
   const startSseForItem = React.useCallback(
     (id: string, jobId: string, cacheType: Pick<CacheType, "ip" | "port">) => {
-      let sseUrl: string;
-      try {
-        const backendUrl = `http://${cacheType.ip}:${cacheType.port}`;
-        const u = new URL(backendUrl);
-        const ip = u.hostname;
-        const port = u.port || (u.protocol === "https:" ? "443" : "80");
-        sseUrl = `/api/server/sse?type=${SseEventType.ZIP_PROGRESS}&ip=${encodeURIComponent(ip)}&port=${encodeURIComponent(port)}`;
-      } catch {
-        sseUrl = `/api/server/sse?type=${SseEventType.ZIP_PROGRESS}`;
-      }
+      const sseUrl = cacheServerUrl(cacheType, `/sse?type=${SseEventType.ZIP_PROGRESS}`);
 
       const es = new EventSource(sseUrl);
       sseMap.current.set(id, es);
@@ -271,11 +262,10 @@ export function ZipDownloadProvider({ children }: { children: React.ReactNode })
           ? `Base ${range.base} \u2192 ${range.rev}`
           : `Rev ${range.rev} (base ${range.base})`;
 
-      const url = zipCreateUrl({ type: opts.kind, base: range.base, rev: range.rev });
+      const url = zipCreateUrl(cacheType, { type: opts.kind, base: range.base, rev: range.rev });
       try {
         const res = await fetch(url, {
           method: "POST",
-          headers: cacheProxyHeaders(cacheType),
           cache: "no-store",
         });
         const raw: unknown = await res.json().catch(() => null);
@@ -371,9 +361,8 @@ export function ZipDownloadProvider({ children }: { children: React.ReactNode })
     (item: DownloadItem) => {
       cleanupItem(item.id);
       if (item.jobId) {
-        void fetch(zipCancelUrl(item.jobId), {
+        void fetch(zipCancelUrl(selectedCacheType, item.jobId), {
           method: "DELETE",
-          headers: cacheProxyHeaders(selectedCacheType),
         }).catch(() => {});
       }
       removeItem(item.id);

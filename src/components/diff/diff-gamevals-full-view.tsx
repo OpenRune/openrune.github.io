@@ -20,7 +20,6 @@ import { useCacheType } from "@/context/cache-type-context";
 import type { GamevalEntry, GamevalExtraData, GamevalType } from "@/context/gameval-context";
 import { useGamevals } from "@/context/gameval-context";
 import { useSettings } from "@/context/settings-context";
-import { cacheProxyHeaders } from "@/lib/cache-proxy-client";
 import { onCopyApplyGamevalUppercaseSetting } from "@/lib/gameval-clipboard";
 import { cacheGamevalGroupsUrl, parseGamevalGroups, type GamevalGroup } from "@/lib/nav-config";
 import { cn } from "@/lib/utils";
@@ -410,10 +409,7 @@ export function DiffGamevalsFullView({
     let cancelled = false;
     async function loadGroups() {
       try {
-        const res = await fetch(cacheGamevalGroupsUrl(), {
-          cache: "no-store",
-          headers: cacheProxyHeaders(selectedCacheType),
-        });
+        const res = await fetch(cacheGamevalGroupsUrl(selectedCacheType), { cache: "no-store" });
         if (!res.ok) return;
         const parsed = parseGamevalGroups(await res.json());
         if (cancelled) return;

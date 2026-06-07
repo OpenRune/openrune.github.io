@@ -1,15 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  async rewrites() {
-    return [
-      {
-        // Prevent rewriting the proxy endpoint itself.
-        source: "/api/:path((?!cache-proxy|server).*)",
-        destination: "/api/cache-proxy/:path*",
-      },
-    ];
-  },
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,

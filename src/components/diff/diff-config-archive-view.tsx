@@ -14,13 +14,13 @@ import type { GamevalType } from "@/context/gameval-context";
 import { useGamevals } from "@/context/gameval-context";
 import { useSettings, type AppSettings } from "@/context/settings-context";
 import {
-  cacheProxyHeaders,
+  cacheDataUrl,
   combinedSpritesUrl,
   diffCacheOrderedPair,
   diffConfigContentUrl,
   diffConfigTableAllUrl,
   diffConfigTableUrl,
-} from "@/lib/cache-proxy-client";
+} from "@/lib/cache-api-client";
 import { conditionalJsonFetch, getTableSearchIndex, putTableSearchIndex } from "@/lib/openrune-idb-cache";
 import { cn } from "@/lib/utils";
 import { getConfigBlocks, trimBlockEndExclusive, type ConfigSectionBlock } from "@/lib/diff-config-blocks";
@@ -694,11 +694,9 @@ export function DiffConfigArchiveView({
       }
 
       try {
-        const url = diffConfigTableAllUrl(configType, { base: tableBase, rev: combinedRev });
+        const url = diffConfigTableAllUrl(selectedCacheTypeRef.current, configType, { base: tableBase, rev: combinedRev });
         const cacheKey = `diff:config:table-all:${cacheTypeId}:${configType}:${tableBase}:${combinedRev}`;
-        const { data, etag } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url, {
-          headers: cacheProxyHeaders(selectedCacheTypeRef.current),
-        });
+        const { data, etag } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url);
 
         if (requestId !== tableSearchIndexRequestRef.current) return;
 
@@ -836,11 +834,9 @@ export function DiffConfigArchiveView({
 
     const run = async () => {
       try {
-        const url = combinedSpritesUrl(combinedRev, tableBase);
+        const url = combinedSpritesUrl(selectedCacheTypeRef.current, combinedRev, tableBase);
         const cacheKey = `diff:combined:sprites:${cacheTypeId}:${tableBase}:${combinedRev}`;
-        const { data } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url, {
-          headers: cacheProxyHeaders(selectedCacheTypeRef.current),
-        });
+        const { data } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url);
 
         if (requestId !== combinedSpritesRequestRef.current) return;
 
@@ -893,7 +889,7 @@ export function DiffConfigArchiveView({
 
     const run = async () => {
       try {
-        const url = diffConfigTableUrl(configType, {
+        const url = diffConfigTableUrl(selectedCacheTypeRef.current, configType, {
           base: tableBase,
           rev: combinedRev,
           offset,
@@ -902,9 +898,7 @@ export function DiffConfigArchiveView({
           mode: serverMode,
         });
         const cacheKey = `diff:config:table:${cacheTypeId}:${url}`;
-        const { data } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url, {
-          headers: cacheProxyHeaders(selectedCacheTypeRef.current),
-        });
+        const { data } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url);
 
         if (requestId !== tableRequestRef.current) return;
 
@@ -940,7 +934,7 @@ export function DiffConfigArchiveView({
           if (!tablePageCacheRef.current.has(nextPageKey)) {
             void (async () => {
               try {
-                const nextUrl = diffConfigTableUrl(configType, {
+                const nextUrl = diffConfigTableUrl(selectedCacheTypeRef.current, configType, {
                   base: tableBase,
                   rev: combinedRev,
                   offset: nextPageOffset,
@@ -949,9 +943,7 @@ export function DiffConfigArchiveView({
                   mode: serverMode,
                 });
                 const nextCacheKey = `diff:config:table:${cacheTypeId}:${nextUrl}`;
-                const { data: nextData } = await conditionalJsonFetch<Record<string, unknown>>(nextCacheKey, nextUrl, {
-                  headers: cacheProxyHeaders(selectedCacheTypeRef.current),
-                });
+                const { data: nextData } = await conditionalJsonFetch<Record<string, unknown>>(nextCacheKey, nextUrl);
                 const nextParsed = parseConfigTablePayload(nextData as Record<string, unknown>);
                 if (nextParsed.decoding) {
                   cacheServerPage(nextPageKey, { rows: [], total: 0, status: "decoding" });
@@ -1034,7 +1026,7 @@ export function DiffConfigArchiveView({
         while (offset < serverTotal) {
           if (requestId !== syntaxBulkRequestRef.current) return;
 
-          const url = diffConfigTableUrl(configType, {
+          const url = diffConfigTableUrl(selectedCacheTypeRef.current, configType, {
             base: tableBase,
             rev: combinedRev,
             offset,
@@ -1043,9 +1035,7 @@ export function DiffConfigArchiveView({
             mode: "id",
           });
           const cacheKey = `diff:config:table:${cacheTypeId}:${url}`;
-          const { data } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url, {
-            headers: cacheProxyHeaders(selectedCacheTypeRef.current),
-          });
+          const { data } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url);
 
           if (requestId !== syntaxBulkRequestRef.current) return;
 
@@ -1137,7 +1127,7 @@ export function DiffConfigArchiveView({
         while (offset < serverTotal) {
           if (requestId !== gamevalBulkRequestRef.current) return;
 
-          const url = diffConfigTableUrl(configType, {
+          const url = diffConfigTableUrl(selectedCacheTypeRef.current, configType, {
             base: tableBase,
             rev: combinedRev,
             offset,
@@ -1146,9 +1136,7 @@ export function DiffConfigArchiveView({
             mode: "id",
           });
           const cacheKey = `diff:config:table:${cacheTypeId}:${url}`;
-          const { data } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url, {
-            headers: cacheProxyHeaders(selectedCacheTypeRef.current),
-          });
+          const { data } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url);
 
           if (requestId !== gamevalBulkRequestRef.current) return;
 
@@ -1258,16 +1246,14 @@ export function DiffConfigArchiveView({
         let cacheKey: string;
         if (isDiff) {
           const o = diffCacheOrderedPair(baseRev, rev);
-          url = diffConfigContentUrl(configType, o);
+          url = diffConfigContentUrl(selectedCacheTypeRef.current, configType, o);
           cacheKey = `diff:config:content:${cacheTypeId}:${configType}:pair:${o.base}:${o.rev}`;
         } else {
           const search = new URLSearchParams({ type: normalizeConfigTypeForCacheApi(configType), rev: String(combinedRev) });
-          url = `/api/cache-proxy/cache?${search.toString()}`;
+          url = cacheDataUrl(selectedCacheTypeRef.current, search);
           cacheKey = `cache:config:content:${cacheTypeId}:${configType}:${combinedRev}`;
         }
-        const { data } = await conditionalJsonFetch<unknown>(cacheKey, url, {
-          headers: cacheProxyHeaders(selectedCacheTypeRef.current),
-        });
+        const { data } = await conditionalJsonFetch<unknown>(cacheKey, url);
 
         if (requestId !== contentRequestRef.current) return;
 
