@@ -87,6 +87,11 @@ export type DiffConfigArchiveViewProps = {
   combinedRev: number;
   baseRev: number;
   rev: number;
+  /**
+   * Force combined mode into text only (hide table / Table↔Text toggle).
+   * Used by Diff explorer Full mode.
+   */
+  textOnly?: boolean;
 
   /** `diff/config/{configType}/…` */
   configType: string;
@@ -122,6 +127,20 @@ export type DiffConfigArchiveViewProps = {
   textFindDebounceMs?: number;
   /** Shown on the search row, aligned to the far right (e.g. zip download). */
   searchRowTrailing?: React.ReactNode;
+  /** Hide the table search field (sidebar owns search). Trailing actions still render if set. */
+  hideSearchChrome?: boolean;
+  /**
+   * When set, table search state is owned by the parent (e.g. Diff explorer sidebar).
+   * Filters the table the same as the in-pane search field.
+   */
+  controlledSearch?: {
+    mode: DiffSearchFieldMode;
+    onModeChange: (mode: DiffSearchFieldMode) => void;
+    text: string;
+    onTextChange: (text: string) => void;
+    tags: SearchTag[];
+    onTagsChange: (tags: SearchTag[]) => void;
+  } | null;
   /** Optional search control size for table mode. */
   tableSearchSize?: "default" | "large";
   /** Optional wrapper classes for table-mode search container width/layout. */

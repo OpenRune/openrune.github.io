@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { useCacheType } from "@/context/cache-type-context";
 import { gamevalUrl } from "@/lib/cache-api-client";
+import { GAMEVAL_MIN_REVISION, GAMEVAL_VARCS_MIN_REVISION } from "@/lib/gameval-revisions";
 import { conditionalJsonFetch } from "@/lib/openrune-idb-cache";
 
 export const GAMEVAL_TYPE_MAP = {
@@ -158,6 +159,16 @@ function makeKey(cacheTypeId: string, type: GamevalType, rev?: number | "latest"
   return `${cacheTypeId}:${type}:${rev ?? "latest"}`;
 }
 
+function minRevisionForGamevalType(type: GamevalType): number {
+  if (type === "varcs") return GAMEVAL_VARCS_MIN_REVISION;
+  return GAMEVAL_MIN_REVISION;
+}
+
+function isGamevalTypeAvailableForRev(type: GamevalType, rev: number | "latest" | undefined): boolean {
+  if (rev == null || rev === "latest") return true;
+  return rev >= minRevisionForGamevalType(type);
+}
+
 export function GamevalProvider({ children }: { children: React.ReactNode }) {
   const { selectedCacheType } = useCacheType();
   const loadingPromisesRef = React.useRef(new Map<string, Promise<void>>());
@@ -188,10 +199,46 @@ export function GamevalProvider({ children }: { children: React.ReactNode }) {
     setLoadedKeys(new Set());
   }, [selectedCacheType.id]);
 
+  const commitEmpty = React.useCallback((key: string) => {
+    const empty = buildDerived({}, {});
+    setGamevalData((prev) => {
+      const next = new Map(prev);
+      next.set(key, {});
+      return next;
+    });
+    setGamevalExtras((prev) => {
+      const next = new Map(prev);
+      next.set(key, {});
+      return next;
+    });
+    setGamevalReverseData((prev) => {
+      const next = new Map(prev);
+      next.set(key, empty.reverseData);
+      return next;
+    });
+    setGamevalEntries((prev) => {
+      const next = new Map(prev);
+      next.set(key, empty.entries);
+      return next;
+    });
+    setGamevalSearchIndex((prev) => {
+      const next = new Map(prev);
+      next.set(key, empty.searchableToId);
+      return next;
+    });
+    loadedKeysRef.current.add(key);
+    setLoadedKeys((prev) => new Set(prev).add(key));
+  }, []);
+
   const loadGamevalType = React.useCallback(
     async (type: GamevalType, rev?: number | "latest") => {
       const key = makeKey(selectedCacheType.id, type, rev);
       if (loadedKeysRef.current.has(key)) return;
+
+      if (!isGamevalTypeAvailableForRev(type, rev)) {
+        commitEmpty(key);
+        return;
+      }
 
       const existing = loadingPromisesRef.current.get(key);
       if (existing) {
@@ -243,6 +290,9 @@ export function GamevalProvider({ children }: { children: React.ReactNode }) {
 
           loadedKeysRef.current.add(key);
           setLoadedKeys((prev) => new Set(prev).add(key));
+        } catch {
+          // Unavailable / missing gameval groups (e.g. varcs before rev 232) — treat as empty.
+          commitEmpty(key);
         } finally {
           setLoadingKeys((prev) => {
             const next = new Set(prev);
@@ -256,7 +306,7 @@ export function GamevalProvider({ children }: { children: React.ReactNode }) {
       loadingPromisesRef.current.set(key, request);
       await request;
     },
-    [selectedCacheType.id, selectedCacheType.ip, selectedCacheType.port],
+    [selectedCacheType.id, selectedCacheType.ip, selectedCacheType.port, commitEmpty],
   );
 
   const lookupGameval = React.useCallback(

@@ -295,7 +295,8 @@ function withExpandedFieldPrefixIfMissing(before: string | undefined, after: str
 function normalizeExpandedChangeLine(line: ConfigLine): ConfigLine {
   if (line.type !== "change") return line;
   const beforeFull = withExpandedFieldPrefixIfMissing(line.before, line.line);
-  if (beforeFull?.trim() !== line.line.trim()) return line;
+  if (beforeFull == null) return line;
+  if (beforeFull.trim() !== line.line.trim()) return line;
   return {
     ...line,
     type: "context",
@@ -576,18 +577,35 @@ function expandEnumValuesLines(value: unknown): ExpandedFieldLine[] {
     });
 }
 
-function expandParamsLines(value: unknown): ExpandedFieldLine[] {
-  const params = parseParamsObject(value);
-  if (!params) return [];
-  return Object.keys(params)
-    .map((k) => Number.parseInt(k, 10))
-    .filter((n) => Number.isFinite(n))
-    .sort((a, b) => a - b)
-    .flatMap((id) => {
-      const rendered = renderParamValue(params[String(id)]);
-      if (!rendered) return [];
-      return [{ line: `param=parm_${id}=${rendered.display}`, hoverText: rendered.hoverText } satisfies ExpandedFieldLine];
-    });
+/** Key token inside `valueN=<key>,...` — stable across from/to expansions. */
+function enumValueMapKeyFromLine(line: string): string | null {
+  const m = /^value\d+=([^,=]+)/.exec(line);
+  return m ? m[1]! : null;
+}
+
+function parseEnumValuesBeforeMap(before: string | undefined): Map<string, ExpandedFieldLine> {
+  const out = new Map<string, ExpandedFieldLine>();
+  if (!before?.trim()) return out;
+  let bParsed: unknown;
+  const beq = before.indexOf("=");
+  if (beq > 0 && before.slice(0, beq).trim().toLowerCase() === "values") {
+    try {
+      bParsed = JSON.parse(before.slice(beq + 1).trim());
+    } catch {
+      return out;
+    }
+  } else {
+    try {
+      bParsed = JSON.parse(before.trim());
+    } catch {
+      return out;
+    }
+  }
+  for (const entry of expandEnumValuesLines(bParsed)) {
+    const key = enumValueMapKeyFromLine(entry.line);
+    if (key) out.set(key, entry);
+  }
+  return out;
 }
 
 function expandEnumValuesConfigLine(line: ConfigLine): ConfigLine[] {
@@ -606,36 +624,33 @@ function expandEnumValuesConfigLine(line: ConfigLine): ConfigLine[] {
   const expanded = expandEnumValuesLines(parsed);
   if (expanded.length === 0) return [line];
 
-  const beforeByIndex = new Map<number, ExpandedFieldLine>();
-  if (line.before) {
-    const beq = line.before.indexOf("=");
-    if (beq > 0 && line.before.slice(0, beq).trim().toLowerCase() === "values") {
-      const brhs = line.before.slice(beq + 1).trim();
-      try {
-        const bParsed = JSON.parse(brhs);
-        const bExpanded = expandEnumValuesLines(bParsed);
-        bExpanded.forEach((entry) => {
-          const m = /^value(\d+)=/.exec(entry.line);
-          const idx = m ? Number.parseInt(m[1]!, 10) : Number.NaN;
-          if (Number.isFinite(idx)) beforeByIndex.set(idx, entry);
-        });
-      } catch {
-        // Keep fallback before text when parse fails.
-      }
-    }
-  }
+  const beforeByKey = parseEnumValuesBeforeMap(line.before);
 
   return expanded.map((entry) => {
-    const m = /^value(\d+)=/.exec(entry.line);
-    const idx = m ? Number.parseInt(m[1]!, 10) : Number.NaN;
-    const beforeRendered = Number.isFinite(idx) ? beforeByIndex.get(idx)?.line : undefined;
+    const mapKey = enumValueMapKeyFromLine(entry.line);
+    const beforeRendered = mapKey ? beforeByKey.get(mapKey)?.line : undefined;
     return {
       ...line,
       line: entry.line,
       hoverText: entry.hoverText,
-      before: beforeRendered ? beforeRendered.split("=").slice(1).join("=") : line.before,
+      // Never fall back to the whole `values={...}` blob — that marks every row as changed.
+      before: beforeRendered ? beforeRendered.split("=").slice(1).join("=") : undefined,
     };
   });
+}
+
+function expandParamsLines(value: unknown): ExpandedFieldLine[] {
+  const params = parseParamsObject(value);
+  if (!params) return [];
+  return Object.keys(params)
+    .map((k) => Number.parseInt(k, 10))
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => a - b)
+    .flatMap((id) => {
+      const rendered = renderParamValue(params[String(id)]);
+      if (!rendered) return [];
+      return [{ line: `param=parm_${id}=${rendered.display}`, hoverText: rendered.hoverText } satisfies ExpandedFieldLine];
+    });
 }
 
 function parseOptionArrayLine(rawLine: string): ParsedOptionArrayLine | null {
@@ -806,6 +821,53 @@ function shouldDropConfigLine(line: ConfigLine): boolean {
   return line.line.trim().toLowerCase() === "actions={}";
 }
 
+/** Synthetic / query-only keys — never dump as `key=value` lines. */
+const SNAPSHOT_HEADER_META_KEYS = new Set(["gameval", "_header", "id", "text"]);
+
+function isSnapshotMetaKey(key: string): boolean {
+  return SNAPSHOT_HEADER_META_KEYS.has(key.trim().toLowerCase());
+}
+
+/** Pull a gameval title out of a snapshot/field JSON value. */
+export function gamevalLabelFromField(raw: unknown): string | undefined {
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    return t || undefined;
+  }
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const o = raw as Record<string, unknown>;
+    if (typeof o.to === "string" && o.to.trim()) return o.to.trim();
+    if (typeof o.value === "string" && o.value.trim()) return o.value.trim();
+    if (o.ref && typeof o.ref === "object") {
+      const name = (o.ref as Record<string, unknown>).name;
+      if (typeof name === "string" && name.trim()) return name.trim();
+    }
+  }
+  return undefined;
+}
+
+function readGamevalMapFromPayload(data: unknown): Map<number, string> {
+  const out = new Map<number, string>();
+  if (!data || typeof data !== "object") return out;
+  const raw = (data as { gamevals?: unknown }).gamevals;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const id = Number.parseInt(k, 10);
+    if (!Number.isFinite(id)) continue;
+    const label = gamevalLabelFromField(v);
+    if (label) out.set(id, label);
+  }
+  return out;
+}
+
+function isGeneratedFallbackHeader(line: string, id: number, sectionPrefix: string): boolean {
+  const t = line.trim();
+  if (t === `[${sectionPrefix}_${id}]`) return true;
+  // lowercase type_id only (real gamevals are usually mixed/upper case)
+  const m = /^\[([a-z][a-z0-9]*)_(\d+)]$/.exec(t);
+  return Boolean(m && Number.parseInt(m[2]!, 10) === id);
+}
+
 function expandParamsConfigLine(line: ConfigLine): ConfigLine[] {
   const eq = line.line.indexOf("=");
   if (eq <= 0) return [line];
@@ -856,7 +918,10 @@ function expandParamsConfigLine(line: ConfigLine): ConfigLine[] {
   });
 }
 
-function synthesizeLinesFromDiffPayload(data: unknown): ConfigLine[] {
+function synthesizeLinesFromDiffPayload(
+  data: unknown,
+  headerOptions?: { headerLabelForId?: (id: number) => string | undefined },
+): ConfigLine[] {
   if (!data || typeof data !== "object") return [];
   const o = data as Record<string, unknown>;
   const added = (o.added && typeof o.added === "object" ? (o.added as Record<string, unknown>) : {}) ?? {};
@@ -866,6 +931,18 @@ function synthesizeLinesFromDiffPayload(data: unknown): ConfigLine[] {
   const sectionPrefix = sectionPrefixForConfigType(typeRaw);
   const rev = readOptionalFiniteNumber(o.rev);
   const base = readOptionalFiniteNumber(o.base);
+  const payloadGamevals = readGamevalMapFromPayload(data);
+  const titleFor = (id: number, fields?: unknown) => {
+    const fromLookup = headerOptions?.headerLabelForId?.(id)?.trim();
+    if (fromLookup) return `[${fromLookup}]`;
+    const fromPayload = payloadGamevals.get(id);
+    if (fromPayload) return `[${fromPayload}]`;
+    if (fields && typeof fields === "object" && !Array.isArray(fields)) {
+      const fromFields = gamevalLabelFromField((fields as Record<string, unknown>).gameval);
+      if (fromFields) return `[${fromFields}]`;
+    }
+    return `[${sectionPrefix}_${id}]`;
+  };
 
   const lines: ConfigLine[] = [];
 
@@ -877,13 +954,14 @@ function synthesizeLinesFromDiffPayload(data: unknown): ConfigLine[] {
 
   for (const id of numericIds(added)) {
     lines.push({ line: `// ${id}`, type: "add", addedInRev: rev });
-    lines.push({ line: `[${sectionPrefix}_${id}]`, type: "add", addedInRev: rev });
     const fields = added[String(id)];
+    lines.push({ line: titleFor(id, fields), type: "add", addedInRev: rev });
     if (fields && typeof fields === "object") {
       const map = pruneCountObjZeros(fields as Record<string, unknown>);
       Object.keys(map)
         .sort((a, b) => a.localeCompare(b))
         .forEach((k) => {
+          if (isSnapshotMetaKey(k)) return;
           const rendered = fieldLinesFromKeyValue(k, map[k]);
           rendered.forEach((entry) =>
             lines.push({ line: entry.line, hoverText: entry.hoverText, type: "add", addedInRev: rev }),
@@ -895,13 +973,15 @@ function synthesizeLinesFromDiffPayload(data: unknown): ConfigLine[] {
 
   for (const id of numericIds(changed)) {
     lines.push({ line: `// ${id}`, type: "context" });
-    lines.push({ line: `[${sectionPrefix}_${id}]`, type: "context" });
-    const fields = changed[String(id)];
+    const changedFields = changed[String(id)];
+    lines.push({ line: titleFor(id, changedFields), type: "context" });
+    const fields = changedFields;
     if (fields && typeof fields === "object") {
       const map = pruneCountObjZeros(fields as Record<string, unknown>);
       Object.keys(map)
         .sort((a, b) => a.localeCompare(b))
         .forEach((k) => {
+          if (isSnapshotMetaKey(k)) return;
           const entry = map[k];
           if (k.trim().toLowerCase() === "actions" && entry && typeof entry === "object" && !Array.isArray(entry)) {
             if (Object.keys(entry as Record<string, unknown>).length === 0) return;
@@ -967,17 +1047,14 @@ function synthesizeLinesFromDiffPayload(data: unknown): ConfigLine[] {
           }
           if (k.trim().toLowerCase() === "values") {
             const toExpanded = expandEnumValuesLines(e.to);
-            const fromExpanded = expandEnumValuesLines(e.from);
-            const fromByIndex = new Map<number, ExpandedFieldLine>();
-            fromExpanded.forEach((f) => {
-              const match = /^value(\d+)=/.exec(f.line);
-              const idx = match ? Number.parseInt(match[1]!, 10) : Number.NaN;
-              if (Number.isFinite(idx)) fromByIndex.set(idx, f);
-            });
+            const fromByKey = new Map<string, ExpandedFieldLine>();
+            for (const f of expandEnumValuesLines(e.from)) {
+              const key = enumValueMapKeyFromLine(f.line);
+              if (key) fromByKey.set(key, f);
+            }
             toExpanded.forEach((t) => {
-              const match = /^value(\d+)=/.exec(t.line);
-              const idx = match ? Number.parseInt(match[1]!, 10) : Number.NaN;
-              const beforeRendered = Number.isFinite(idx) ? fromByIndex.get(idx)?.line : undefined;
+              const mapKey = enumValueMapKeyFromLine(t.line);
+              const beforeRendered = mapKey ? fromByKey.get(mapKey)?.line : undefined;
               pushNormalizedChangeLine(lines, {
                 line: t.line,
                 hoverText: t.hoverText,
@@ -1061,7 +1138,7 @@ function synthesizeLinesFromDiffPayload(data: unknown): ConfigLine[] {
     .sort((a, b) => a - b);
   for (const id of removedIds) {
     lines.push({ line: `// ${id}`, type: "removed", removedInRev: base });
-    lines.push({ line: `[${sectionPrefix}_${id}]`, type: "removed", removedInRev: base });
+    lines.push({ line: titleFor(id), type: "removed", removedInRev: base });
     lines.push({ line: "", type: "context" });
   }
 
@@ -1069,7 +1146,10 @@ function synthesizeLinesFromDiffPayload(data: unknown): ConfigLine[] {
 }
 
 /** Map `diff/config/.../content` body to `ConfigLine[]` (empty array when shape is wrong). */
-export function configLinesFromDiffBody(data: unknown): ConfigLine[] {
+export function configLinesFromDiffBody(
+  data: unknown,
+  headerOptions?: { headerLabelForId?: (id: number) => string | undefined },
+): ConfigLine[] {
   const raw = configLinesArrayFromPayload(data);
   if (raw.length > 0) {
     const out: ConfigLine[] = [];
@@ -1095,20 +1175,30 @@ export function configLinesFromDiffBody(data: unknown): ConfigLine[] {
         }
       }
     }
+    const typeRaw =
+      data && typeof data === "object" && typeof (data as { type?: unknown }).type === "string"
+        ? (data as { type: string }).type
+        : "config";
+    if (headerOptions?.headerLabelForId) {
+      return relabelConfigSectionHeaders(out, typeRaw, headerOptions.headerLabelForId);
+    }
     return out;
   }
-  return synthesizeLinesFromDiffPayload(data);
+  return synthesizeLinesFromDiffPayload(data, headerOptions);
 }
 
 /**
  * Map `diff/config/.../content` JSON body to `ConfigLine[]`.
  * Returns `null` when the server reports decoding/missing (caller usually treats as empty).
  */
-export function configLinesFromContentPayload(data: unknown): ConfigLine[] | null {
+export function configLinesFromContentPayload(
+  data: unknown,
+  headerOptions?: { headerLabelForId?: (id: number) => string | undefined },
+): ConfigLine[] | null {
   if (!data || typeof data !== "object") return [];
   const o = data as { status?: string };
   if (o.status === "decoding" || o.status === "missing") return null;
-  return configLinesFromDiffBody(data);
+  return configLinesFromDiffBody(data, headerOptions);
 }
 
 /** Map `/cache?type=...&rev=...` payload to full `ConfigLine[]` for combined text mode. */
@@ -1152,16 +1242,20 @@ export function configLinesFromCachePayload(
     if (!snap || typeof snap !== "object" || Array.isArray(snap)) continue;
     const map = pruneCountObjZeros(snap as Record<string, unknown>);
 
-    const headerLabel = headerOptions?.headerLabelForId?.(id)?.trim();
-    const includeComment =
-      Boolean(headerLabel) || (headerOptions?.includeCommentWithoutHeaderLabel ?? true);
-
-    if (includeComment) lines.push({ line: `// ${id}`, type: "context" });
-    lines.push({ line: `[${headerLabel || `${sectionPrefix}_${id}`}]`, type: "context" });
+    const fromLookup = headerOptions?.headerLabelForId?.(id)?.trim();
+    const fromSnap = gamevalLabelFromField(map.gameval);
+    const headerLabel = fromLookup || fromSnap;
+    // Always keep `// id` so section chrome can group blocks even before gamevals resolve.
+    lines.push({ line: `// ${id}`, type: "context" });
+    lines.push({
+      line: `[${headerLabel || `${sectionPrefix}_${id}`}]`,
+      type: "context",
+    });
 
     Object.keys(map)
       .sort((a, b) => a.localeCompare(b))
       .forEach((k) => {
+        if (isSnapshotMetaKey(k)) return;
         const rendered = fieldLinesFromKeyValue(k, map[k]);
         rendered.forEach((entry) => {
           const line: ConfigLine = { line: entry.line, hoverText: entry.hoverText, type: "context" };
@@ -1173,6 +1267,32 @@ export function configLinesFromCachePayload(
   }
 
   return lines;
+}
+
+/**
+ * Replace fallback `[type_123]` headers with gameval names once lookups are available.
+ * Leaves already-named headers untouched.
+ */
+export function relabelConfigSectionHeaders(
+  lines: ConfigLine[],
+  configType: string,
+  headerLabelForId: (id: number) => string | undefined,
+): ConfigLine[] {
+  const sectionPrefix = sectionPrefixForConfigType(configType);
+  let changed = false;
+  const out = lines.map((row, i) => {
+    if (!row.line.startsWith("[") || !row.line.endsWith("]")) return row;
+    const prev = i > 0 ? lines[i - 1] : undefined;
+    if (!prev?.line.startsWith("// ")) return row;
+    const id = Number.parseInt(prev.line.slice(3).trim(), 10);
+    if (!Number.isFinite(id)) return row;
+    if (!isGeneratedFallbackHeader(row.line, id, sectionPrefix)) return row;
+    const label = headerLabelForId(id)?.trim();
+    if (!label) return row;
+    changed = true;
+    return { ...row, line: `[${label}]` };
+  });
+  return changed ? out : lines;
 }
 
 /**

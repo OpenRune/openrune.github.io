@@ -9,12 +9,12 @@ import { getCurrentRevisionSnapshot } from "@/lib/openrs2";
 
 const FEATURE_CARDS = [
   {
-    title: "Configs / Diff",
+    title: "Configs",
     description:
-      "Compare and inspect cache config changes quickly with shared revision targeting.",
+      "Browse cache configs as tables or text for any revision, with gamevals and archives.",
     icon: GitCompareArrows,
     href: "/diff/full",
-    buttonLabel: "Open Diff",
+    buttonLabel: "Open Configs",
   },
   {
     title: "Color Helper",
@@ -64,8 +64,11 @@ export default async function HomePage() {
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2 pt-0">
           <Button render={<Link href="/diff/full" />} size="sm">
-            Open Diff
+            Open Configs
             <ArrowRight className="size-4" />
+          </Button>
+          <Button variant="outline" render={<Link href="/diff/diffview" />} size="sm">
+            Open Diff
           </Button>
           <Button variant="outline" render={<Link href="/colors" />} size="sm">
             Open Color Helper

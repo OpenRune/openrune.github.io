@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Cinzel, Geist_Mono, Inter } from "next/font/google";
+import { Cinzel, Geist_Mono, Inter, JetBrains_Mono } from "next/font/google";
 
 import { AppProviders } from "@/components/providers/app-providers";
 
@@ -13,6 +13,13 @@ const inter = Inter({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
+  /** Loaded when ligatures are enabled; keep off the critical path by default. */
+  preload: false,
 });
 
 const cinzel = Cinzel({
@@ -45,7 +52,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${geistMono.variable} ${cinzel.variable} font-sans antialiased`}
+        className={`${inter.variable} ${geistMono.variable} ${jetbrainsMono.variable} ${cinzel.variable} font-sans antialiased`}
       >
         <AppProviders>{children}</AppProviders>
       </body>

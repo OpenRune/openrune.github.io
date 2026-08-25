@@ -20,6 +20,22 @@ export type SearchTag = {
   exact: boolean;
 };
 
+/** Shared sprites/textures search (sidebar list + main table). */
+export type DiffArchiveSearchState = {
+  mode: DiffSearchFieldMode;
+  text: string;
+  tags: SearchTag[];
+  /** Diff-mode kind filter (`all` when Full / no compare). */
+  kind: ConfigFilterMode;
+};
+
+export const EMPTY_DIFF_ARCHIVE_SEARCH: DiffArchiveSearchState = {
+  mode: "id",
+  text: "",
+  tags: [],
+  kind: "all",
+};
+
 /** Unified diff search field modes (dropdown shows a subset via `modeOptions` on the field). */
 export type DiffSearchFieldMode = "gameval" | "id" | "name" | "regex";
 

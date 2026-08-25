@@ -1,10 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { IconDatabase } from "@tabler/icons-react";
 import { useSearchParams } from "next/navigation";
 
-import { OptionDropdown } from "@/components/ui/option-dropdown";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePaginationBar } from "@/components/ui/table-pagination-bar";
@@ -21,11 +19,16 @@ import {
   diffConfigTableAllUrl,
   diffConfigTableUrl,
 } from "@/lib/cache-api-client";
-import { conditionalJsonFetch, getTableSearchIndex, putTableSearchIndex } from "@/lib/openrune-idb-cache";
+import { DiffDecodeProgressBanner } from "@/components/diff/diff-decode-progress";
+import {
+  conditionalJsonFetchAwaitingDecode,
+  type DiffDecodeProgress,
+} from "@/lib/diff-decode";
+import { getTableSearchIndex, putTableSearchIndex } from "@/lib/openrune-idb-cache";
 import { cn } from "@/lib/utils";
 import { getConfigBlocks, trimBlockEndExclusive, type ConfigSectionBlock } from "@/lib/diff-config-blocks";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { ChevronDown, ChevronUp, Loader2, Minus, Pencil, Plus, Search } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 
 import {
   DIFF_COMBINED_SEARCH_WRAP_CLASS,
@@ -57,8 +60,31 @@ import {
   DIFF_ARCHIVE_TABLE_HEAD_CLASS,
   DIFF_ARCHIVE_TABLE_HEADER_CLASS,
 } from "./diff-table-archive-styles";
-import { configLinesFromCachePayload, configLinesFromContentPayload } from "./diff-config-content";
-import type { ConfigFilterMode, ConfigLine, DiffSearchFieldMode, SearchTag } from "./diff-types";
+import { configLinesFromCachePayload, configLinesFromContentPayload, relabelConfigSectionHeaders } from "./diff-config-content";
+import { useDiffExplorerFocus } from "./diff-explorer-focus";
+import {
+  buildSectionMetas,
+  buildTextViewRowsWithHeaders,
+  DiffChangeMinimap,
+  SectionChromeHeader,
+  sectionMatchesFocus,
+  type TextViewRow,
+} from "./diff-section-sticky";
+import {
+  buildSectionTitleHoverByLineIndex,
+  DumpSectionTitleHover,
+  type SectionTitleHoverInfo,
+} from "./diff-section-title-tooltip";
+import { findConfigFocusLineIndex, parseFocusEntityId, bareFocusTitle } from "./diff-focus-match";
+import {
+  buildPrefixOffsets,
+  estimateCharsPerLine,
+  estimateWrappedRowUnits,
+  virtualWindowFromOffsets,
+} from "./diff-text-wrap";
+import { useDiffTextLayoutOptional } from "./diff-text-layout";
+import { lineMatchesTextQuery, queryHighlightNeedles } from "./diff-text-query-match";
+import type { ConfigLine, DiffSearchFieldMode, SearchTag } from "./diff-types";
 
 const DEFAULT_BULK_PAGE = 500;
 const DEFAULT_TEXT_OVERSCAN = 14;
@@ -174,18 +200,18 @@ function isBracketSectionTitleLine(lines: ConfigLine[], i: number): boolean {
 }
 
 const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualTextRow({
-  lineIndex,
-  oldLineNumber,
-  newLineNumber,
   line,
   lineType,
   hoverText,
+  sectionHover,
+  definitionLabel,
   addedInRev,
   changedInRev,
   removedInRev,
   before,
   layout,
   rowH,
+  wordWrap,
   combinedRev,
   lookupRevisions,
   debouncedFindQuery,
@@ -195,18 +221,18 @@ const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualText
   getTextLineShowInline,
   settings,
 }: {
-  lineIndex: number;
-  oldLineNumber: number | null;
-  newLineNumber: number | null;
   line: string;
   lineType: ConfigLine["type"];
   hoverText?: string;
+  sectionHover?: SectionTitleHoverInfo | null;
+  definitionLabel?: string;
   addedInRev?: number;
   changedInRev?: number;
   removedInRev?: number;
   before?: string;
   layout: "unified" | "split";
   rowH: number;
+  wordWrap?: boolean;
   combinedRev: number;
   lookupRevisions?: readonly number[];
   debouncedFindQuery: string;
@@ -216,45 +242,47 @@ const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualText
   getTextLineShowInline?: (s: AppSettings) => boolean;
   settings: AppSettings;
 }) {
+  const beforeDisplay = withFieldPrefixIfMissing(before, line);
+  const paintType: ConfigLine["type"] =
+    lineType === "change" && beforeDisplay != null && beforeDisplay.trim() === line.trim()
+      ? "context"
+      : lineType;
+
   const rowTint =
-    lineType === "add"
+    paintType === "add"
       ? "bg-green-500/8 dark:bg-green-500/12"
-      : lineType === "removed"
+      : paintType === "removed"
         ? "bg-red-500/8 dark:bg-red-500/12"
-        : lineType === "change"
+        : paintType === "change"
           ? "bg-amber-500/10 dark:bg-amber-500/14"
           : "";
 
   const barColor =
-    lineType === "add"
+    paintType === "add"
       ? "bg-green-500"
-      : lineType === "change"
+      : paintType === "change"
         ? "bg-amber-500"
-        : lineType === "removed"
+        : paintType === "removed"
           ? "bg-red-500"
           : "bg-transparent";
 
-  const icon =
-    lineType === "add" ? (
-      <Plus className="size-3.5 text-green-600 dark:text-green-400" aria-hidden />
-    ) : lineType === "removed" ? (
-      <Minus className="size-3.5 text-red-600 dark:text-red-400" aria-hidden />
-    ) : lineType === "change" ? (
-      <Pencil className="size-3.5 text-amber-600 dark:text-amber-400" aria-hidden />
-    ) : null;
-
   const hasRefHover = Boolean(hoverText?.trim());
-  const gutterIcon = hasRefHover ? (
-    <IconDatabase className="size-3.5 text-sky-700 dark:text-sky-300" aria-hidden />
-  ) : icon;
+  const isSectionTitle = Boolean(sectionHover);
 
-  const beforeDisplay = withFieldPrefixIfMissing(before, line);
+  const sectionTitleNode = sectionHover ? (
+    <span className="font-mono text-xs leading-[22px]">
+      <span className="text-sky-500 dark:text-sky-400">[</span>
+      <DumpSectionTitleHover info={sectionHover} definitionLabel={definitionLabel} />
+      <span className="text-sky-500 dark:text-sky-400">]</span>
+    </span>
+  ) : null;
+
   const diffTooltipBody: React.ReactNode =
-    lineType === "add" && addedInRev != null
+    paintType === "add" && addedInRev != null
       ? <>Added in rev {addedInRev}</>
-      : lineType === "removed" && removedInRev != null
+      : paintType === "removed" && removedInRev != null
         ? <>Removed in rev {removedInRev}</>
-        : lineType === "change" && (changedInRev != null || beforeDisplay != null)
+        : paintType === "change" && (changedInRev != null || beforeDisplay != null)
           ? (
             <span className="block space-y-1">
               {changedInRev != null ? <span className="block">Changed in rev {changedInRev}</span> : null}
@@ -269,107 +297,90 @@ const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualText
           )
           : null;
 
-  const tooltipBody: React.ReactNode = hasRefHover ? hoverText : diffTooltipBody;
+  const tooltipBody: React.ReactNode = isSectionTitle ? null : hasRefHover ? hoverText : diffTooltipBody;
 
-  const iconTrigger: NonNullable<React.ComponentProps<typeof TooltipTrigger>["render"]> = (props) => (
-    <span {...props} className={cn("flex w-5 shrink-0 items-center justify-center", props.className)}>
-      {gutterIcon}
-    </span>
-  );
+  const hostOverflow = wordWrap
+    ? "overflow-x-hidden overflow-y-visible"
+    : "overflow-x-auto overflow-y-hidden";
+  const hostWrap = wordWrap ? "whitespace-pre-wrap break-words [overflow-wrap:anywhere]" : "";
 
   if (layout === "split") {
-    const leftLine = lineType === "add" ? "" : (lineType === "change" ? (beforeDisplay ?? before ?? line) : line);
-    const rightLine = lineType === "removed" ? "" : line;
+    const leftLine = paintType === "add" ? "" : paintType === "change" ? (beforeDisplay ?? before ?? "") : line;
+    const rightLine = paintType === "removed" ? "" : line;
     const leftTint =
-      lineType === "change"
+      paintType === "change"
         ? "bg-amber-500/16 dark:bg-amber-500/14"
-        : lineType === "removed"
+        : paintType === "removed"
         ? "bg-red-500/16 dark:bg-red-500/14"
         : "bg-transparent";
     const rightTint =
-      lineType === "change"
+      paintType === "change"
         ? "bg-amber-500/16 dark:bg-amber-500/14"
-        : lineType === "add"
+        : paintType === "add"
         ? "bg-green-500/16 dark:bg-green-500/14"
         : "bg-transparent";
 
-    const leftMarker = lineType === "change" ? "~" : (lineType === "removed" ? "-" : " ");
-    const rightMarker = lineType === "change" ? "~" : (lineType === "add" ? "+" : " ");
-
-    const leftMarkerText =
-      lineType === "change" ? "text-amber-700 dark:text-amber-400" : "text-red-700 dark:text-red-400";
-    const rightMarkerText =
-      lineType === "change" ? "text-amber-700 dark:text-amber-400" : "text-green-700 dark:text-green-400";
-
-    const splitMarker = (
-      marker: string,
-      className: string,
-      side: "left" | "right",
-    ) => {
-      const node = <span className={className}>{marker}</span>;
-      if (marker.trim() === "" || !diffTooltipBody) return node;
-      return (
-        <Tooltip>
-          <TooltipTrigger render={node} />
-          <TooltipContent
-            opaque
-            side={side === "left" ? "left" : "right"}
-            className="max-w-sm border border-zinc-800 bg-zinc-950 p-3 text-xs text-white"
-          >
-            {diffTooltipBody}
-          </TooltipContent>
-        </Tooltip>
-      );
-    };
-
     return (
       <div className="flex items-stretch" style={{ height: rowH }}>
-        <div className="flex min-w-0 flex-1 border-r border-border/40">
-          <div className="flex w-14 shrink-0 select-none items-center justify-end border-r bg-muted/35 pr-2 font-mono text-[11px] tabular-nums text-muted-foreground">
-            {oldLineNumber ?? ""}
-          </div>
-          <div className={cn("flex w-6 shrink-0 select-none items-center justify-center border-r bg-muted/25 font-mono text-[11px]", leftMarkerText)}>
-            {splitMarker(
-              leftMarker,
-              "flex h-full w-full items-center justify-center",
-              "left",
+        <div className="flex min-w-0 flex-1 border-r border-border/30">
+          <div
+            className={cn(
+              "diff-editor-line-host min-h-0 min-w-0 flex-1 px-3 py-0.5 text-xs leading-[22px]",
+              hostOverflow,
+              hostWrap,
+              leftTint,
             )}
-          </div>
-          <div className={cn("min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden px-3 py-0.5 text-xs leading-[22px]", leftTint)}>
-            <TextLine
-              line={leftLine || " "}
-              combinedRev={combinedRev}
-              lookupRevisions={lookupRevisions}
-              hoverText={hoverText}
-              showInline={getTextLineShowInline?.(settings)}
-              findKind={findKind}
-              findQuery={debouncedFindQuery}
-              findMarkActive={findMarkActive}
-            />
+          >
+            {leftLine ? (
+              sectionTitleNode && paintType !== "add" ? (
+                sectionTitleNode
+              ) : (
+                <TextLine
+                  line={leftLine}
+                  combinedRev={combinedRev}
+                  lookupRevisions={lookupRevisions}
+                  hoverText={hoverText}
+                  showInline={getTextLineShowInline?.(settings)}
+                  findKind={findKind}
+                  findQuery={debouncedFindQuery}
+                  findMarkActive={findMarkActive}
+                />
+              )
+            ) : null}
           </div>
         </div>
         <div className="flex min-w-0 flex-1">
-          <div className="flex w-14 shrink-0 select-none items-center justify-end border-r bg-muted/35 pr-2 font-mono text-[11px] tabular-nums text-muted-foreground">
-            {newLineNumber ?? ""}
-          </div>
-          <div className={cn("flex w-6 shrink-0 select-none items-center justify-center border-r bg-muted/25 font-mono text-[11px]", rightMarkerText)}>
-            {splitMarker(
-              rightMarker,
-              "flex h-full w-full items-center justify-center",
-              "right",
+          <div
+            className={cn(
+              "w-0.5 shrink-0 self-stretch",
+              paintType === "add" || paintType === "change" ? "bg-emerald-500/80" : "bg-transparent",
             )}
-          </div>
-          <div className={cn("min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden px-3 py-0.5 text-xs leading-[22px]", rightTint)}>
-            <TextLine
-              line={rightLine || " "}
-              combinedRev={combinedRev}
-              lookupRevisions={lookupRevisions}
-              hoverText={hoverText}
-              showInline={getTextLineShowInline?.(settings)}
-              findKind={findKind}
-              findQuery={debouncedFindQuery}
-              findMarkActive={findMarkActive}
-            />
+            aria-hidden
+          />
+          <div
+            className={cn(
+              "diff-editor-line-host min-h-0 min-w-0 flex-1 px-3 py-0.5 text-xs leading-[22px]",
+              hostOverflow,
+              hostWrap,
+              rightTint,
+            )}
+          >
+            {rightLine ? (
+              sectionTitleNode && paintType !== "removed" ? (
+                sectionTitleNode
+              ) : (
+                <TextLine
+                  line={rightLine}
+                  combinedRev={combinedRev}
+                  lookupRevisions={lookupRevisions}
+                  hoverText={hoverText}
+                  showInline={getTextLineShowInline?.(settings)}
+                  findKind={findKind}
+                  findQuery={debouncedFindQuery}
+                  findMarkActive={findMarkActive}
+                />
+              )
+            ) : null}
           </div>
         </div>
       </div>
@@ -378,14 +389,37 @@ const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualText
 
   return (
     <div className={cn("flex items-stretch", rowTint)} style={{ height: rowH }}>
-      <div className="flex w-[4.5rem] shrink-0 select-none items-center border-r bg-muted/40 font-mono text-[11px] leading-none">
-        <span className="flex w-10 shrink-0 items-center justify-end pr-1.5 text-right tabular-nums text-muted-foreground">
-          {lineIndex + 1}
-        </span>
-        <span className={cn("h-full w-1 shrink-0", barColor)} aria-hidden />
-        {gutterIcon && tooltipBody ? (
+      <div className={cn("w-0.5 shrink-0 self-stretch", barColor)} aria-hidden />
+      <div
+        className={cn(
+          "diff-editor-line-host min-h-0 min-w-0 flex-1 px-3 py-0.5 text-xs leading-[22px]",
+          hostOverflow,
+          hostWrap,
+          paintType === "add" && "bg-green-500/20 dark:bg-green-500/14",
+          paintType === "change" && "bg-amber-500/20 dark:bg-amber-500/14",
+          paintType === "removed" && "bg-red-500/20 dark:bg-red-500/14",
+        )}
+      >
+        {sectionTitleNode ? (
+          sectionTitleNode
+        ) : tooltipBody ? (
           <Tooltip>
-            <TooltipTrigger render={iconTrigger} />
+            <TooltipTrigger
+              render={(props) => (
+                <span {...props} className={cn("block w-full min-w-0", props.className)}>
+                  <TextLine
+                    line={line}
+                    combinedRev={combinedRev}
+                    lookupRevisions={lookupRevisions}
+                    hoverText={hoverText}
+                    showInline={getTextLineShowInline?.(settings)}
+                    findKind={findKind}
+                    findQuery={debouncedFindQuery}
+                    findMarkActive={findMarkActive}
+                  />
+                </span>
+              )}
+            />
             <TooltipContent
               opaque
               side="right"
@@ -395,29 +429,17 @@ const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualText
             </TooltipContent>
           </Tooltip>
         ) : (
-          <span className="flex w-5 shrink-0 items-center justify-center" aria-hidden>
-            {gutterIcon}
-          </span>
+          <TextLine
+            line={line}
+            combinedRev={combinedRev}
+            lookupRevisions={lookupRevisions}
+            hoverText={hoverText}
+            showInline={getTextLineShowInline?.(settings)}
+            findKind={findKind}
+            findQuery={debouncedFindQuery}
+            findMarkActive={findMarkActive}
+          />
         )}
-      </div>
-      <div
-        className={cn(
-          "min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden px-3 py-0.5 text-xs leading-[22px]",
-          lineType === "add" && "bg-green-500/20 dark:bg-green-500/14",
-          lineType === "change" && "bg-amber-500/20 dark:bg-amber-500/14",
-          lineType === "removed" && "bg-red-500/20 dark:bg-red-500/14",
-        )}
-      >
-        <TextLine
-          line={line}
-          combinedRev={combinedRev}
-          lookupRevisions={lookupRevisions}
-          hoverText={hoverText}
-          showInline={getTextLineShowInline?.(settings)}
-          findKind={findKind}
-          findQuery={debouncedFindQuery}
-          findMarkActive={findMarkActive}
-        />
       </div>
     </div>
   );
@@ -428,6 +450,7 @@ export function DiffConfigArchiveView({
   combinedRev,
   baseRev,
   rev,
+  textOnly = false,
   configType,
   tableBase = 1,
   title,
@@ -442,6 +465,8 @@ export function DiffConfigArchiveView({
   textOverscan = DEFAULT_TEXT_OVERSCAN,
   textFindDebounceMs = DEFAULT_FIND_DEBOUNCE_MS,
   searchRowTrailing,
+  hideSearchChrome = false,
+  controlledSearch = null,
   tableSearchSize = "default",
   tableSearchWrapClassName,
 }: DiffConfigArchiveViewProps) {
@@ -452,10 +477,10 @@ export function DiffConfigArchiveView({
   const cacheTypeId = selectedCacheType.id;
 
   const { settings } = useSettings();
-  const { loadGamevalType, hasLoaded, lookupGameval, getGamevalExtra } = useGamevals();
+  const { loadGamevalType, hasLoaded, lookupGameval, lookupGamevalByName, getGamevalExtra } = useGamevals();
   const isCombined = diffViewMode === "combined";
   const isDiff = diffViewMode === "diff";
-  const urlWantsText = isCombined && searchParams.get("view") === "text";
+  const urlWantsTable = isCombined && searchParams.get("view") === "table";
   const archiveGamevalRev = isCombined ? combinedRev : rev;
   const textLookupRevisions = React.useMemo(() => {
     if (!isDiff) return [archiveGamevalRev] as const;
@@ -470,17 +495,54 @@ export function DiffConfigArchiveView({
   }, [archiveGamevalRev, baseRev, isDiff, rev]);
 
   const [viewMode, setViewMode] = React.useState<"text" | "table">(() =>
-    diffViewMode === "combined" ? (urlWantsText ? "text" : "table") : "text",
+    textOnly || diffViewMode !== "combined" ? "text" : urlWantsTable ? "table" : "text",
   );
-  const [diffLayout, setDiffLayout] = React.useState<"unified" | "split">("split");
+  const textLayoutCtx = useDiffTextLayoutOptional();
+  const diffLayout = textLayoutCtx?.diffLayout ?? "split";
   const [page, setPage] = React.useState(1);
   const [perPage, setPerPage] = React.useState<number>(105);
 
-  const [tableSearchMode, setTableSearchMode] = React.useState<DiffSearchFieldMode>(() =>
+  const [localTableSearchMode, setLocalTableSearchMode] = React.useState<DiffSearchFieldMode>(() =>
     pickDefaultArchiveTableSearchMode(combinedRev, tableSearch.disabledModes),
   );
-  const [searchText, setSearchText] = React.useState("");
-  const [gamevalTags, setGamevalTags] = React.useState<SearchTag[]>([]);
+  const [localSearchText, setLocalSearchText] = React.useState("");
+  const [localGamevalTags, setLocalGamevalTags] = React.useState<SearchTag[]>([]);
+  const tableSearchMode = controlledSearch?.mode ?? localTableSearchMode;
+  const searchText = controlledSearch?.text ?? localSearchText;
+  const gamevalTags = controlledSearch?.tags ?? localGamevalTags;
+
+  const setTableSearchMode = React.useCallback(
+    (next: DiffSearchFieldMode | ((prev: DiffSearchFieldMode) => DiffSearchFieldMode)) => {
+      if (controlledSearch) {
+        const resolved = typeof next === "function" ? next(controlledSearch.mode) : next;
+        controlledSearch.onModeChange(resolved);
+        return;
+      }
+      setLocalTableSearchMode(next);
+    },
+    [controlledSearch],
+  );
+  const setSearchText = React.useCallback(
+    (next: string) => {
+      if (controlledSearch) {
+        controlledSearch.onTextChange(next);
+        return;
+      }
+      setLocalSearchText(next);
+    },
+    [controlledSearch],
+  );
+  const setGamevalTags = React.useCallback(
+    (next: SearchTag[] | ((prev: SearchTag[]) => SearchTag[])) => {
+      if (controlledSearch) {
+        const resolved = typeof next === "function" ? next(controlledSearch.tags) : next;
+        controlledSearch.onTagsChange(resolved);
+        return;
+      }
+      setLocalGamevalTags(next);
+    },
+    [controlledSearch],
+  );
   const prevCombinedGamevalSupportedRef = React.useRef(combinedRev >= GAMEVAL_MIN_REVISION);
 
   const debouncedTableQuery = useDebouncedValue(searchText.trim(), 180);
@@ -499,6 +561,7 @@ export function DiffConfigArchiveView({
   const syntaxDrivenClientTableActive = false;
 
   React.useEffect(() => {
+    if (controlledSearch) return;
     const supported = combinedRev >= GAMEVAL_MIN_REVISION;
     const prev = prevCombinedGamevalSupportedRef.current;
     prevCombinedGamevalSupportedRef.current = supported;
@@ -510,35 +573,41 @@ export function DiffConfigArchiveView({
     if (!prev && supported) {
       setTableSearchMode((m) => (m === "id" ? "gameval" : m));
     }
-  }, [combinedRev]);
+  }, [combinedRev, controlledSearch, setGamevalTags, setTableSearchMode]);
 
   React.useEffect(() => {
+    if (controlledSearch) return;
     if (tableSearchMode !== "gameval") setGamevalTags([]);
-  }, [tableSearchMode]);
+  }, [controlledSearch, setGamevalTags, tableSearchMode]);
 
   React.useEffect(() => {
-    if (isDiff) {
+    if (textOnly || isDiff) {
       setViewMode("text");
     } else if (isCombined) {
-      setViewMode(urlWantsText ? "text" : "table");
+      setViewMode(urlWantsTable ? "table" : "text");
     }
-  }, [isDiff, isCombined, urlWantsText]);
+  }, [isDiff, isCombined, textOnly, urlWantsTable]);
 
   const disabledModesKey = tableSearch.disabledModes.join("\0");
 
   /** When the archive table identity or which modes exist changes, re-apply the default (prefer gameval when allowed). */
   React.useEffect(() => {
+    if (controlledSearch) {
+      setPage(1);
+      return;
+    }
     setTableSearchMode(pickDefaultArchiveTableSearchMode(combinedRev, tableSearch.disabledModes));
     setPage(1);
     // combinedRev is read for pickDefault but omitted from deps so changing revision alone does not reset mode.
-  }, [configType, disabledModesKey]);
+  }, [configType, controlledSearch, disabledModesKey, setTableSearchMode]);
 
   React.useEffect(() => {
+    if (controlledSearch) return;
     if (!tableSearch.disabledModes.includes(tableSearchMode)) return;
     const next =
       (["gameval", "id", "name", "regex"] as const).find((m) => !tableSearch.disabledModes.includes(m)) ?? "id";
     setTableSearchMode(next);
-  }, [disabledModesKey, tableSearch.disabledModes, tableSearchMode]);
+  }, [controlledSearch, disabledModesKey, setTableSearchMode, tableSearch.disabledModes, tableSearchMode]);
 
   const [tableRows, setTableRows] = React.useState<ConfigArchiveTableRow[]>([]);
   const [tableTotal, setTableTotal] = React.useState(0);
@@ -551,16 +620,53 @@ export function DiffConfigArchiveView({
     "idle" | "loading" | "ok" | "error" | "decoding"
   >("idle");
   const [contentError, setContentError] = React.useState<string | null>(null);
+  const [decodeProgress, setDecodeProgress] = React.useState<DiffDecodeProgress | null>(null);
+  /** Combined text is fetched in entity pages (not one giant /cache dump). */
+  const [textFeed, setTextFeed] = React.useState({
+    nextOffset: 0,
+    total: 0,
+    hasMore: false,
+    loadingMore: false,
+  });
+  const textFeedRef = React.useRef(textFeed);
+  textFeedRef.current = textFeed;
+
+  const awaitDiffJson = React.useCallback(
+    async <T,>(cacheKey: string, url: string) => {
+      try {
+        const result = await conditionalJsonFetchAwaitingDecode<T>(cacheKey, url, {
+          cacheType: selectedCacheType,
+          onProgress: setDecodeProgress,
+        });
+        setDecodeProgress(null);
+        return result;
+      } catch (e) {
+        setDecodeProgress(null);
+        throw e;
+      }
+    },
+    [selectedCacheType],
+  );
 
   const [textFindQuery, setTextFindQuery] = React.useState("");
-  const [archiveDiffLineFilter, setArchiveDiffLineFilter] = React.useState<ConfigFilterMode>("all");
   const debouncedTextFindQuery = useDebouncedValue(textFindQuery, textFindDebounceMs);
-  const [textFindKind, setTextFindKind] = React.useState<"literal" | "regex">("literal");
   const [textFindActiveIdx, setTextFindActiveIdx] = React.useState(0);
+  const { focusBracketTitle, focusNonce } = useDiffExplorerFocus();
   const textScrollRef = React.useRef<HTMLDivElement | null>(null);
   const textVirtRafRef = React.useRef<number | null>(null);
   const textVirtPendingRef = React.useRef({ scrollTop: 0, clientHeight: 400 });
   const [textVirt, setTextVirt] = React.useState({ scrollTop: 0, clientHeight: 400 });
+  const [textViewportWidth, setTextViewportWidth] = React.useState(800);
+  const wordWrap = settings.editorWordWrap;
+
+  React.useEffect(() => {
+    if (!focusNonce || !focusBracketTitle) return;
+    setViewMode("text");
+    // Prefer bare id for `// 33428`; otherwise use gameval / title text.
+    const id = parseFocusEntityId(focusBracketTitle);
+    setTextFindQuery(id != null ? String(id) : bareFocusTitle(focusBracketTitle));
+    setTextFindActiveIdx(0);
+  }, [focusBracketTitle, focusNonce]);
 
   const onTextScroll = React.useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
@@ -570,18 +676,10 @@ export function DiffConfigArchiveView({
       textVirtRafRef.current = null;
       const p = textVirtPendingRef.current;
       setTextVirt({ scrollTop: p.scrollTop, clientHeight: p.clientHeight });
+      const nearEnd = p.scrollTop + p.clientHeight >= el.scrollHeight - 1600;
+      if (nearEnd) void loadMoreCombinedTextRef.current?.();
     });
   }, []);
-
-  React.useEffect(() => {
-    if (!isDiff) setArchiveDiffLineFilter("all");
-  }, [isDiff]);
-
-  React.useEffect(() => {
-    if (!isDiff || viewMode !== "text") return;
-    const el = textScrollRef.current;
-    if (el) el.scrollTop = 0;
-  }, [archiveDiffLineFilter, isDiff, viewMode]);
 
   React.useEffect(() => {
     return () => {
@@ -592,12 +690,28 @@ export function DiffConfigArchiveView({
     };
   }, []);
 
+  React.useEffect(() => {
+    const el = textScrollRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const apply = () => {
+      const w = el.clientWidth;
+      if (w > 0) setTextViewportWidth(w);
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [viewMode, contentStatus]);
+
   const [combinedSpriteIds, setCombinedSpriteIds] = React.useState<number[] | null>(null);
   const tableRequestRef = React.useRef(0);
   const gamevalBulkRequestRef = React.useRef(0);
   const syntaxBulkRequestRef = React.useRef(0);
   const contentRequestRef = React.useRef(0);
   const combinedSpritesRequestRef = React.useRef(0);
+
+  const COMBINED_TEXT_PAGE_SIZE = 150;
+  const loadMoreCombinedTextRef = React.useRef<(() => Promise<void>) | null>(null);
 
   const [clientFilteredRows, setClientFilteredRows] = React.useState<ConfigArchiveTableRow[] | null>(null);
   const [clientFetchStatus, setClientFetchStatus] = React.useState<"idle" | "loading" | "ok" | "error">("idle");
@@ -696,7 +810,7 @@ export function DiffConfigArchiveView({
       try {
         const url = diffConfigTableAllUrl(selectedCacheTypeRef.current, configType, { base: tableBase, rev: combinedRev });
         const cacheKey = `diff:config:table-all:${cacheTypeId}:${configType}:${tableBase}:${combinedRev}`;
-        const { data, etag } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url);
+        const { data, etag } = await awaitDiffJson<Record<string, unknown>>(cacheKey, url);
 
         if (requestId !== tableSearchIndexRequestRef.current) return;
 
@@ -836,7 +950,7 @@ export function DiffConfigArchiveView({
       try {
         const url = combinedSpritesUrl(selectedCacheTypeRef.current, combinedRev, tableBase);
         const cacheKey = `diff:combined:sprites:${cacheTypeId}:${tableBase}:${combinedRev}`;
-        const { data } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url);
+        const { data } = await awaitDiffJson<Record<string, unknown>>(cacheKey, url);
 
         if (requestId !== combinedSpritesRequestRef.current) return;
 
@@ -898,7 +1012,7 @@ export function DiffConfigArchiveView({
           mode: serverMode,
         });
         const cacheKey = `diff:config:table:${cacheTypeId}:${url}`;
-        const { data } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url);
+        const { data } = await awaitDiffJson<Record<string, unknown>>(cacheKey, url);
 
         if (requestId !== tableRequestRef.current) return;
 
@@ -943,7 +1057,7 @@ export function DiffConfigArchiveView({
                   mode: serverMode,
                 });
                 const nextCacheKey = `diff:config:table:${cacheTypeId}:${nextUrl}`;
-                const { data: nextData } = await conditionalJsonFetch<Record<string, unknown>>(nextCacheKey, nextUrl);
+                const { data: nextData } = await awaitDiffJson<Record<string, unknown>>(nextCacheKey, nextUrl);
                 const nextParsed = parseConfigTablePayload(nextData as Record<string, unknown>);
                 if (nextParsed.decoding) {
                   cacheServerPage(nextPageKey, { rows: [], total: 0, status: "decoding" });
@@ -1035,7 +1149,7 @@ export function DiffConfigArchiveView({
             mode: "id",
           });
           const cacheKey = `diff:config:table:${cacheTypeId}:${url}`;
-          const { data } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url);
+          const { data } = await awaitDiffJson<Record<string, unknown>>(cacheKey, url);
 
           if (requestId !== syntaxBulkRequestRef.current) return;
 
@@ -1136,7 +1250,7 @@ export function DiffConfigArchiveView({
             mode: "id",
           });
           const cacheKey = `diff:config:table:${cacheTypeId}:${url}`;
-          const { data } = await conditionalJsonFetch<Record<string, unknown>>(cacheKey, url);
+          const { data } = await awaitDiffJson<Record<string, unknown>>(cacheKey, url);
 
           if (requestId !== gamevalBulkRequestRef.current) return;
 
@@ -1232,13 +1346,132 @@ export function DiffConfigArchiveView({
     setGamevalTags([]);
   }, [configType]);
 
+  const buildCombinedTextHeaderOptions = React.useCallback(
+    () => ({
+      headerLabelForId:
+        headerGamevalType && combinedRev >= GAMEVAL_MIN_REVISION
+          ? (id: number) =>
+              lookupGameval(headerGamevalType, id, combinedRev)?.trim() ||
+              getGamevalExtra(headerGamevalType, id, combinedRev)?.searchable?.trim() ||
+              undefined
+          : undefined,
+    }),
+    [combinedRev, getGamevalExtra, headerGamevalType, lookupGameval],
+  );
+
+  const headerGamevalRev =
+    headerGamevalType == null
+      ? combinedRev
+      : isCombined
+        ? combinedRev
+        : Math.max(baseRev, rev);
+
+  const headerGamevalReady =
+    !headerGamevalType ||
+    headerGamevalRev < GAMEVAL_MIN_REVISION ||
+    hasLoaded(headerGamevalType, headerGamevalRev);
+
+  /** Once gamevals arrive, rewrite any leftover `[item_123]` titles in already-loaded text. */
+  React.useEffect(() => {
+    if (viewMode !== "text") return;
+    if (!headerGamevalType || !headerGamevalReady) return;
+    const labelFor = (id: number) =>
+      lookupGameval(headerGamevalType, id, headerGamevalRev)?.trim() ||
+      getGamevalExtra(headerGamevalType, id, headerGamevalRev)?.searchable?.trim() ||
+      undefined;
+    setContentLines((prev) => {
+      if (prev.length === 0) return prev;
+      return relabelConfigSectionHeaders(prev, configType, labelFor);
+    });
+  }, [
+    configType,
+    getGamevalExtra,
+    headerGamevalReady,
+    headerGamevalRev,
+    headerGamevalType,
+    lookupGameval,
+    viewMode,
+  ]);
+
+  const loadMoreCombinedText = React.useCallback(async () => {
+    if (!isCombined || viewMode !== "text") return;
+    const feed = textFeedRef.current;
+    if (!feed.hasMore || feed.loadingMore) return;
+    const requestId = contentRequestRef.current;
+    setTextFeed((f) => ({ ...f, loadingMore: true }));
+    try {
+      const search = new URLSearchParams({
+        type: normalizeConfigTypeForCacheApi(configType),
+        rev: String(combinedRev),
+        offset: String(feed.nextOffset),
+        limit: String(COMBINED_TEXT_PAGE_SIZE),
+      });
+      const url = cacheDataUrl(selectedCacheTypeRef.current, search);
+      const cacheKey = `cache:config:content:${cacheTypeId}:${configType}:${combinedRev}:o${feed.nextOffset}:l${COMBINED_TEXT_PAGE_SIZE}`;
+      const { data } = await awaitDiffJson<unknown>(cacheKey, url);
+      if (requestId !== contentRequestRef.current) return;
+      const linesResult = configLinesFromCachePayload(data, configType, buildCombinedTextHeaderOptions());
+      if (linesResult === null) {
+        setTextFeed((f) => ({ ...f, loadingMore: false }));
+        return;
+      }
+      const o = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+      const hasMore = o.hasMore === true;
+      const total = typeof o.total === "number" ? o.total : feed.total;
+      setContentLines((prev) => prev.concat(linesResult));
+      setTextFeed({
+        nextOffset: feed.nextOffset + COMBINED_TEXT_PAGE_SIZE,
+        total,
+        hasMore,
+        loadingMore: false,
+      });
+    } catch {
+      if (requestId !== contentRequestRef.current) return;
+      setTextFeed((f) => ({ ...f, loadingMore: false }));
+    }
+  }, [
+    awaitDiffJson,
+    buildCombinedTextHeaderOptions,
+    cacheTypeId,
+    combinedRev,
+    configType,
+    isCombined,
+    viewMode,
+  ]);
+  loadMoreCombinedTextRef.current = loadMoreCombinedText;
+
   React.useEffect(() => {
     const wantsText = viewMode === "text";
     if (!wantsText || (!isCombined && !isDiff)) return;
 
+    // Prefer gameval titles before first paint when this config type has them.
+    if (
+      (isCombined || isDiff) &&
+      headerGamevalType &&
+      headerGamevalRev >= GAMEVAL_MIN_REVISION &&
+      !headerGamevalReady
+    ) {
+      void loadGamevalType(headerGamevalType, headerGamevalRev);
+      return;
+    }
+
     const requestId = ++contentRequestRef.current;
     setContentStatus("loading");
     setContentError(null);
+    setTextFeed({ nextOffset: 0, total: 0, hasMore: false, loadingMore: false });
+    setContentLines([]);
+
+    const headerOpts = buildCombinedTextHeaderOptions();
+    // Diff text uses the newer rev for gameval names.
+    const diffHeaderOpts =
+      headerGamevalType && headerGamevalRev >= GAMEVAL_MIN_REVISION
+        ? {
+            headerLabelForId: (id: number) =>
+              lookupGameval(headerGamevalType, id, headerGamevalRev)?.trim() ||
+              getGamevalExtra(headerGamevalType, id, headerGamevalRev)?.searchable?.trim() ||
+              undefined,
+          }
+        : undefined;
 
     const run = async () => {
       try {
@@ -1249,30 +1482,42 @@ export function DiffConfigArchiveView({
           url = diffConfigContentUrl(selectedCacheTypeRef.current, configType, o);
           cacheKey = `diff:config:content:${cacheTypeId}:${configType}:pair:${o.base}:${o.rev}`;
         } else {
-          const search = new URLSearchParams({ type: normalizeConfigTypeForCacheApi(configType), rev: String(combinedRev) });
+          const search = new URLSearchParams({
+            type: normalizeConfigTypeForCacheApi(configType),
+            rev: String(combinedRev),
+            offset: "0",
+            limit: String(COMBINED_TEXT_PAGE_SIZE),
+          });
           url = cacheDataUrl(selectedCacheTypeRef.current, search);
-          cacheKey = `cache:config:content:${cacheTypeId}:${configType}:${combinedRev}`;
+          cacheKey = `cache:config:content:${cacheTypeId}:${configType}:${combinedRev}:o0:l${COMBINED_TEXT_PAGE_SIZE}`;
         }
-        const { data } = await conditionalJsonFetch<unknown>(cacheKey, url);
+        const { data } = await awaitDiffJson<unknown>(cacheKey, url);
 
         if (requestId !== contentRequestRef.current) return;
 
         const dataUnknown: unknown = data;
         const linesResult = isDiff
-          ? configLinesFromContentPayload(dataUnknown)
-          : configLinesFromCachePayload(dataUnknown, configType, {
-              headerLabelForId:
-                headerGamevalType && combinedRev >= GAMEVAL_MIN_REVISION
-                  ? (id) => lookupGameval(headerGamevalType, id, combinedRev)
-                  : undefined,
-              includeCommentWithoutHeaderLabel: false,
-            });
+          ? configLinesFromContentPayload(dataUnknown, diffHeaderOpts)
+          : configLinesFromCachePayload(dataUnknown, configType, headerOpts);
         if (linesResult === null) {
           setContentLines([]);
           setContentStatus("decoding");
           return;
         }
         setContentLines(linesResult);
+        if (!isDiff && dataUnknown && typeof dataUnknown === "object") {
+          const o = dataUnknown as Record<string, unknown>;
+          const total = typeof o.total === "number" ? o.total : linesResult.length;
+          const hasMore = o.hasMore === true;
+          setTextFeed({
+            nextOffset: COMBINED_TEXT_PAGE_SIZE,
+            total,
+            hasMore,
+            loadingMore: false,
+          });
+        } else {
+          setTextFeed({ nextOffset: 0, total: 0, hasMore: false, loadingMore: false });
+        }
         setContentStatus("ok");
       } catch (e) {
         if (requestId !== contentRequestRef.current) return;
@@ -1294,8 +1539,14 @@ export function DiffConfigArchiveView({
     configType,
     tableBase,
     labels.contentErrorVerb,
+    buildCombinedTextHeaderOptions,
+    awaitDiffJson,
+    headerGamevalReady,
+    headerGamevalRev,
     headerGamevalType,
+    loadGamevalType,
     lookupGameval,
+    getGamevalExtra,
   ]);
 
   const textFindMatcher = React.useMemo(():
@@ -1304,47 +1555,16 @@ export function DiffConfigArchiveView({
     | { mode: "ok"; test: (line: string) => boolean } => {
     const q = debouncedTextFindQuery.trim();
     if (!q) return { mode: "empty" };
-    if (textFindKind === "literal") {
-      const lower = q.toLowerCase();
-      return {
-        mode: "ok",
-        test: (line: string) => line.toLowerCase().includes(lower),
-      };
-    }
-    try {
-      const re = new RegExp(q, "i");
-      return {
-        mode: "ok",
-        test: (line: string) => {
-          try {
-            re.lastIndex = 0;
-            return re.test(line);
-          } catch {
-            return false;
-          }
-        },
-      };
-    } catch (e) {
-      return {
-        mode: "bad",
-        error: e instanceof Error ? e.message : "Invalid regular expression",
-      };
-    }
-  }, [debouncedTextFindQuery, textFindKind]);
+    return {
+      mode: "ok",
+      test: (line: string) => lineMatchesTextQuery(line, q),
+    };
+  }, [debouncedTextFindQuery]);
 
-  const textRegexErrorImmediate = React.useMemo(() => {
-    if (textFindKind !== "regex") return null;
-    const q = textFindQuery.trim();
-    if (!q) return null;
-    try {
-      new RegExp(q);
-      return null;
-    } catch (e) {
-      return e instanceof Error ? e.message : "Invalid regular expression";
-    }
-  }, [textFindKind, textFindQuery]);
-
-  const textFindDisplayedError = textFindKind === "regex" ? textRegexErrorImmediate : null;
+  const textFindHighlightQuery = React.useMemo(() => {
+    const needles = queryHighlightNeedles(debouncedTextFindQuery);
+    return needles[0] ?? debouncedTextFindQuery;
+  }, [debouncedTextFindQuery]);
 
   const contentBlocks = React.useMemo(() => getConfigBlocks(contentLines), [contentLines]);
 
@@ -1382,87 +1602,10 @@ export function DiffConfigArchiveView({
     return out;
   }, [contentLines, contentBlocks]);
 
-  const textLineNumbersByIndex = React.useMemo(() => {
-    const out: { oldLine: number | null; newLine: number | null }[] = [];
-    let oldLine = 1;
-    let newLine = 1;
-    for (let i = 0; i < contentLines.length; i++) {
-      const kind = textLineKindByIndex[i] ?? "context";
-      if (kind === "add") {
-        out[i] = { oldLine: null, newLine };
-        newLine++;
-      } else if (kind === "removed") {
-        out[i] = { oldLine, newLine: null };
-        oldLine++;
-      } else {
-        out[i] = { oldLine, newLine };
-        oldLine++;
-        newLine++;
-      }
-    }
-    return out;
-  }, [contentLines, textLineKindByIndex]);
-
   const textLineDisplayIndices = React.useMemo(() => {
     if (viewMode !== "text") return [];
-    if (!isDiff) return contentLines.map((_, i) => i);
-
-    const bodyVisible = new Array<boolean>(contentLines.length).fill(false);
-    const wantKind =
-      archiveDiffLineFilter === "added"
-        ? "add"
-        : archiveDiffLineFilter === "removed"
-          ? "removed"
-          : archiveDiffLineFilter === "changed"
-            ? "change"
-            : null;
-    if (wantKind === null) {
-      bodyVisible.fill(true);
-    } else {
-      for (let i = 0; i < contentLines.length; i++) {
-        const row = contentLines[i]!;
-        if (row.line.startsWith("// ") || isBracketSectionTitleLine(contentLines, i)) continue;
-        const kind = textLineKindByIndex[i] ?? "context";
-        bodyVisible[i] = wantKind === "change" ? row.type === "change" : kind === wantKind;
-      }
-    }
-
-    const sectionVisible = new Array<boolean>(contentLines.length).fill(false);
-    let sectionStart = -1;
-    let hasVisibleBody = false;
-    const flushSection = (endExclusive: number) => {
-      if (sectionStart < 0) return;
-      sectionVisible[sectionStart] = hasVisibleBody;
-      const titleIdx = sectionStart + 1;
-      if (titleIdx < endExclusive && isBracketSectionTitleLine(contentLines, titleIdx)) {
-        sectionVisible[titleIdx] = hasVisibleBody;
-      }
-    };
-    for (let i = 0; i <= contentLines.length; i++) {
-      const isHeader = i < contentLines.length && contentLines[i]!.line.startsWith("// ");
-      if (isHeader || i === contentLines.length) {
-        flushSection(i);
-        sectionStart = i < contentLines.length ? i : -1;
-        hasVisibleBody = false;
-        continue;
-      }
-      if (sectionStart >= 0 && bodyVisible[i]) hasVisibleBody = true;
-    }
-
-    const out: number[] = [];
-    for (let i = 0; i < contentLines.length; i++) {
-      if (bodyVisible[i] || sectionVisible[i]) out.push(i);
-    }
-    return out;
-  }, [viewMode, isDiff, contentLines, archiveDiffLineFilter, textLineKindByIndex]);
-
-  const textDisplayPositionBySourceIndex = React.useMemo(() => {
-    const map = new Map<number, number>();
-    for (let i = 0; i < textLineDisplayIndices.length; i++) {
-      map.set(textLineDisplayIndices[i]!, i);
-    }
-    return map;
-  }, [textLineDisplayIndices]);
+    return contentLines.map((_, i) => i);
+  }, [viewMode, contentLines]);
 
   const textMatchIndices = React.useMemo(() => {
     if (textFindMatcher.mode !== "ok") return [];
@@ -1480,19 +1623,124 @@ export function DiffConfigArchiveView({
   const resolvedTextRowHeight =
     typeof textRowHeight === "function" ? textRowHeight(settings) : textRowHeight;
 
+  const sectionMetas = React.useMemo(
+    () => buildSectionMetas(contentLines, textLineKindByIndex),
+    [contentLines, textLineKindByIndex],
+  );
+
+  const sectionTitleHoverByLineIndex = React.useMemo(
+    () => buildSectionTitleHoverByLineIndex(contentLines, sectionMetas, configType, focusBracketTitle),
+    [contentLines, sectionMetas, configType, focusBracketTitle],
+  );
+
+  const definitionLabel = React.useMemo(() => {
+    const t = configType.trim().toLowerCase();
+    if (!t) return undefined;
+    return `config.${t}`;
+  }, [configType]);
+
+  const textViewRows = React.useMemo(
+    (): TextViewRow[] => buildTextViewRowsWithHeaders(textLineDisplayIndices, sectionMetas),
+    [sectionMetas, textLineDisplayIndices],
+  );
+
+  const textDisplayPositionBySourceIndex = React.useMemo(() => {
+    const map = new Map<number, number>();
+    for (let vi = 0; vi < textViewRows.length; vi++) {
+      const row = textViewRows[vi]!;
+      if (row.kind === "line") map.set(row.lineIndex, vi);
+    }
+    return map;
+  }, [textViewRows]);
+
+  const textRowHeights = React.useMemo(() => {
+    const base = resolvedTextRowHeight;
+    if (!wordWrap || viewMode !== "text") {
+      return textViewRows.map(() => base);
+    }
+    const cols = isDiff && diffLayout === "split" ? 2 : 1;
+    const chars = estimateCharsPerLine(textViewportWidth, cols);
+    return textViewRows.map((viewRow) => {
+      if (viewRow.kind === "header") return base;
+      const text = contentLines[viewRow.lineIndex]?.line ?? " ";
+      // Split layout uses the longer of before/after for height.
+      if (isDiff && diffLayout === "split") {
+        const row = contentLines[viewRow.lineIndex];
+        const before = row?.before ?? "";
+        const units = Math.max(
+          estimateWrappedRowUnits(text, chars),
+          estimateWrappedRowUnits(before, chars),
+        );
+        return units * base;
+      }
+      return estimateWrappedRowUnits(text, chars) * base;
+    });
+  }, [
+    contentLines,
+    diffLayout,
+    isDiff,
+    resolvedTextRowHeight,
+    textViewRows,
+    textViewportWidth,
+    viewMode,
+    wordWrap,
+  ]);
+
+  const textRowPrefix = React.useMemo(() => buildPrefixOffsets(textRowHeights), [textRowHeights]);
+
   const textVirtualWindow = React.useMemo(() => {
     if (viewMode !== "text") {
-      return { start: 0, end: 0, topPx: 0, totalLines: 0, rowH: resolvedTextRowHeight };
+      return { start: 0, end: 0, topPx: 0, totalRows: 0, totalH: 0, rowH: resolvedTextRowHeight };
     }
-    const total = textLineDisplayIndices.length;
-    const rowH = resolvedTextRowHeight;
-    if (total === 0) return { start: 0, end: 0, topPx: 0, totalLines: 0, rowH: resolvedTextRowHeight };
-    const { scrollTop, clientHeight } = textVirt;
-    const ch = Math.max(clientHeight, 1);
-    const start = Math.max(0, Math.floor(scrollTop / rowH) - textOverscan);
-    const end = Math.min(total, Math.ceil((scrollTop + ch) / rowH) + textOverscan);
-    return { start, end, topPx: start * rowH, totalLines: total, rowH };
-  }, [viewMode, textLineDisplayIndices, textVirt, resolvedTextRowHeight, textOverscan]);
+    const total = textViewRows.length;
+    if (total === 0) {
+      return { start: 0, end: 0, topPx: 0, totalRows: 0, totalH: 0, rowH: resolvedTextRowHeight };
+    }
+    if (!wordWrap) {
+      const rowH = resolvedTextRowHeight;
+      const { scrollTop, clientHeight } = textVirt;
+      const ch = Math.max(clientHeight, 1);
+      const start = Math.max(0, Math.floor(scrollTop / rowH) - textOverscan);
+      const end = Math.min(total, Math.ceil((scrollTop + ch) / rowH) + textOverscan);
+      return { start, end, topPx: start * rowH, totalRows: total, totalH: total * rowH, rowH };
+    }
+    const win = virtualWindowFromOffsets(
+      textRowPrefix,
+      textVirt.scrollTop,
+      textVirt.clientHeight,
+      textOverscan,
+    );
+    return {
+      start: win.start,
+      end: win.end,
+      topPx: win.topPx,
+      totalRows: total,
+      totalH: win.totalH,
+      rowH: resolvedTextRowHeight,
+    };
+  }, [
+    viewMode,
+    textViewRows,
+    textVirt,
+    resolvedTextRowHeight,
+    textOverscan,
+    wordWrap,
+    textRowPrefix,
+  ]);
+
+  const minimapMarks = React.useMemo(() => {
+    const marks: { topPct: number; kind: "add" | "removed" | "change" }[] = [];
+    const n = textViewRows.length;
+    if (n === 0) return marks;
+    for (let vi = 0; vi < n; vi++) {
+      const row = textViewRows[vi]!;
+      if (row.kind !== "line") continue;
+      const dk = textLineKindByIndex[row.lineIndex] ?? "context";
+      if (dk === "context") continue;
+      marks.push({ topPct: (vi / n) * 100, kind: dk });
+    }
+    return marks;
+  }, [textLineKindByIndex, textViewRows]);
 
   React.useEffect(() => {
     const n = textMatchIndices.length;
@@ -1521,10 +1769,10 @@ export function DiffConfigArchiveView({
     if (viewMode !== "text" || activeTextLineIndex == null) return;
     const root = textScrollRef.current;
     if (!root) return;
-    const rowH = resolvedTextRowHeight;
     const displayPos = textDisplayPositionBySourceIndex.get(activeTextLineIndex);
     if (displayPos == null) return;
-    const rowTop = displayPos * rowH;
+    const rowTop = textRowPrefix[displayPos] ?? displayPos * resolvedTextRowHeight;
+    const rowH = textRowHeights[displayPos] ?? resolvedTextRowHeight;
     const viewTop = root.scrollTop;
     const viewH = root.clientHeight;
     const pad = 8;
@@ -1533,7 +1781,47 @@ export function DiffConfigArchiveView({
     } else if (rowTop + rowH > viewTop + viewH - pad) {
       root.scrollTop = rowTop - viewH + rowH + pad;
     }
-  }, [viewMode, activeTextLineIndex, textFindActiveIdx, resolvedTextRowHeight, textDisplayPositionBySourceIndex]);
+  }, [
+    viewMode,
+    activeTextLineIndex,
+    textFindActiveIdx,
+    resolvedTextRowHeight,
+    textDisplayPositionBySourceIndex,
+    textRowPrefix,
+    textRowHeights,
+  ]);
+
+  /** Inspector jump: scroll to `// id` even when the bracket title is a gameval name. */
+  React.useEffect(() => {
+    if (!focusNonce || !focusBracketTitle || viewMode !== "text") return;
+    const root = textScrollRef.current;
+    if (!root || contentLines.length === 0) return;
+    let resolvedId = parseFocusEntityId(focusBracketTitle);
+    if (resolvedId == null && headerGamevalType) {
+      const name = bareFocusTitle(focusBracketTitle);
+      if (name) {
+        resolvedId = lookupGamevalByName(headerGamevalType, name, combinedRev) ?? null;
+      }
+    }
+    const sourceIdx = findConfigFocusLineIndex(contentLines, focusBracketTitle, resolvedId);
+    if (sourceIdx < 0) return;
+    const displayPos = textDisplayPositionBySourceIndex.get(sourceIdx);
+    if (displayPos == null) return;
+    const rowTop = textRowPrefix[displayPos] ?? displayPos * resolvedTextRowHeight;
+    root.scrollTop = Math.max(0, rowTop - 8);
+    setTextVirt((v) => ({ ...v, scrollTop: root.scrollTop }));
+  }, [
+    focusBracketTitle,
+    focusNonce,
+    viewMode,
+    contentLines,
+    textDisplayPositionBySourceIndex,
+    textRowPrefix,
+    resolvedTextRowHeight,
+    headerGamevalType,
+    lookupGamevalByName,
+    combinedRev,
+  ]);
 
   const clientSidePagination =
     indexedClientPageActive ||
@@ -1651,15 +1939,6 @@ export function DiffConfigArchiveView({
   const textHeadlineWord =
     headlineCount === 1 ? (labels.textLineSingular ?? "line") : (labels.textLinePlural ?? "lines");
 
-  const textFindHasMatches = textMatchIndices.length > 0;
-  const textFindHasQuery = textFindQuery.trim().length > 0;
-  const textFindNavDisabled =
-    !textFindHasQuery ||
-    Boolean(textRegexErrorImmediate) ||
-    !textFindHasMatches ||
-    textFindMatcher.mode === "bad" ||
-    textFindMatcher.mode === "empty";
-
   const gamevalRev = archiveGamevalRev;
   const gamevalSupported = gamevalRev >= GAMEVAL_MIN_REVISION;
 
@@ -1693,8 +1972,6 @@ export function DiffConfigArchiveView({
     gamevalAllowedIds,
   ]);
 
-  const findErrorId = `archive-text-find-error-${configType}`;
-
   const headerCountLabel = isDiff
     ? `· Base ${baseRev} → Compare ${rev} · ${headlineCount.toLocaleString()} ${textHeadlineWord}`
     : `· ${headlineCount.toLocaleString()} ${viewMode === "text" ? textHeadlineWord : tableHeadlineWord}`;
@@ -1706,26 +1983,17 @@ export function DiffConfigArchiveView({
         tooltipContent={
           viewMode === "table"
             ? diffSearchModeTooltipHelp(tableSearchMode)
-            : "Search the raw config: String = case-insensitive substring. Regex = JavaScript-style pattern (case-insensitive). Enter = next match, Shift+Enter = previous."
+            : "Use Search all below the viewer to describe or query config text."
         }
         countLabel={headerCountLabel}
         trailing={
-          isCombined ? (
+          isCombined && !textOnly ? (
             <DiffViewModeToggle
               value={viewMode}
               onChange={setViewMode}
               options={[
                 { value: "table", label: "Table" },
                 { value: "text", label: "Text" },
-              ]}
-            />
-          ) : isDiff ? (
-            <DiffViewModeToggle
-              value={diffLayout}
-              onChange={setDiffLayout}
-              options={[
-                { value: "unified", label: "Unified" },
-                { value: "split", label: "Split" },
               ]}
             />
           ) : null
@@ -1747,15 +2015,18 @@ export function DiffConfigArchiveView({
           {tableSearchIndexError}
         </p>
       ) : null}
-      {isCombined && viewMode === "table" && tableStatus === "decoding" ? (
-        <p className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-100">
-          {labels.decodingMessage}
-        </p>
-      ) : null}
-      {viewMode === "text" && contentStatus === "decoding" ? (
-        <p className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-100">
-          {labels.decodingMessage}
-        </p>
+      {decodeProgress ? (
+        <div className="mb-3">
+          <DiffDecodeProgressBanner progress={decodeProgress} fallbackMessage={labels.decodingMessage} />
+        </div>
+      ) : isCombined && viewMode === "table" && tableStatus === "decoding" ? (
+        <div className="mb-3">
+          <DiffDecodeProgressBanner progress={null} fallbackMessage={labels.decodingMessage} />
+        </div>
+      ) : viewMode === "text" && contentStatus === "decoding" ? (
+        <div className="mb-3">
+          <DiffDecodeProgressBanner progress={null} fallbackMessage={labels.decodingMessage} />
+        </div>
       ) : null}
       {viewMode === "text" && contentStatus === "error" && contentError ? (
         <p className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -1763,8 +2034,8 @@ export function DiffConfigArchiveView({
         </p>
       ) : null}
 
-      {isCombined && viewMode === "table" ? (
-        <div className="mb-3 flex w-full min-w-0 flex-wrap items-center gap-2 justify-between">
+      {isCombined && viewMode === "table" && !hideSearchChrome ? (
+        <div className="mb-3 flex w-full min-w-0 flex-wrap items-center gap-2 justify-between px-3 pt-3">
           <div className={cn(DIFF_COMBINED_SEARCH_WRAP_CLASS, tableSearchWrapClassName)}>
             <DiffUnifiedSearchField
             mode={tableSearchMode}
@@ -1793,187 +2064,14 @@ export function DiffConfigArchiveView({
           </div>
           {searchRowTrailing ? <div className="flex shrink-0 items-center">{searchRowTrailing}</div> : null}
         </div>
-      ) : (
-        <div className="mb-3 flex w-full min-w-0 max-w-full flex-wrap items-center gap-2 justify-between">
-          <div className="flex min-w-0 flex-1 flex-wrap items-start gap-2">
-          {isDiff ? (
-            <OptionDropdown
-              className="w-[8.5rem] shrink-0"
-              ariaLabel="Config line change filter"
-              value={archiveDiffLineFilter}
-              options={[
-                { value: "all", label: "All" },
-                { value: "added", label: "Added" },
-                { value: "changed", label: "Changed" },
-                { value: "removed", label: "Removed" },
-              ]}
-              onChange={(v) => setArchiveDiffLineFilter(v as ConfigFilterMode)}
-            />
-          ) : null}
-          <div className="relative z-[70] flex min-w-0 max-w-full flex-initial flex-col gap-1.5">
-            <div
-              className={cn(
-                "relative z-50 flex h-8 min-w-0 max-w-full flex-nowrap items-stretch rounded-md border border-border bg-muted/25 shadow-sm",
-                "dark:bg-muted/20",
-              )}
-            >
-              <label className="flex min-h-0 w-[min(13rem,100%)] shrink cursor-text items-center gap-2 pl-2 pr-0.5 sm:w-[min(14rem,100%)]">
-                <span className="sr-only">Find in config text</span>
-                <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                <input
-                  type="text"
-                  value={textFindQuery}
-                  onChange={(e) => setTextFindQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      if (e.shiftKey) {
-                        if (!textFindNavDisabled) {
-                          const n = textMatchIndices.length;
-                          setTextFindActiveIdx((i) => (i - 1 + n) % n);
-                        }
-                      } else if (!textFindNavDisabled) {
-                        const n = textMatchIndices.length;
-                        setTextFindActiveIdx((i) => (i + 1) % n);
-                      }
-                    }
-                  }}
-                  placeholder={textFindKind === "regex" ? "Regex…" : "Find…"}
-                  aria-invalid={textFindDisplayedError != null}
-                  aria-describedby={textFindDisplayedError ? findErrorId : undefined}
-                  className={cn(
-                    "min-h-0 min-w-0 w-full bg-transparent py-1 font-mono text-xs text-foreground outline-none",
-                    "placeholder:text-muted-foreground",
-                  )}
-                />
-              </label>
-
-              <div className="w-px shrink-0 self-stretch bg-border" aria-hidden />
-
-              <div className="flex h-full shrink-0 items-center px-1">
-                <div
-                  className="flex h-6 items-stretch gap-0.5 rounded border border-border bg-background/95 p-px shadow-sm dark:bg-background/50"
-                  role="group"
-                  aria-label="Search mode"
-                >
-                  <button
-                    type="button"
-                    aria-pressed={textFindKind === "literal"}
-                    className={cn(
-                      "min-w-[3.25rem] rounded-sm px-1.5 text-xs font-medium transition-colors",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                      textFindKind === "literal"
-                        ? "bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/40"
-                        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
-                    )}
-                    onClick={() => setTextFindKind("literal")}
-                  >
-                    String
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={textFindKind === "regex"}
-                    className={cn(
-                      "min-w-[3.25rem] rounded-sm px-1.5 text-xs font-medium transition-colors",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                      textFindKind === "regex"
-                        ? "bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/40"
-                        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
-                    )}
-                    onClick={() => setTextFindKind("regex")}
-                  >
-                    Regex
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex shrink-0 flex-nowrap items-stretch" aria-label="Match navigation">
-                <div className="w-px shrink-0 self-stretch bg-border" aria-hidden />
-                <div className="flex h-full w-8 shrink-0 flex-col divide-y divide-border">
-                  <button
-                    type="button"
-                    title="Previous match (Shift+Enter)"
-                    aria-label="Previous match"
-                    disabled={textFindNavDisabled}
-                    className={cn(
-                      "flex min-h-0 flex-1 items-center justify-center border-0 bg-muted/50 text-foreground",
-                      "hover:bg-muted/80 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-                      "dark:bg-muted/35 dark:hover:bg-muted/55",
-                      "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40",
-                    )}
-                    onClick={() => {
-                      const n = textMatchIndices.length;
-                      setTextFindActiveIdx((i) => (i - 1 + n) % n);
-                    }}
-                  >
-                    <ChevronUp className="size-3 shrink-0 opacity-80" aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    title="Next match (Enter)"
-                    aria-label="Next match"
-                    disabled={textFindNavDisabled}
-                    className={cn(
-                      "flex min-h-0 flex-1 items-center justify-center border-0 bg-muted/50 text-foreground",
-                      "hover:bg-muted/80 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-                      "dark:bg-muted/35 dark:hover:bg-muted/55",
-                      "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40",
-                    )}
-                    onClick={() => {
-                      const n = textMatchIndices.length;
-                      setTextFindActiveIdx((i) => (i + 1) % n);
-                    }}
-                  >
-                    <ChevronDown className="size-3 shrink-0 opacity-80" aria-hidden />
-                  </button>
-                </div>
-                <div className="w-px shrink-0 self-stretch bg-border" aria-hidden />
-                <div
-                  className={cn(
-                    "flex h-full min-w-[4.75rem] shrink-0 items-center justify-center bg-muted/50 px-1 text-[11px] leading-none tabular-nums text-muted-foreground",
-                    "dark:bg-muted/35",
-                    textFindNavDisabled && "opacity-40",
-                  )}
-                  aria-live="polite"
-                  aria-label={
-                    textFindNavDisabled
-                      ? "Match count unavailable"
-                      : `Match ${textFindActiveIdx + 1} of ${textMatchIndices.length}`
-                  }
-                >
-                  {textFindMatcher.mode === "bad"
-                    ? "—"
-                    : textFindHasMatches
-                      ? `${textFindActiveIdx + 1}/${textMatchIndices.length}`
-                      : "—"}
-                </div>
-              </div>
-            </div>
-            {textFindHasQuery && textFindDisplayedError ? (
-              <p id={findErrorId} className="text-xs text-destructive">
-                {textFindDisplayedError}
-              </p>
-            ) : null}
-          </div>
-          {isDiff ? (
-            <div className="ml-auto hidden h-8 shrink-0 items-center gap-1 self-start rounded-md border border-border/60 bg-muted/35 px-2 pt-0.5 text-[11px] text-muted-foreground lg:flex">
-              <span className="font-mono text-amber-700 dark:text-amber-400">~</span>
-              <span>changed</span>
-              <span className="mx-0.5 text-border">|</span>
-              <span className="font-mono text-green-700 dark:text-green-400">+</span>
-              <span>added</span>
-              <span className="mx-0.5 text-border">|</span>
-              <span className="font-mono text-red-700 dark:text-red-400">-</span>
-              <span>removed</span>
-            </div>
-          ) : null}
-          </div>
-          {searchRowTrailing ? <div className="flex shrink-0 items-center self-start pt-0.5">{searchRowTrailing}</div> : null}
+      ) : isCombined && viewMode === "table" && hideSearchChrome ? null : searchRowTrailing && !hideSearchChrome ? (
+        <div className="mb-3 flex w-full min-w-0 justify-end">
+          <div className="flex shrink-0 items-center">{searchRowTrailing}</div>
         </div>
-      )}
+      ) : null}
 
       {isCombined && viewMode === "table" ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-3 pb-3">
           <DiffArchiveTable
             aria-busy={tableIsLoading}
             aria-label={tableIsLoading ? tablePlan.loadingAriaLabel : tablePlan.readyAriaLabel}
@@ -2016,10 +2114,10 @@ export function DiffConfigArchiveView({
           />
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
           {contentStatus === "loading" ? (
             <div
-              className="flex min-h-0 flex-1 items-center justify-center rounded-md border bg-background p-6"
+              className="flex min-h-0 flex-1 items-center justify-center bg-background p-6"
               aria-busy="true"
               aria-label="Loading config text"
             >
@@ -2029,44 +2127,72 @@ export function DiffConfigArchiveView({
               </div>
             </div>
           ) : (
-            <div
-              ref={textScrollRef}
-              onScroll={onTextScroll}
-              className="min-h-0 flex-1 overflow-auto rounded-md border bg-background"
-            >
+            <div className="relative min-h-0 flex-1">
               <div
-                className="relative font-mono text-xs"
-                style={{ height: textVirtualWindow.totalLines * textVirtualWindow.rowH }}
+                ref={textScrollRef}
+                onScroll={onTextScroll}
+                className="absolute inset-0 overflow-auto bg-background"
               >
-                {textVirtualWindow.totalLines === 0 ? (
-                  isDiff && contentLines.length > 0 ? (
-                    <div className="p-4 text-sm text-muted-foreground">
-                      No lines match the current change-type filter. Choose &quot;All&quot; to see every line.
-                    </div>
-                  ) : null
-                ) : (
-                  <div
-                    className="absolute left-0 right-0"
-                    style={{ top: textVirtualWindow.topPx, willChange: "transform" }}
-                  >
-                    {textLineDisplayIndices
-                      .slice(textVirtualWindow.start, textVirtualWindow.end)
-                      .map((sourceLineIndex) => {
-                        const i = sourceLineIndex;
+                <DiffChangeMinimap
+                  marks={minimapMarks}
+                  scrollTop={textVirt.scrollTop}
+                  viewportH={textVirt.clientHeight}
+                  totalH={textVirtualWindow.totalH}
+                />
+                <div
+                  className="relative pr-2.5 font-mono text-xs"
+                  style={{ height: textVirtualWindow.totalH }}
+                >
+                  {textVirtualWindow.totalRows === 0 ? (
+                    isDiff && contentLines.length > 0 ? (
+                      <div className="p-4 text-sm text-muted-foreground">
+                        No lines match the current change-type filter. Choose &quot;All&quot; to see every line.
+                      </div>
+                    ) : null
+                  ) : (
+                    <div
+                      className="absolute left-0 right-0"
+                      style={{ top: textVirtualWindow.topPx, willChange: "transform" }}
+                    >
+                      {textViewRows.slice(textVirtualWindow.start, textVirtualWindow.end).map((viewRow, offset) => {
+                        const vi = textVirtualWindow.start + offset;
+                        const rowH = textRowHeights[vi] ?? textVirtualWindow.rowH;
+                        if (viewRow.kind === "header") {
+                          const titleLineIndex =
+                            viewRow.section.start + 1 < viewRow.section.end
+                              ? viewRow.section.start + 1
+                              : -1;
+                          const hoverInfo =
+                            titleLineIndex >= 0 ? sectionTitleHoverByLineIndex.get(titleLineIndex) : undefined;
+                          return (
+                            <div key={`hdr-${viewRow.section.start}`} style={{ height: rowH }}>
+                              <SectionChromeHeader
+                                title={viewRow.section.title}
+                                added={viewRow.section.added}
+                                removed={viewRow.section.removed}
+                                isCurrent={sectionMatchesFocus(
+                                  viewRow.section.title,
+                                  focusBracketTitle,
+                                  viewRow.section.entityId,
+                                )}
+                                hoverInfo={hoverInfo}
+                                definitionLabel={definitionLabel}
+                              />
+                            </div>
+                          );
+                        }
+                        const i = viewRow.lineIndex;
                         const row = contentLines[i]!;
                         const kind = textLineKindByIndex[i] ?? row.type;
-                        const nums = textLineNumbersByIndex[i] ?? { oldLine: null, newLine: null };
                         const debouncedQ = debouncedTextFindQuery.trim();
                         const findOk = textFindMatcher.mode === "ok";
-                        const rowH = textVirtualWindow.rowH;
                         return (
                           <ConfigArchiveVirtualTextRow
                             key={i}
-                            lineIndex={i}
                             line={row.line}
                             hoverText={row.hoverText}
-                            oldLineNumber={nums.oldLine}
-                            newLineNumber={nums.newLine}
+                            sectionHover={sectionTitleHoverByLineIndex.get(i)}
+                            definitionLabel={definitionLabel}
                             lineType={isDiff ? kind : "context"}
                             addedInRev={row.addedInRev}
                             changedInRev={row.changedInRev}
@@ -2074,10 +2200,11 @@ export function DiffConfigArchiveView({
                             before={row.before}
                             layout={isDiff ? diffLayout : "unified"}
                             rowH={rowH}
+                            wordWrap={wordWrap}
                             combinedRev={archiveGamevalRev}
                             lookupRevisions={textLookupRevisions}
-                            debouncedFindQuery={debouncedQ}
-                            findKind={textFindKind}
+                            debouncedFindQuery={textFindHighlightQuery.trim() || debouncedQ}
+                            findKind="literal"
                             findMarkActive={findOk && textMatchSet.has(i)}
                             TextLine={TextLine}
                             getTextLineShowInline={getTextLineShowInline}
@@ -2085,8 +2212,26 @@ export function DiffConfigArchiveView({
                           />
                         );
                       })}
+                    </div>
+                  )}
+                </div>
+                {isCombined && (textFeed.hasMore || textFeed.loadingMore || textFeed.total > 0) ? (
+                  <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-md border border-border/60 bg-background/90 px-2.5 py-1 text-[11px] text-muted-foreground shadow-sm backdrop-blur-sm">
+                    {textFeed.loadingMore ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Loader2 className="size-3 animate-spin" aria-hidden />
+                        Loading more…
+                      </span>
+                    ) : textFeed.hasMore ? (
+                      <span>
+                        Loaded {Math.min(textFeed.nextOffset, textFeed.total).toLocaleString()} /{" "}
+                        {textFeed.total.toLocaleString()} — scroll for more
+                      </span>
+                    ) : textFeed.total > 0 ? (
+                      <span>{textFeed.total.toLocaleString()} entities</span>
+                    ) : null}
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           )}

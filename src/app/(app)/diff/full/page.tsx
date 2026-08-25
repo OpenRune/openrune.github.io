@@ -1,3 +1,5 @@
+import { DiffWorkbench } from "@/components/diff/diff-workbench";
+
 export default function DiffFullPage() {
-  return null;
+  return <DiffWorkbench mode="combined" />;
 }

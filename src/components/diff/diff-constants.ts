@@ -1,13 +1,10 @@
 import { GAMEVAL_TYPE_MAP, type GamevalType } from "@/context/gameval-context";
+import { GAMEVAL_MIN_REVISION, GAMEVAL_VARCS_MIN_REVISION } from "@/lib/gameval-revisions";
 import type { NavConfig } from "@/lib/nav-config";
 
 import type { ConfigLine, ConfigRow, DiffMode, GamevalsFullSection, Section } from "./diff-types";
 
-/** Revisions below this do not expose gameval extras on the cache server (sprites, archives, etc.). */
-export const GAMEVAL_MIN_REVISION = 230;
-
-/** Var client script gamevals exist from this revision onward (cache server). */
-export const GAMEVAL_VARCS_MIN_REVISION = 232;
+export { GAMEVAL_MIN_REVISION, GAMEVAL_VARCS_MIN_REVISION } from "@/lib/gameval-revisions";
 
 /** Tab / URL suffix order for the combined gamevals explorer (matches `GAMEVAL_TYPE_MAP` insertion order). */
 export const GAMEVAL_FULL_TAB_ORDER: readonly GamevalType[] = Object.values(GAMEVAL_TYPE_MAP) as GamevalType[];
@@ -76,7 +73,41 @@ export function normalizeSectionIdFromApiType(rawType: string): string {
 /** Optional primary gameval type for a section (from `/cache/nav`). */
 export function sectionGamevalTypeForSection(section: string): GamevalType | null {
   const key = section.trim().toLowerCase();
-  return sectionGamevalType[key] ?? null;
+  const fromNav = sectionGamevalType[key];
+  if (fromNav) return fromNav;
+  // Fallback before `/cache/nav` applies (text headers still need gamevals).
+  switch (key) {
+    case "items":
+    case "item":
+      return "items";
+    case "npcs":
+    case "npc":
+      return "npcs";
+    case "objects":
+    case "object":
+    case "locs":
+    case "loc":
+      return "objects";
+    case "sequences":
+    case "sequence":
+    case "spotanim":
+    case "spotanims":
+      return key.startsWith("spot") ? "spotanims" : "sequences";
+    case "inv":
+    case "inventories":
+      return "inv";
+    case "varbit":
+    case "varbits":
+      return "varbits";
+    case "varp":
+    case "varps":
+      return "varp";
+    case "enums":
+    case "enum":
+      return null;
+    default:
+      return null;
+  }
 }
 
 function singularizeSectionPrefix(sectionId: string): string {

@@ -4,39 +4,49 @@ import * as React from "react";
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useSettings } from "@/context/settings-context";
 import { cn } from "@/lib/utils";
 import { getConfigBlocks, trimBlockEndExclusive, type ConfigSectionBlock } from "@/lib/diff-config-blocks";
 
 import { RsColorBox } from "@/components/ui/rs-color-box";
 import { RSTexture } from "@/components/ui/RSTexture";
+import { useDiffExplorerFocus } from "./diff-explorer-focus";
+import { DumpSyntaxText, SearchHitHighlightedText } from "./diff-dump-syntax";
+import {
+  buildSectionMetas,
+  DiffChangeMinimap,
+  insertSectionHeadersIntoViewRows,
+  SectionChromeHeader,
+  sectionMatchesFocus,
+  type SectionMeta,
+} from "./diff-section-sticky";
+import {
+  buildSectionTitleHoverByLineIndex,
+  DumpSectionTitleHover,
+} from "./diff-section-title-tooltip";
+import {
+  buildPrefixOffsets,
+  estimateCharsPerLine,
+  estimateWrappedRowUnits,
+  virtualWindowFromOffsets,
+} from "./diff-text-wrap";
 import { inConfigSectionBlock } from "./diff-config-line-filter";
+import { findConfigFocusLineIndex, configLineMatchesFocusNeedle, bareFocusTitle, parseFocusEntityId } from "./diff-focus-match";
+import { sectionGamevalTypeForSection } from "./diff-constants";
 import type { ConfigFilterMode, ConfigLine } from "./diff-types";
+import { useGamevals } from "@/context/gameval-context";
 
 const LINE_H = 22;
 const OVERSCAN = 14;
+/** Collapse context runs longer than this when showing the full file. */
+const CONTEXT_COLLAPSE_MIN = 10;
 
-type HighlightSeg = { text: string; highlight: boolean };
 type InlineDiffSeg = { text: string; kind: "same" | "add" | "remove" };
 
-function splitHighlightLiteral(text: string, needleRaw: string): HighlightSeg[] {
-  const needle = needleRaw.trim();
-  if (!needle) return [{ text, highlight: false }];
-  const lowerText = text.toLowerCase();
-  const lowerNeedle = needle.toLowerCase();
-  const out: HighlightSeg[] = [];
-  let pos = 0;
-  while (pos < text.length) {
-    const idx = lowerText.indexOf(lowerNeedle, pos);
-    if (idx === -1) {
-      out.push({ text: text.slice(pos), highlight: false });
-      break;
-    }
-    if (idx > pos) out.push({ text: text.slice(pos, idx), highlight: false });
-    out.push({ text: text.slice(idx, idx + needle.length), highlight: true });
-    pos = idx + needle.length;
-  }
-  return out;
-}
+type ViewRow =
+  | { kind: "line"; lineIndex: number }
+  | { kind: "collapse"; count: number }
+  | { kind: "header"; section: SectionMeta };
 
 function getColorFieldType(name: string): "hsl" | "rgb" | null {
   const l = name.toLowerCase();
@@ -121,57 +131,52 @@ export function ColorLineText({
   const colorKind = fn ? getColorFieldType(fn) : null;
   const textureField = fn ? isTextureField(fn) : false;
   if (!colorKind && !textureField) {
-    return <SearchHitHighlightedText text={displayText} query={query} />;
+    return <DumpSyntaxText text={displayText} query={query} />;
   }
   const eqIdx = displayText.indexOf("=");
-  const prefix = displayText.slice(0, eqIdx + 1);
+  const prefix = displayText.slice(0, eqIdx);
+  const eq = displayText.slice(eqIdx, eqIdx + 1);
   const rest = displayText.slice(eqIdx + 1);
   const isArray = isArrayValue(rest);
   const parts: React.ReactNode[] = [
-    <SearchHitHighlightedText key="pfx" text={prefix} query={query} />,
+    <span key="pfx" className="text-fuchsia-600 dark:text-fuchsia-400">
+      <SearchHitHighlightedText text={prefix} query={query} />
+    </span>,
+    <span key="eq" className="text-zinc-400 dark:text-zinc-300">
+      {eq}
+    </span>,
   ];
   const re = /(-?\d+)/g;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(rest)) !== null) {
     if (m.index > last)
-      parts.push(<SearchHitHighlightedText key={`t${last}`} text={rest.slice(last, m.index)} query={query} />);
+      parts.push(
+        <span key={`t${last}`} className="text-teal-600 dark:text-teal-300">
+          <SearchHitHighlightedText text={rest.slice(last, m.index)} query={query} />
+        </span>,
+      );
     const widget = colorKind ? (
       <RsColorSwatch key={`sw${m.index}`} value={+m[1]} kind={colorKind} />
     ) : (
       <RsTextureSwatch key={`sw${m.index}`} value={+m[1]} />
     );
     if (enableWidgets && isArray) parts.push(widget);
-    parts.push(<SearchHitHighlightedText key={`n${m.index}`} text={m[1]} query={query} />);
+    parts.push(
+      <span key={`n${m.index}`} className="text-emerald-600 dark:text-emerald-300">
+        <SearchHitHighlightedText text={m[1]} query={query} />
+      </span>,
+    );
     if (enableWidgets && !isArray) parts.push(widget);
     last = m.index + m[1].length;
   }
   if (last < rest.length)
-    parts.push(<SearchHitHighlightedText key="tend" text={rest.slice(last)} query={query} />);
+    parts.push(
+      <span key="tend" className="text-teal-600 dark:text-teal-300">
+        <SearchHitHighlightedText text={rest.slice(last)} query={query} />
+      </span>,
+    );
   return <>{parts}</>;
-}
-
-/** High-contrast hit paint (avoid `<mark>` UA styles that can hide highlights). */
-const SEARCH_HIT_MARK_CLASS =
-  "rounded-[2px] px-0.5 font-mono text-xs font-normal not-italic ring-1 ring-yellow-700/70 bg-yellow-300 text-neutral-950 dark:bg-amber-400 dark:text-neutral-950 dark:ring-amber-600/80";
-
-function SearchHitHighlightedText({ text, query }: { text: string; query: string }) {
-  const q = query.trim();
-  if (!q) return <>{text || " "}</>;
-  const segs = splitHighlightLiteral(text || " ", q);
-  return (
-    <>
-      {segs.map((seg, i) =>
-        seg.highlight ? (
-          <span key={i} className={SEARCH_HIT_MARK_CLASS} data-search-hit>
-            {seg.text}
-          </span>
-        ) : (
-          <span key={i}>{seg.text}</span>
-        ),
-      )}
-    </>
-  );
 }
 
 function tokenizeWithWhitespace(text: string): string[] {
@@ -255,7 +260,7 @@ function ChangedInlineText({
           return (
             <React.Fragment key={i}>
               {swatchBefore}
-              <SearchHitHighlightedText text={seg.text} query={query} />
+              <DumpSyntaxText text={seg.text} query={query} />
               {swatchAfter}
             </React.Fragment>
           );
@@ -264,7 +269,7 @@ function ChangedInlineText({
           return (
             <React.Fragment key={i}>
               {swatchBefore}
-              <span className="rounded-[2px] bg-green-500/30 dark:bg-green-500/24">
+              <span className="rounded-[2px] bg-emerald-400/45 px-0.5 text-emerald-950 dark:bg-emerald-400/35 dark:text-emerald-50">
                 <SearchHitHighlightedText text={seg.text} query={query} />
               </span>
               {swatchAfter}
@@ -274,7 +279,7 @@ function ChangedInlineText({
         return (
           <React.Fragment key={i}>
             {swatchBefore}
-            <span className="rounded-[2px] bg-red-500/24 text-red-900 line-through opacity-85 dark:bg-red-500/22 dark:text-red-100">
+            <span className="rounded-[2px] bg-rose-400/45 px-0.5 text-rose-950 line-through opacity-90 dark:bg-rose-500/40 dark:text-rose-50">
               <SearchHitHighlightedText text={seg.text} query={query} />
             </span>
             {swatchAfter}
@@ -290,6 +295,8 @@ type DiffConfigDiffTextProps = {
   filterMode: ConfigFilterMode;
   searchQuery: string;
   layout?: "unified" | "split";
+  /** Config section id for hover tooltips (`overlay`, `items`, …). */
+  configType?: string;
 };
 
 function ChangedSideText({
@@ -329,7 +336,7 @@ function ChangedSideText({
           return (
             <React.Fragment key={i}>
               {swatchBefore}
-              <SearchHitHighlightedText text={seg.text} query={query} />
+              <DumpSyntaxText text={seg.text} query={query} />
               {swatchAfter}
             </React.Fragment>
           );
@@ -338,7 +345,7 @@ function ChangedSideText({
           return (
             <React.Fragment key={i}>
               {swatchBefore}
-              <span className="rounded-[2px] bg-red-500/24 text-red-900 line-through opacity-85 dark:bg-red-500/22 dark:text-red-100">
+              <span className="rounded-[2px] bg-rose-400/45 px-0.5 text-rose-950 line-through opacity-90 dark:bg-rose-500/40 dark:text-rose-50">
                 <SearchHitHighlightedText text={seg.text} query={query} />
               </span>
               {swatchAfter}
@@ -349,7 +356,7 @@ function ChangedSideText({
           return (
             <React.Fragment key={i}>
               {swatchBefore}
-              <span className="rounded-[2px] bg-green-500/30 dark:bg-green-500/24">
+              <span className="rounded-[2px] bg-emerald-400/45 px-0.5 text-emerald-950 dark:bg-emerald-400/35 dark:text-emerald-50">
                 <SearchHitHighlightedText text={seg.text} query={query} />
               </span>
               {swatchAfter}
@@ -363,22 +370,7 @@ function ChangedSideText({
 }
 
 function passesSearch(i: number, lines: ConfigLine[], q: string): boolean {
-  if (!q) return true;
-  const needle = q.toLowerCase();
-  let sectionStart = 0;
-  for (let k = 0; k <= i; k++) {
-    if (lines[k]?.line.startsWith("// ")) sectionStart = k;
-  }
-  if (lines[i].line.toLowerCase().includes(needle)) return true;
-  if (lines[sectionStart]?.line.toLowerCase().includes(needle)) return true;
-  if (sectionStart + 1 < lines.length && lines[sectionStart + 1].line.toLowerCase().includes(needle)) return true;
-  return false;
-}
-
-function bracketedSectionQuery(q: string): string | null {
-  const trimmed = q.trim().toLowerCase();
-  if (!trimmed.startsWith("[") || !trimmed.endsWith("]") || trimmed.length < 3) return null;
-  return trimmed;
+  return configLineMatchesFocusNeedle(lines, i, q);
 }
 
 function isBracketSectionTitleLine(lines: ConfigLine[], i: number): boolean {
@@ -394,6 +386,60 @@ function withFieldPrefixIfMissing(before: string | null | undefined, after: stri
   const eq = after.indexOf("=");
   if (eq <= 0) return before;
   return `${after.slice(0, eq + 1)}${before}`;
+}
+
+function isStructuralLine(lines: ConfigLine[], i: number): boolean {
+  const line = lines[i]?.line ?? "";
+  return line.startsWith("// ") || isBracketSectionTitleLine(lines, i);
+}
+
+function buildViewRows(
+  lines: ConfigLine[],
+  visibleIndices: number[],
+  lineKindByIndex: readonly ("add" | "removed" | "change" | "context")[],
+  filterMode: ConfigFilterMode,
+  searchQuery: string,
+): ViewRow[] {
+  if (filterMode !== "all" || searchQuery.trim()) {
+    return visibleIndices.map((lineIndex) => ({ kind: "line" as const, lineIndex }));
+  }
+
+  const out: ViewRow[] = [];
+  let i = 0;
+  while (i < visibleIndices.length) {
+    const li = visibleIndices[i]!;
+    if ((lineKindByIndex[li] ?? "context") === "context" && !isStructuralLine(lines, li)) {
+      let j = i + 1;
+      while (j < visibleIndices.length) {
+        const lj = visibleIndices[j]!;
+        if ((lineKindByIndex[lj] ?? "context") !== "context" || isStructuralLine(lines, lj)) break;
+        j++;
+      }
+      const count = j - i;
+      if (count >= CONTEXT_COLLAPSE_MIN) {
+        out.push({ kind: "collapse", count });
+      } else {
+        for (let k = i; k < j; k++) out.push({ kind: "line", lineIndex: visibleIndices[k]! });
+      }
+      i = j;
+      continue;
+    }
+    out.push({ kind: "line", lineIndex: li });
+    i++;
+  }
+  return out;
+}
+
+function CollapseSeparator({ count }: { count: number }) {
+  return (
+    <div className="flex h-full w-full items-center justify-center gap-3 border-y border-border/30 bg-muted/20 px-3 text-[11px] text-sky-700/80 dark:bg-zinc-900/50 dark:text-sky-400/70">
+      <span className="h-px flex-1 bg-border/60" />
+      <span className="shrink-0 font-mono tabular-nums">
+        … {count.toLocaleString()} unchanged lines
+      </span>
+      <span className="h-px flex-1 bg-border/60" />
+    </div>
+  );
 }
 
 function tooltipBody(row: ConfigLine, inSection: boolean): React.ReactNode {
@@ -418,10 +464,21 @@ function tooltipBody(row: ConfigLine, inSection: boolean): React.ReactNode {
   return null;
 }
 
-export function DiffConfigDiffText({ lines, filterMode, searchQuery, layout = "split" }: DiffConfigDiffTextProps) {
+export function DiffConfigDiffText({
+  lines,
+  filterMode,
+  searchQuery,
+  layout = "split",
+  configType = "config",
+}: DiffConfigDiffTextProps) {
   const parentRef = React.useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = React.useState(0);
   const [viewportH, setViewportH] = React.useState(400);
+  const [viewportW, setViewportW] = React.useState(800);
+  const { focusBracketTitle, focusNonce } = useDiffExplorerFocus();
+  const { lookupGamevalByName } = useGamevals();
+  const { settings } = useSettings();
+  const wordWrap = settings.editorWordWrap;
 
   const blocks = React.useMemo(() => getConfigBlocks(lines), [lines]);
 
@@ -506,48 +563,37 @@ export function DiffConfigDiffText({ lines, filterMode, searchQuery, layout = "s
     return arr;
   }, [lines, filterMode, searchQuery, lineKindByIndex]);
 
-  const sectionSearchHits = React.useMemo(() => {
-    const exactTitleQuery = bracketedSectionQuery(searchQuery);
-    const hits = new Set<number>();
-    if (!exactTitleQuery) return hits;
+  const viewRows = React.useMemo(() => {
+    const base = buildViewRows(lines, visibleIndices, lineKindByIndex, filterMode, searchQuery);
+    const sections = buildSectionMetas(lines, lineKindByIndex);
+    return insertSectionHeadersIntoViewRows(base, sections) as ViewRow[];
+  }, [filterMode, lineKindByIndex, lines, searchQuery, visibleIndices]);
 
-    let sectionStart = -1;
-    for (let i = 0; i <= lines.length; i++) {
-      const isHeader = i < lines.length && lines[i]!.line.startsWith("// ");
-      if (isHeader || i === lines.length) {
-        if (sectionStart >= 0) {
-          const titleIdx = sectionStart + 1;
-          const titleLine = lines[titleIdx]?.line?.trim().toLowerCase();
-          if (titleLine === exactTitleQuery) {
-            for (let k = sectionStart; k < i; k++) hits.add(k);
-          }
-        }
-        sectionStart = i < lines.length ? i : -1;
-      }
-    }
-    return hits;
-  }, [lines, searchQuery]);
+  const sectionMetas = React.useMemo(() => buildSectionMetas(lines, lineKindByIndex), [lines, lineKindByIndex]);
 
-  const lineNumbersByIndex = React.useMemo(() => {
-    const out: { oldLine: number | null; newLine: number | null }[] = [];
-    let oldLine = 1;
-    let newLine = 1;
-    for (let i = 0; i < lines.length; i++) {
-      const dk = lineKindByIndex[i] ?? "context";
-      if (dk === "add") {
-        out[i] = { oldLine: null, newLine };
-        newLine++;
-      } else if (dk === "removed") {
-        out[i] = { oldLine, newLine: null };
-        oldLine++;
-      } else {
-        out[i] = { oldLine, newLine };
-        oldLine++;
-        newLine++;
-      }
+  const sectionTitleHoverByLineIndex = React.useMemo(
+    () => buildSectionTitleHoverByLineIndex(lines, sectionMetas, configType, focusBracketTitle),
+    [lines, sectionMetas, configType, focusBracketTitle],
+  );
+
+  const definitionLabel = React.useMemo(() => {
+    const t = configType.trim().toLowerCase();
+    return t && t !== "config" ? `config.${t}` : undefined;
+  }, [configType]);
+
+  const minimapMarks = React.useMemo(() => {
+    const marks: { topPct: number; kind: "add" | "removed" | "change" }[] = [];
+    const n = viewRows.length;
+    if (n === 0) return marks;
+    for (let vi = 0; vi < n; vi++) {
+      const row = viewRows[vi]!;
+      if (row.kind !== "line") continue;
+      const dk = lineKindByIndex[row.lineIndex] ?? "context";
+      if (dk === "context") continue;
+      marks.push({ topPct: (vi / n) * 100, kind: dk });
     }
-    return out;
-  }, [lines, lineKindByIndex]);
+    return marks;
+  }, [lineKindByIndex, viewRows]);
 
   const onScroll = React.useCallback(() => {
     const el = parentRef.current;
@@ -558,24 +604,76 @@ export function DiffConfigDiffText({ lines, filterMode, searchQuery, layout = "s
   React.useLayoutEffect(() => {
     const el = parentRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setViewportH(el.clientHeight || 400));
+    const apply = () => {
+      setViewportH(el.clientHeight || 400);
+      setViewportW(el.clientWidth || 800);
+    };
+    const ro = new ResizeObserver(apply);
     ro.observe(el);
-    setViewportH(el.clientHeight || 400);
+    apply();
     return () => ro.disconnect();
   }, []);
 
-  const totalH = visibleIndices.length === 0 ? 0 : visibleIndices.length * LINE_H;
-  const start =
-    visibleIndices.length === 0 ? 0 : Math.max(0, Math.floor(scrollTop / LINE_H) - OVERSCAN);
-  const end =
-    visibleIndices.length === 0
+  const rowHeights = React.useMemo(() => {
+    if (!wordWrap) return viewRows.map(() => LINE_H);
+    const cols = layout === "split" ? 2 : 1;
+    const chars = estimateCharsPerLine(viewportW, cols);
+    return viewRows.map((viewRow) => {
+      if (viewRow.kind === "header" || viewRow.kind === "collapse") return LINE_H;
+      const row = lines[viewRow.lineIndex];
+      const text = row?.line ?? " ";
+      const before = row?.before ?? "";
+      const units = Math.max(estimateWrappedRowUnits(text, chars), estimateWrappedRowUnits(before, chars));
+      return units * LINE_H;
+    });
+  }, [layout, lines, viewRows, viewportW, wordWrap]);
+
+  const rowPrefix = React.useMemo(() => buildPrefixOffsets(rowHeights), [rowHeights]);
+
+  const totalH = rowPrefix[viewRows.length] ?? 0;
+  const wrapWindow = wordWrap
+    ? virtualWindowFromOffsets(rowPrefix, scrollTop, viewportH, OVERSCAN)
+    : null;
+  const start = wrapWindow
+    ? wrapWindow.start
+    : viewRows.length === 0
+      ? 0
+      : Math.max(0, Math.floor(scrollTop / LINE_H) - OVERSCAN);
+  const end = wrapWindow
+    ? Math.max(wrapWindow.start, wrapWindow.end - 1)
+    : viewRows.length === 0
       ? -1
-      : Math.min(visibleIndices.length - 1, Math.ceil((scrollTop + viewportH) / LINE_H) + OVERSCAN);
-  const visibleStart = visibleIndices.length === 0 ? 0 : Math.max(0, Math.floor(scrollTop / LINE_H));
-  const visibleEnd =
-    visibleIndices.length === 0
+      : Math.min(viewRows.length - 1, Math.ceil((scrollTop + viewportH) / LINE_H) + OVERSCAN);
+  const visibleStart = wrapWindow
+    ? wrapWindow.start
+    : viewRows.length === 0
+      ? 0
+      : Math.max(0, Math.floor(scrollTop / LINE_H));
+  const visibleEnd = wrapWindow
+    ? Math.max(wrapWindow.start, wrapWindow.end - 1)
+    : viewRows.length === 0
       ? -1
-      : Math.min(visibleIndices.length - 1, Math.ceil((scrollTop + viewportH) / LINE_H));
+      : Math.min(viewRows.length - 1, Math.ceil((scrollTop + viewportH) / LINE_H));
+
+  React.useEffect(() => {
+    if (!focusNonce || !focusBracketTitle) return;
+    const el = parentRef.current;
+    if (!el) return;
+    let resolvedId = parseFocusEntityId(focusBracketTitle);
+    if (resolvedId == null) {
+      const gvType = sectionGamevalTypeForSection(configType);
+      const name = bareFocusTitle(focusBracketTitle);
+      if (gvType && name) {
+        resolvedId = lookupGamevalByName(gvType, name) ?? null;
+      }
+    }
+    const sourceIdx = findConfigFocusLineIndex(lines, focusBracketTitle, resolvedId);
+    if (sourceIdx < 0) return;
+    const vi = viewRows.findIndex((r) => r.kind === "line" && r.lineIndex === sourceIdx);
+    if (vi < 0) return;
+    el.scrollTop = Math.max(0, (rowPrefix[vi] ?? vi * LINE_H) - 8);
+    setScrollTop(el.scrollTop);
+  }, [focusBracketTitle, focusNonce, lines, viewRows, rowPrefix, configType, lookupGamevalByName]);
 
   /**
    * Tooltip trigger must not merge `className` onto the colored line/gutter nodes: Base UI passes
@@ -604,33 +702,92 @@ export function DiffConfigDiffText({ lines, filterMode, searchQuery, layout = "s
   };
 
   return (
-    <div
-      ref={parentRef}
-      className="min-h-0 flex-1 overflow-auto rounded-md border bg-background"
-      onScroll={onScroll}
-    >
-      <div className="relative min-h-[8rem] font-mono text-xs" style={{ height: Math.max(totalH, 120) }}>
-        {visibleIndices.length === 0 ? (
+    <div className="diff-codeview relative min-h-0 flex-1">
+      <div
+        ref={parentRef}
+        className="absolute inset-0 overflow-auto bg-background"
+        onScroll={onScroll}
+      >
+      <DiffChangeMinimap
+        marks={minimapMarks}
+        scrollTop={scrollTop}
+        viewportH={viewportH}
+        totalH={totalH}
+      />
+
+      <div className="relative min-h-[8rem] pr-2.5 font-mono text-xs" style={{ height: Math.max(totalH, 120) }}>
+        {viewRows.length === 0 ? (
           <div className="p-4 text-muted-foreground">No lines match the current filter and search.</div>
         ) : null}
-        {visibleIndices.length > 0 && end >= start
+        {viewRows.length > 0 && end >= start
           ? Array.from({ length: end - start + 1 }, (_, k) => start + k)
-              .filter((vi) => vi >= 0 && vi < visibleIndices.length)
+              .filter((vi) => vi >= 0 && vi < viewRows.length)
               .map((vi) => {
+              const viewRow = viewRows[vi]!;
+              const top = rowPrefix[vi] ?? vi * LINE_H;
+              const rowH = rowHeights[vi] ?? LINE_H;
+
+              if (viewRow.kind === "header") {
+                return (
+                  <div
+                    key={`hdr-${viewRow.section.start}`}
+                    data-virtual-row
+                    className="absolute left-0 flex w-full items-stretch"
+                    style={{ top, height: rowH }}
+                  >
+                    <SectionChromeHeader
+                      title={viewRow.section.title}
+                      added={viewRow.section.added}
+                      removed={viewRow.section.removed}
+                      isCurrent={sectionMatchesFocus(
+                        viewRow.section.title,
+                        focusBracketTitle,
+                        viewRow.section.entityId,
+                      )}
+                      hoverInfo={
+                        viewRow.section.start + 1 < viewRow.section.end
+                          ? sectionTitleHoverByLineIndex.get(viewRow.section.start + 1)
+                          : undefined
+                      }
+                      definitionLabel={definitionLabel}
+                    />
+                  </div>
+                );
+              }
+
+              if (viewRow.kind === "collapse") {
+                return (
+                  <div
+                    key={`collapse-${vi}`}
+                    data-virtual-row
+                    className="absolute left-0 flex w-full items-stretch"
+                    style={{ top, height: rowH }}
+                  >
+                    <CollapseSeparator count={viewRow.count} />
+                  </div>
+                );
+              }
+
               const widgetsInView = vi >= visibleStart && vi <= visibleEnd;
-              const lineIndex = visibleIndices[vi];
+              const lineIndex = viewRow.lineIndex;
               const row = lines[lineIndex];
               const beforeDisplay = withFieldPrefixIfMissing(row.before, row.line || " ");
               const inSection = inConfigSectionBlock(blocks, lineIndex);
               const lineTip = tooltipBody(row, inSection);
-              const dk = lineKindByIndex[lineIndex] ?? "context";
+              const rawDk = lineKindByIndex[lineIndex] ?? "context";
+              const dk: "add" | "removed" | "change" | "context" =
+                rawDk === "change" &&
+                beforeDisplay != null &&
+                beforeDisplay.trim() === (row.line || " ").trim()
+                  ? "context"
+                  : rawDk;
               const barColor =
                 dk === "add"
-                  ? "bg-green-500"
+                  ? "bg-emerald-500"
                   : dk === "change"
-                    ? "bg-amber-500"
+                    ? "bg-sky-500"
                     : dk === "removed"
-                      ? "bg-red-500"
+                      ? "bg-rose-500"
                       : null;
 
               const addRemovedBlock = blocks.find(
@@ -679,63 +836,26 @@ export function DiffConfigDiffText({ lines, filterMode, searchQuery, layout = "s
                   blockTooltipContent
                 );
 
-              const iconWrap = "flex h-full w-5 shrink-0 items-center justify-center font-semibold";
-              const lineMarker =
-                dk === "add" ? (
-                  <span className={cn(iconWrap, "text-green-700 dark:text-green-400")} aria-label="Added line">
-                    +
-                  </span>
-                ) : dk === "removed" ? (
-                  <span className={cn(iconWrap, "text-red-700 dark:text-red-400")} aria-label="Removed line">
-                    -
-                  </span>
-                ) : dk === "change" ? (
-                  <span className={cn(iconWrap, "text-amber-700 dark:text-amber-400")} aria-label="Changed line">
-                    ~
-                  </span>
-                ) : (
-                  <span className={cn(iconWrap, "opacity-0")} aria-hidden>
-                    .
-                  </span>
-                );
-
               const showBlockRangeTip = Boolean(lineTooltipBody && blockInfo?.isFirst);
 
-              const gutterIcon = showBlockRangeTip ? (
-                <Tooltip key={`ic-${lineIndex}`}>
-                  <TooltipTrigger render={<span className="inline-flex">{lineMarker}</span>} />
-                  <TooltipContent
-                    opaque
-                    side="right"
-                    className="max-w-sm border border-zinc-800 bg-zinc-950 p-3 text-xs text-white"
-                  >
-                    {lineTooltipBody}
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                lineMarker
-              );
-
-              const gutterCell = (
-                <div className="flex h-full items-center font-mono text-[11px]">
-                  <span className="flex w-6 shrink-0 items-center justify-end pr-1.5 text-right tabular-nums text-muted-foreground">
-                    {lineIndex + 1}
-                  </span>
-                  <span className={cn("w-1 shrink-0 self-stretch rounded-sm", barColor ?? "bg-transparent")} />
-                  {gutterIcon}
-                </div>
-              );
-
+              const sectionHover = sectionTitleHoverByLineIndex.get(lineIndex);
               const lineInner = (
                 <span
                   className={cn(
-                    "block w-full min-w-0 cursor-default whitespace-pre px-3 py-0",
-                    dk === "add" && "bg-green-500/35 dark:bg-green-500/28",
-                    dk === "change" && "bg-amber-500/35 dark:bg-amber-500/28",
-                    dk === "removed" && "bg-red-500/35 dark:bg-red-500/28",
+                    "diff-editor-line block w-full min-w-0 cursor-default px-3 py-0",
+                    wordWrap ? "whitespace-pre-wrap break-words [overflow-wrap:anywhere]" : "whitespace-pre",
+                    dk === "add" && "bg-emerald-500/20 dark:bg-emerald-500/16",
+                    dk === "change" && "bg-sky-500/15 dark:bg-sky-500/12",
+                    dk === "removed" && "bg-rose-500/20 dark:bg-rose-500/16",
                   )}
                 >
-                  {dk === "change" && typeof row.before === "string" ? (
+                  {sectionHover ? (
+                    <span className="font-mono text-xs leading-[22px]">
+                      <span className="text-sky-500 dark:text-sky-400">[</span>
+                      <DumpSectionTitleHover info={sectionHover} definitionLabel={definitionLabel} />
+                      <span className="text-sky-500 dark:text-sky-400">]</span>
+                    </span>
+                  ) : dk === "change" && typeof row.before === "string" ? (
                     <ChangedInlineText
                       before={beforeDisplay ?? row.before}
                       after={row.line || " "}
@@ -752,50 +872,54 @@ export function DiffConfigDiffText({ lines, filterMode, searchQuery, layout = "s
               if (blockInfo && addRemovedBlock) {
                 const blockClass =
                   addRemovedBlock.type === "add"
-                    ? "border-green-600/70 bg-green-500/15 dark:border-green-500/60 dark:bg-green-500/10"
-                    : "border-red-600/70 bg-red-500/15 dark:border-red-500/60 dark:bg-red-500/10";
+                    ? "border-emerald-600/50 bg-emerald-500/10 dark:border-emerald-500/40 dark:bg-emerald-500/8"
+                    : "border-rose-600/50 bg-rose-500/10 dark:border-rose-500/40 dark:bg-rose-500/8";
                 const wrapperClass = cn(
                   "ml-2 mr-1 min-h-full w-full min-w-0 overflow-hidden",
-                  blockInfo.isFirst && "mt-1 rounded-t-lg border-x border-t",
-                  blockInfo.isLast && "mb-1 rounded-b-lg border-x border-b",
+                  blockInfo.isFirst && "mt-1 rounded-t-md border-x border-t",
+                  blockInfo.isLast && "mb-1 rounded-b-md border-x border-b",
                   !blockInfo.isFirst && !blockInfo.isLast && "border-x",
                 );
                 content = <div className={cn(wrapperClass, blockClass)}>{lineInner}</div>;
-              } else {
-                content = wrapTooltip(lineInner, lineTip, `ln-${lineIndex}`);
+              } else if (!sectionHover) {
+                content = wrapTooltip(lineInner, showBlockRangeTip ? lineTooltipBody : lineTip, `ln-${lineIndex}`);
               }
-
-              const sectionSearchTint = sectionSearchHits.has(lineIndex)
-                ? "ring-1 ring-inset ring-yellow-600/40 bg-yellow-200/10 dark:ring-yellow-400/30 dark:bg-yellow-300/10"
-                : "";
 
               const rowTint =
                 dk === "add"
-                  ? cn("bg-green-500/10 dark:bg-green-500/14", sectionSearchTint)
+                  ? "bg-emerald-500/8 dark:bg-emerald-500/10"
                   : dk === "removed"
-                    ? cn("bg-red-500/10 dark:bg-red-500/14", sectionSearchTint)
+                    ? "bg-rose-500/8 dark:bg-rose-500/10"
                     : dk === "change"
-                      ? cn("bg-amber-500/12 dark:bg-amber-500/16", sectionSearchTint)
-                      : sectionSearchTint;
-
-              const top = vi * LINE_H;
+                      ? "bg-sky-500/8 dark:bg-sky-500/10"
+                      : "";
 
               if (layout === "split") {
-                const nums = lineNumbersByIndex[lineIndex] ?? { oldLine: null, newLine: null };
                 const hasBefore = typeof row.before === "string";
                 const splitTip = showBlockRangeTip ? lineTooltipBody : lineTip;
 
                 const leftContent =
                   dk === "add"
                     ? ""
-                    : dk === "change" && hasBefore
-                      ? (beforeDisplay ?? row.before!)
+                    : dk === "change"
+                      ? hasBefore
+                        ? (beforeDisplay ?? row.before!)
+                        : ""
                       : row.line || " ";
 
                 const rightContent = dk === "removed" ? "" : row.line || " ";
 
-                const leftNode =
-                  dk === "change" && hasBefore ? (
+                const sectionTitleNode = sectionHover ? (
+                  <span className="font-mono text-xs leading-[22px]">
+                    <span className="text-sky-500 dark:text-sky-400">[</span>
+                    <DumpSectionTitleHover info={sectionHover} definitionLabel={definitionLabel} />
+                    <span className="text-sky-500 dark:text-sky-400">]</span>
+                  </span>
+                ) : null;
+
+                const leftNode = sectionTitleNode && dk !== "add"
+                  ? sectionTitleNode
+                  : dk === "change" && hasBefore ? (
                     <ChangedSideText
                       before={beforeDisplay ?? row.before!}
                       after={row.line || " "}
@@ -803,12 +927,13 @@ export function DiffConfigDiffText({ lines, filterMode, searchQuery, layout = "s
                       side="left"
                       enableWidgets={widgetsInView}
                     />
-                  ) : (
+                  ) : leftContent ? (
                     <ColorLineText text={leftContent} query={searchQuery} enableWidgets={widgetsInView} />
-                  );
+                  ) : null;
 
-                const rightNode =
-                  dk === "change" && hasBefore ? (
+                const rightNode = sectionTitleNode && dk !== "removed"
+                  ? sectionTitleNode
+                  : dk === "change" && hasBefore ? (
                     <ChangedSideText
                       before={beforeDisplay ?? row.before!}
                       after={row.line || " "}
@@ -816,32 +941,30 @@ export function DiffConfigDiffText({ lines, filterMode, searchQuery, layout = "s
                       side="right"
                       enableWidgets={widgetsInView}
                     />
-                  ) : (
+                  ) : rightContent ? (
                     <ColorLineText text={rightContent} query={searchQuery} enableWidgets={widgetsInView} />
-                  );
+                  ) : null;
 
                 const leftBg =
                   dk === "removed" || dk === "change"
-                    ? "bg-red-500/16 dark:bg-red-500/14"
+                    ? "bg-rose-500/14 dark:bg-rose-500/12"
                     : "bg-transparent";
                 const rightBg =
                   dk === "add" || dk === "change"
-                    ? "bg-green-500/16 dark:bg-green-500/14"
+                    ? "bg-emerald-500/14 dark:bg-emerald-500/12"
                     : "bg-transparent";
 
-                const leftMarker = dk === "removed" || dk === "change" ? "-" : " ";
-                const rightMarker = dk === "add" || dk === "change" ? "+" : " ";
-
-                const splitMarker = (
-                  marker: string,
-                  className: string,
-                  side: "left" | "right",
-                ) => {
-                  const node = <span className={className}>{marker}</span>;
-                  if (marker.trim() === "" || !splitTip) return node;
+                const paneWithTip = (node: React.ReactNode, side: "left" | "right") => {
+                  if (sectionHover || !splitTip || !node) return node;
                   return (
                     <Tooltip>
-                      <TooltipTrigger render={node} />
+                      <TooltipTrigger
+                        render={(props) => (
+                          <div {...props} className={cn("h-full min-w-0 flex-1", props.className)}>
+                            {node}
+                          </div>
+                        )}
+                      />
                       <TooltipContent
                         opaque
                         side={side}
@@ -858,36 +981,38 @@ export function DiffConfigDiffText({ lines, filterMode, searchQuery, layout = "s
                     key={lineIndex}
                     data-virtual-row
                     className="absolute left-0 flex w-full items-stretch"
-                    style={{ top, height: LINE_H }}
+                    style={{ top, height: rowH }}
                   >
-                    <div className="flex min-w-0 flex-1 border-r border-border/40">
-                      <div className="flex w-14 shrink-0 items-center justify-end border-r bg-muted/35 pr-2 font-mono text-[11px] tabular-nums text-muted-foreground">
-                        {nums.oldLine ?? ""}
-                      </div>
-                      <div className="flex w-6 shrink-0 items-center justify-center border-r bg-muted/25 font-mono text-[11px] text-red-700 dark:text-red-400">
-                        {splitMarker(
-                          leftMarker,
-                          "flex h-full w-full items-center justify-center",
-                          "left",
+                    <div className="flex min-w-0 flex-1 border-r border-border/30">
+                      <div
+                        className={cn(
+                          "w-0.5 shrink-0 self-stretch",
+                          dk === "removed" || dk === "change" ? "bg-rose-500/80" : "bg-transparent",
                         )}
-                      </div>
-                      <div className={cn("min-w-0 flex-1 overflow-hidden px-3 py-0 font-mono text-xs leading-[22px]", leftBg)}>
-                        {leftNode}
+                        aria-hidden
+                      />
+                      <div className={cn(
+                        "diff-editor-line-host min-w-0 flex-1 px-3 py-0 font-mono text-xs leading-[22px]",
+                        wordWrap ? "overflow-x-hidden overflow-y-visible whitespace-pre-wrap break-words" : "overflow-hidden",
+                        leftBg,
+                      )}>
+                        {paneWithTip(leftNode, "left")}
                       </div>
                     </div>
                     <div className="flex min-w-0 flex-1">
-                      <div className="flex w-14 shrink-0 items-center justify-end border-r bg-muted/35 pr-2 font-mono text-[11px] tabular-nums text-muted-foreground">
-                        {nums.newLine ?? ""}
-                      </div>
-                      <div className="flex w-6 shrink-0 items-center justify-center border-r bg-muted/25 font-mono text-[11px] text-green-700 dark:text-green-400">
-                        {splitMarker(
-                          rightMarker,
-                          "flex h-full w-full items-center justify-center",
-                          "right",
+                      <div
+                        className={cn(
+                          "w-0.5 shrink-0 self-stretch",
+                          dk === "add" || dk === "change" ? "bg-emerald-500/80" : "bg-transparent",
                         )}
-                      </div>
-                      <div className={cn("min-w-0 flex-1 overflow-hidden px-3 py-0 font-mono text-xs leading-[22px]", rightBg)}>
-                        {rightNode}
+                        aria-hidden
+                      />
+                      <div className={cn(
+                        "diff-editor-line-host min-w-0 flex-1 px-3 py-0 font-mono text-xs leading-[22px]",
+                        wordWrap ? "overflow-x-hidden overflow-y-visible whitespace-pre-wrap break-words" : "overflow-hidden",
+                        rightBg,
+                      )}>
+                        {paneWithTip(rightNode, "right")}
                       </div>
                     </div>
                   </div>
@@ -899,16 +1024,15 @@ export function DiffConfigDiffText({ lines, filterMode, searchQuery, layout = "s
                   key={lineIndex}
                   data-virtual-row
                   className={cn("absolute left-0 flex w-full items-stretch", rowTint)}
-                  style={{ top, height: LINE_H }}
+                  style={{ top, height: rowH }}
                 >
-                  <div className="shrink-0 border-r bg-muted/40" style={{ width: 72 }}>
-                    {wrapTooltip(gutterCell, blockInfo && !showBlockRangeTip ? null : !blockInfo ? lineTip : null, `g-${lineIndex}`)}
-                  </div>
-                  <div className="min-w-0 flex-1 border-b border-border/40">{content}</div>
+                  <div className={cn("w-0.5 shrink-0 self-stretch", barColor ?? "bg-transparent")} aria-hidden />
+                  <div className="min-w-0 flex-1 border-b border-border/20">{content}</div>
                 </div>
               );
             })
           : null}
+      </div>
       </div>
     </div>
   );

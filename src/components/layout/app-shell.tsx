@@ -38,6 +38,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   } = useShellPreferences();
   const { settings } = useSettings();
 
+  /** Diff explorer is full-bleed; keep the app nav icon-rail unless the user expands it on this route. */
+  const isDiffExplorerRoute = pathname.startsWith("/diff/diffview");
+  const [diffSidebarExpanded, setDiffSidebarExpanded] = React.useState(false);
+
+  React.useEffect(() => {
+    setDiffSidebarExpanded(false);
+  }, [isDiffExplorerRoute]);
+
+  const sidebarCollapsedEffective =
+    isDiffExplorerRoute ? !diffSidebarExpanded : sidebarCollapsed;
+
+  const handleToggleSidebar = React.useCallback(() => {
+    if (isDiffExplorerRoute) {
+      setDiffSidebarExpanded((open) => !open);
+      return;
+    }
+    toggleSidebarCollapsed();
+  }, [isDiffExplorerRoute, toggleSidebarCollapsed]);
+
   const closeMobile = React.useCallback(() => {
     setMobileNavOpen(false);
   }, [setMobileNavOpen]);
@@ -120,21 +139,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [requestForcedCacheSelection, selectedStatusChecking, selectedStatus]);
 
   return (
-    <div className="flex min-h-dvh w-full">
+    <div className="flex h-dvh min-h-0 w-full">
       <aside
         className={cn(
-          "relative z-20 hidden h-dvh shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-300 ease-out md:flex",
-          sidebarCollapsed ? "w-16" : "w-60",
+          "relative z-20 hidden h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-300 ease-out md:flex",
+          sidebarCollapsedEffective ? "w-16" : "w-52",
         )}
         aria-label="Primary navigation"
       >
         <div
           className={cn(
             "flex h-14 items-center border-b border-sidebar-border px-3",
-            sidebarCollapsed && "justify-center px-0",
+            sidebarCollapsedEffective && "justify-center px-0",
           )}
         >
-          {sidebarCollapsed ? (
+          {sidebarCollapsedEffective ? (
             <div className="flex w-full items-center justify-center">
               <Sygnet
                 className="h-8 w-8 text-sidebar-foreground"
@@ -155,7 +174,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 size="icon-sm"
                 className="ml-2 shrink-0"
                 aria-label="Collapse sidebar"
-                onClick={toggleSidebarCollapsed}
+                onClick={handleToggleSidebar}
               >
                 <PanelLeft className="size-4" />
               </Button>
@@ -163,13 +182,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
         </div>
         <SidebarNav
-          collapsed={sidebarCollapsed}
-          onToggleSidebar={toggleSidebarCollapsed}
+          collapsed={sidebarCollapsedEffective}
+          onToggleSidebar={handleToggleSidebar}
         />
       </aside>
 
       <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-        <SheetContent side="left" className="w-[min(100%,20rem)] gap-0 p-0">
+        <SheetContent side="left" className="w-[min(100%,18rem)] gap-0 p-0">
           <SheetHeader className="border-b border-border px-4 py-3 text-left">
             <SheetTitle className="flex items-center">
               <Logo
@@ -185,9 +204,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </SheetContent>
       </Sheet>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <main data-app-main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className={cn(!settings.fullWidthContent && "mx-auto w-full max-w-7xl")}>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <main
+          data-app-main
+          className={cn(
+            "min-h-0 flex-1",
+            isDiffExplorerRoute ? "overflow-hidden p-0" : "overflow-y-auto p-4 md:p-6",
+          )}
+        >
+          <div
+            className={cn(
+              isDiffExplorerRoute && "flex h-full min-h-0 flex-col",
+              !settings.fullWidthContent && !isDiffExplorerRoute && "mx-auto w-full max-w-7xl",
+            )}
+          >
             {children}
           </div>
         </main>

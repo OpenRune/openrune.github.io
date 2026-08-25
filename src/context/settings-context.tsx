@@ -30,6 +30,12 @@ export type AppSettings = {
   fullWidthContent: boolean;
   allowMultipleCollapsiblesOpen: boolean;
   diffTextViewPreviews: boolean;
+  /** Wrap long lines in config/diff text editors. */
+  editorWordWrap: boolean;
+  /** Enable JetBrains Mono ligatures (->, !=, =>, …) in monospace text. */
+  editorFontLigatures: boolean;
+  /** Hide config nav entries that have no transmitted/decoded rows for the selected revision. */
+  hideNonTransmittedConfigs: boolean;
   navItemSize: NavItemSize;
   themePreset: ThemePreset;
   suggestionDisplay: SuggestionDisplay;
@@ -47,6 +53,9 @@ const defaultSettings: AppSettings = {
   fullWidthContent: true,
   allowMultipleCollapsiblesOpen: true,
   diffTextViewPreviews: true,
+  editorWordWrap: false,
+  editorFontLigatures: false,
+  hideNonTransmittedConfigs: false,
   navItemSize: "medium",
   themePreset: "default",
   suggestionDisplay: {
@@ -116,6 +125,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     if (!hydrated) return;
     document.body.classList.toggle("full-width-content", settings.fullWidthContent);
   }, [hydrated, settings.fullWidthContent]);
+
+  React.useEffect(() => {
+    if (!hydrated) return;
+    document.body.classList.toggle("editor-word-wrap", settings.editorWordWrap);
+  }, [hydrated, settings.editorWordWrap]);
+
+  React.useEffect(() => {
+    if (!hydrated) return;
+    document.body.classList.toggle("editor-font-ligatures", settings.editorFontLigatures);
+  }, [hydrated, settings.editorFontLigatures]);
 
   const updateSettings = React.useCallback((next: Partial<AppSettings>) => {
     setSettings((prev) => ({

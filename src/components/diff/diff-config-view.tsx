@@ -4,16 +4,20 @@ import * as React from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
-import { OptionDropdown } from "@/components/ui/option-dropdown";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCacheType } from "@/context/cache-type-context";
 import type { GamevalType } from "@/context/gameval-context";
 import type { AppSettings } from "@/context/settings-context";
 import { useSettings } from "@/context/settings-context";
+import { DiffDecodeProgressBanner } from "@/components/diff/diff-decode-progress";
 import { diffCacheOrderedPair, diffConfigContentUrl } from "@/lib/cache-api-client";
+import {
+  conditionalJsonFetchAwaitingDecode,
+  isDiffDecodePayload,
+  type DiffDecodeProgress,
+} from "@/lib/diff-decode";
 import { onCopyApplyGamevalUppercaseSetting } from "@/lib/gameval-clipboard";
-import { conditionalJsonFetch } from "@/lib/openrune-idb-cache";
 import { cn } from "@/lib/utils";
 
 import {
@@ -26,12 +30,15 @@ import {
 } from "./diff-constants";
 import { configLinesFromDiffBody } from "./diff-config-content";
 import { ColorLineText, DiffConfigDiffText } from "./diff-config-diff-text";
+import { useDiffExplorerFocus } from "./diff-explorer-focus";
+import { parseFocusEntityId, bareFocusTitle } from "./diff-focus-match";
 import { DiffArchiveTable } from "./diff-archive-table";
 import { idQueryMatchesNumericId, looksLikeSpriteIdQueryText } from "./diff-id-search";
 import { openruneColumnHeaderLabel } from "./diff-openrune-archive-columns";
 import { diffSearchModeTooltipHelp } from "./diff-search-modes";
 import { DiffSearchToolbar } from "./diff-search-toolbar";
 import { DiffSectionHeader } from "./diff-section-header";
+import { useDiffTextLayoutOptional } from "./diff-text-layout";
 import { DiffUnifiedSearchField } from "./diff-unified-search-field";
 import { DiffViewModeToggle } from "./diff-view-mode-toggle";
 import {
@@ -40,16 +47,10 @@ import {
   DIFF_ARCHIVE_TABLE_HEADER_CLASS,
   DIFF_ARCHIVE_TABLE_ROW_CLASS,
 } from "./diff-table-archive-styles";
-import type { ConfigFilterMode, ConfigLine, DiffMode, DiffSearchFieldMode, SearchTag, Section } from "./diff-types";
+import type { ConfigLine, DiffMode, DiffSearchFieldMode, SearchTag, Section } from "./diff-types";
 
 function normalizeRemoteConfigLines(payload: unknown): ConfigLine[] {
   return configLinesFromDiffBody(payload);
-}
-
-function isDecodePayload(data: unknown): boolean {
-  if (!data || typeof data !== "object") return false;
-  const s = (data as { status?: unknown }).status;
-  return s === "decoding" || s === "missing";
 }
 
 function configSectionGamevalType(section: Section): GamevalType | null {
@@ -96,18 +97,28 @@ type DiffConfigViewProps = {
   combinedRev: number;
   baseRev: number;
   rev: number;
+  /** Diff explorer Full: text only (no table toggle). */
+  textOnly?: boolean;
 };
 
-export function DiffConfigView({ section, sectionLabel, diffViewMode, combinedRev, baseRev, rev }: DiffConfigViewProps) {
+export function DiffConfigView({
+  section,
+  sectionLabel,
+  diffViewMode,
+  combinedRev,
+  baseRev,
+  rev,
+  textOnly = false,
+}: DiffConfigViewProps) {
   const searchParams = useSearchParams();
   const { settings } = useSettings();
   const { selectedCacheType } = useCacheType();
-  const urlWantsText = diffViewMode === "combined" && searchParams.get("view") === "text";
+  const urlWantsTable = diffViewMode === "combined" && searchParams.get("view") === "table";
   const [configViewMode, setConfigViewMode] = React.useState<"text" | "table">(() =>
-    diffViewMode === "diff" ? "text" : (urlWantsText ? "text" : "table"),
+    textOnly || diffViewMode === "diff" ? "text" : urlWantsTable ? "table" : "text",
   );
-  const [configDiffLayout, setConfigDiffLayout] = React.useState<"unified" | "split">("split");
-  const [configFilterMode, setConfigFilterMode] = React.useState<ConfigFilterMode>("all");
+  const textLayoutCtx = useDiffTextLayoutOptional();
+  const diffLayout = textLayoutCtx?.diffLayout ?? "split";
   const [configTableSearchMode, setConfigTableSearchMode] = React.useState<DiffSearchFieldMode>(() => {
     if (combinedRev < GAMEVAL_MIN_REVISION) return "id";
     return configStaticRowsIncludeGamevalColumn(section) ? "gameval" : "id";
@@ -117,30 +128,41 @@ export function DiffConfigView({ section, sectionLabel, diffViewMode, combinedRe
   const prevCombinedGamevalSupportedRef = React.useRef(combinedRev >= GAMEVAL_MIN_REVISION);
   const prevSectionRef = React.useRef<Section | null>(null);
   const configSearchInputRef = React.useRef<HTMLInputElement | null>(null);
+  const { focusBracketTitle, focusNonce } = useDiffExplorerFocus();
 
   const [remoteDiffLines, setRemoteDiffLines] = React.useState<ConfigLine[] | null>(null);
   const [remoteDiffStatus, setRemoteDiffStatus] = React.useState<"idle" | "loading" | "ok" | "error" | "decoding">(
     "idle",
   );
   const [remoteDiffError, setRemoteDiffError] = React.useState<string | null>(null);
+  const [decodeProgress, setDecodeProgress] = React.useState<DiffDecodeProgress | null>(null);
   const diffFetchRef = React.useRef(0);
 
   const fetchableDiffSection = (CONFIG_TYPES as readonly string[]).includes(section);
   const liveDiffText = diffViewMode === "diff" && fetchableDiffSection;
 
   React.useEffect(() => {
-    if (diffViewMode === "diff") {
+    if (diffViewMode === "diff" || textOnly) {
       setConfigViewMode("text");
     } else {
-      setConfigViewMode(urlWantsText ? "text" : "table");
+      setConfigViewMode(urlWantsTable ? "table" : "text");
     }
-  }, [diffViewMode, urlWantsText]);
+  }, [diffViewMode, textOnly, urlWantsTable]);
+
+  React.useEffect(() => {
+    if (!focusNonce || !focusBracketTitle) return;
+    // Prefer bare id for `// 33428`; otherwise use gameval / title text.
+    const id = parseFocusEntityId(focusBracketTitle);
+    setConfigSearchQuery(id != null ? String(id) : bareFocusTitle(focusBracketTitle));
+    setConfigViewMode("text");
+  }, [focusBracketTitle, focusNonce]);
 
   React.useEffect(() => {
     if (!liveDiffText) {
       setRemoteDiffLines(null);
       setRemoteDiffStatus("idle");
       setRemoteDiffError(null);
+      setDecodeProgress(null);
       return;
     }
 
@@ -148,12 +170,15 @@ export function DiffConfigView({ section, sectionLabel, diffViewMode, combinedRe
       setRemoteDiffLines([]);
       setRemoteDiffStatus("ok");
       setRemoteDiffError(null);
+      setDecodeProgress(null);
       return;
     }
 
     const requestId = ++diffFetchRef.current;
+    const ac = new AbortController();
     setRemoteDiffStatus("loading");
     setRemoteDiffError(null);
+    setDecodeProgress(null);
 
     const pair = diffCacheOrderedPair(baseRev, rev);
     const url = diffConfigContentUrl(selectedCacheType, section, pair);
@@ -161,22 +186,34 @@ export function DiffConfigView({ section, sectionLabel, diffViewMode, combinedRe
 
     void (async () => {
       try {
-        const { data: raw } = await conditionalJsonFetch<unknown>(cacheKey, url);
+        const { data: raw } = await conditionalJsonFetchAwaitingDecode<unknown>(cacheKey, url, {
+          cacheType: selectedCacheType,
+          signal: ac.signal,
+          onProgress: (progress) => {
+            if (requestId !== diffFetchRef.current) return;
+            setDecodeProgress(progress);
+            setRemoteDiffStatus("decoding");
+          },
+        });
         if (requestId !== diffFetchRef.current) return;
-        if (isDecodePayload(raw)) {
+        if (isDiffDecodePayload(raw)) {
           setRemoteDiffLines([]);
           setRemoteDiffStatus("decoding");
           return;
         }
         setRemoteDiffLines(normalizeRemoteConfigLines(raw));
+        setDecodeProgress(null);
         setRemoteDiffStatus("ok");
       } catch (e) {
-        if (requestId !== diffFetchRef.current) return;
+        if (ac.signal.aborted || requestId !== diffFetchRef.current) return;
         setRemoteDiffLines(null);
+        setDecodeProgress(null);
         setRemoteDiffStatus("error");
         setRemoteDiffError(e instanceof Error ? e.message : "Failed to load config diff");
       }
     })();
+
+    return () => ac.abort();
   }, [liveDiffText, section, baseRev, rev, selectedCacheType, fetchableDiffSection]);
 
   React.useEffect(() => {
@@ -278,22 +315,10 @@ export function DiffConfigView({ section, sectionLabel, diffViewMode, combinedRe
   const staticDiffLines = CONFIG_DIFF_LINES[section] ?? [];
 
   const fallbackDiffLines = React.useMemo(() => {
-    let lines = staticDiffLines;
-    if (configFilterMode !== "all") {
-      const want: ConfigLine["type"] | null =
-        configFilterMode === "added"
-          ? "add"
-          : configFilterMode === "changed"
-            ? "change"
-            : configFilterMode === "removed"
-              ? "removed"
-              : null;
-      if (want) lines = lines.filter((line) => line.type === want || line.type === "context");
-    }
     const q = configSearchQuery.trim().toLowerCase();
-    if (!q) return lines;
-    return lines.filter((line) => line.line.toLowerCase().includes(q));
-  }, [staticDiffLines, configFilterMode, configSearchQuery]);
+    if (!q) return staticDiffLines;
+    return staticDiffLines.filter((line) => line.line.toLowerCase().includes(q));
+  }, [staticDiffLines, configSearchQuery]);
 
   const linesForVirtualDiff =
     liveDiffText && remoteDiffStatus === "ok" && remoteDiffLines != null ? remoteDiffLines : staticDiffLines;
@@ -331,21 +356,6 @@ export function DiffConfigView({ section, sectionLabel, diffViewMode, combinedRe
       ? `${diffLineCount} lines`
       : `${fallbackDiffLines.length} lines`;
 
-  const diffFilterDropdown = (
-    <OptionDropdown
-      className="w-[8.5rem] shrink-0"
-      ariaLabel="Diff line filter"
-      value={configFilterMode}
-      options={[
-        { value: "all", label: "All" },
-        { value: "added", label: "Added" },
-        { value: "changed", label: "Changed" },
-        { value: "removed", label: "Removed" },
-      ]}
-      onChange={(v) => setConfigFilterMode(v as ConfigFilterMode)}
-    />
-  );
-
   const configTableSearchDisabledModes = React.useMemo((): readonly DiffSearchFieldMode[] => {
     const out: DiffSearchFieldMode[] = ["regex"];
     if (combinedRev < GAMEVAL_MIN_REVISION) out.push("gameval");
@@ -376,28 +386,19 @@ export function DiffConfigView({ section, sectionLabel, diffViewMode, combinedRe
   const diffContentBusy = liveDiffText && (remoteDiffStatus === "loading" || diffTextBooting);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <DiffSectionHeader
         title={diffHeaderTitle}
         tooltipContent={diffSearchModeTooltipHelp(configTableSearchMode)}
         countLabel={`· ${headlineCount}`}
         trailing={
-          diffViewMode === "combined" ? (
+          diffViewMode === "combined" && !textOnly ? (
             <DiffViewModeToggle
               value={configViewMode}
               onChange={setConfigViewMode}
               options={[
                 { value: "table", label: "Table" },
                 { value: "text", label: "Text" },
-              ]}
-            />
-          ) : diffViewMode === "diff" ? (
-            <DiffViewModeToggle
-              value={configDiffLayout}
-              onChange={setConfigDiffLayout}
-              options={[
-                { value: "unified", label: "Unified" },
-                { value: "split", label: "Split" },
               ]}
             />
           ) : null
@@ -472,7 +473,6 @@ export function DiffConfigView({ section, sectionLabel, diffViewMode, combinedRe
         <>
           {diffViewMode === "diff" ? (
             <DiffSearchToolbar
-              leading={diffFilterDropdown}
               placeholder="Search lines… (Ctrl+F)"
               value={configSearchQuery}
               onChange={(e) => setConfigSearchQuery(e.target.value)}
@@ -498,9 +498,10 @@ export function DiffConfigView({ section, sectionLabel, diffViewMode, combinedRe
             </div>
           ) : null}
           {liveDiffText && !diffContentBusy && remoteDiffStatus === "decoding" ? (
-            <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-100">
-              Config diff is still decoding on the cache server. Try again shortly.
-            </p>
+            <DiffDecodeProgressBanner
+              progress={decodeProgress}
+              fallbackMessage="Config diff is decoding on the cache server…"
+            />
           ) : null}
           {liveDiffText && !diffContentBusy && remoteDiffStatus === "error" && remoteDiffError ? (
             <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -510,19 +511,21 @@ export function DiffConfigView({ section, sectionLabel, diffViewMode, combinedRe
           {liveDiffText && !diffContentBusy ? (
             <DiffConfigDiffText
               lines={linesForVirtualDiff}
-              filterMode={configFilterMode}
+              filterMode="all"
               searchQuery={configSearchQuery}
-              layout={configDiffLayout}
+              layout={diffLayout}
+              configType={section}
             />
           ) : !liveDiffText && diffViewMode === "diff" ? (
             <DiffConfigDiffText
               lines={linesForVirtualDiff}
-              filterMode={configFilterMode}
+              filterMode="all"
               searchQuery={configSearchQuery}
-              layout={configDiffLayout}
+              layout={diffLayout}
+              configType={section}
             />
           ) : !liveDiffText ? (
-            <div className="min-h-0 flex-1 overflow-auto rounded-md border bg-background">
+            <div className="min-h-0 flex-1 overflow-auto bg-background">
               <div className="font-mono text-xs">
                 {fallbackDiffLines.map((row, index) => (
                   <div key={`${index}-${row.line}`} className="flex items-stretch">

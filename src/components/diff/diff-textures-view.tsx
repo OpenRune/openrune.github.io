@@ -21,7 +21,8 @@ import type {
   DiffConfigArchiveTextLineProps,
 } from "./diff-config-archive-types";
 import { GAMEVAL_MIN_REVISION } from "./diff-constants";
-import type { DiffMode, DiffSearchFieldMode } from "./diff-types";
+import type { ConfigFilterMode, DiffMode, DiffSearchFieldMode, SearchTag } from "./diff-types";
+import { DiffTexturesExplorerGrid, type TextureGridEntry } from "./diff-textures-explorer-grid";
 import {
   DIFF_ARCHIVE_TABLE_CELL_CLASS,
   DIFF_ARCHIVE_TABLE_HEAD_CLASS,
@@ -38,6 +39,22 @@ type DiffTexturesViewProps = {
   combinedRev: number;
   baseRev: number;
   rev: number;
+  textOnly?: boolean;
+  /** Hide search / download toolbar (repository sidebar owns them). */
+  hideSearchChrome?: boolean;
+  /** Shared search with the repository sidebar (filters the table). */
+  controlledSearch?: {
+    mode: DiffSearchFieldMode;
+    onModeChange: (mode: DiffSearchFieldMode) => void;
+    text: string;
+    onTextChange: (text: string) => void;
+    tags: SearchTag[];
+    onTagsChange: (tags: SearchTag[]) => void;
+    deltaFilterMode?: ConfigFilterMode;
+  } | null;
+  /** Diff explorer: open shared texture dialog. */
+  onOpenTexture?: (entry: TextureGridEntry) => void;
+  selectedTextureId?: number | null;
 };
 
 function formatBoolishCell(entries: Record<string, string>, key: string): string {
@@ -286,7 +303,17 @@ const DiffTextureTextLine = React.memo(function DiffTextureTextLine({
   );
 });
 
-export function DiffTexturesView({ diffViewMode, combinedRev, baseRev, rev }: DiffTexturesViewProps) {
+export function DiffTexturesView({
+  diffViewMode,
+  combinedRev,
+  baseRev,
+  rev,
+  textOnly = false,
+  hideSearchChrome = false,
+  controlledSearch = null,
+  onOpenTexture,
+  selectedTextureId = null,
+}: DiffTexturesViewProps) {
   const { getGamevalExtra } = useGamevals();
   const { settings } = useSettings();
   const textureGamevalSupported = combinedRev >= GAMEVAL_MIN_REVISION;
@@ -464,11 +491,32 @@ export function DiffTexturesView({ diffViewMode, combinedRev, baseRev, rev }: Di
 
   return (
     <>
+      {hideSearchChrome ? (
+        <DiffTexturesExplorerGrid
+          diffViewMode={diffViewMode}
+          combinedRev={combinedRev}
+          baseRev={baseRev}
+          rev={rev}
+          controlledSearch={
+            controlledSearch
+              ? {
+                  mode: controlledSearch.mode,
+                  text: controlledSearch.text,
+                  tags: controlledSearch.tags,
+                  deltaFilterMode: controlledSearch.deltaFilterMode,
+                }
+              : null
+          }
+          onOpenTexture={onOpenTexture}
+          selectedId={selectedTextureId}
+        />
+      ) : (
       <DiffConfigArchiveView
         diffViewMode={diffViewMode}
         combinedRev={combinedRev}
         baseRev={baseRev}
         rev={rev}
+        textOnly={textOnly}
         configType={TEXTURE_CONFIG_TYPE}
         tableBase={TABLE_BASE}
         title="Textures"
@@ -504,7 +552,10 @@ export function DiffTexturesView({ diffViewMode, combinedRev, baseRev, rev }: Di
         TextLine={DiffTextureTextLine}
         textRowHeight={(s) => (s.suggestionDisplay.textures ? 40 : TEXTURE_TEXT_LINE_HEIGHT)}
         getTextLineShowInline={(s) => s.suggestionDisplay.textures}
+        hideSearchChrome={hideSearchChrome}
+        controlledSearch={controlledSearch}
         searchRowTrailing={
+          hideSearchChrome ? undefined : (
           <ZipArchiveDownloadButton
             kind="textures"
             diffViewMode={diffViewMode}
@@ -513,8 +564,10 @@ export function DiffTexturesView({ diffViewMode, combinedRev, baseRev, rev }: Di
             rev={rev}
             tableBase={TABLE_BASE}
           />
+          )
         }
       />
+      )}
 
       {textureModal != null ? (
         <div className="sr-only fixed top-0 left-0 h-0 w-0 overflow-hidden" aria-hidden>

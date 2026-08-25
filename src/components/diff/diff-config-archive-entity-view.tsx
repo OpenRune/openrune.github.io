@@ -27,6 +27,7 @@ import {
   useGamevals,
 } from "@/context/gameval-context";
 import type { AppSettings } from "@/context/settings-context";
+import { useSettings } from "@/context/settings-context";
 import { cacheDataUrl, diffConfigSchemaUrl, diffSpriteResolveUrl } from "@/lib/cache-api-client";
 import { conditionalJsonFetch } from "@/lib/openrune-idb-cache";
 import { cn } from "@/lib/utils";
@@ -40,7 +41,7 @@ import type {
   ConfigFieldRenderSchema,
   DiffConfigArchiveTextLineProps,
 } from "./diff-config-archive-types";
-import { GAMEVAL_MIN_REVISION, interfaceComponentCombinedId, normalizeConfigTypeForCacheApi, sectionGamevalTypeForSection } from "./diff-constants";
+import { GAMEVAL_MIN_REVISION, GAMEVAL_VARCS_MIN_REVISION, interfaceComponentCombinedId, normalizeConfigTypeForCacheApi, sectionGamevalTypeForSection } from "./diff-constants";
 import { configLinesFromCachePayload } from "./diff-config-content";
 import type { ConfigLine, DiffMode, DiffSearchFieldMode } from "./diff-types";
 import {
@@ -606,6 +607,7 @@ function GamevalReferenceDialog({
   getGamevalExtra: (type: GamevalType, id: number, rev?: number | "latest") => GamevalExtraData | undefined;
 }) {
   const { selectedCacheType } = useCacheType();
+  const { loadGamevalType } = useGamevals();
   const [configLines, setConfigLines] = React.useState<ConfigLine[] | null>(null);
   const [configStatus, setConfigStatus] = React.useState<"idle" | "loading" | "ok" | "error">("idle");
   const [configError, setConfigError] = React.useState<string | null>(null);
@@ -672,10 +674,16 @@ function GamevalReferenceDialog({
 
     const run = async () => {
       try {
+        if (combinedRev >= GAMEVAL_MIN_REVISION) {
+          await loadGamevalType(openRef.ref.type, combinedRev);
+        }
         const { data } = await conditionalJsonFetch<unknown>(cacheKey, url);
         if (cancelled) return;
         const lines = configLinesFromCachePayload(data, configType, {
-          headerLabelForId: (id) => lookupGameval(openRef.ref.type, id, combinedRev),
+          headerLabelForId: (id) =>
+            lookupGameval(openRef.ref.type, id, combinedRev)?.trim() ||
+            getGamevalExtra(openRef.ref.type, id, combinedRev)?.searchable?.trim() ||
+            undefined,
           includeCommentWithoutHeaderLabel: true,
         });
         setConfigLines(lines ?? []);
@@ -692,7 +700,7 @@ function GamevalReferenceDialog({
     return () => {
       cancelled = true;
     };
-  }, [openRef, combinedRev, selectedCacheType, lookupGameval]);
+  }, [openRef, combinedRev, selectedCacheType, lookupGameval, getGamevalExtra, loadGamevalType]);
 
   return (
     <Dialog open={openRef != null} onOpenChange={onOpenChange}>
@@ -879,6 +887,9 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
   findQuery,
   findMarkActive,
 }: DiffConfigArchiveTextLineProps) {
+  const { settings } = useSettings();
+  const wordWrap = settings.editorWordWrap;
+  const lineClass = cn("diff-editor-line", wordWrap ? "whitespace-pre-wrap break-words [overflow-wrap:anywhere]" : "whitespace-pre");
   const { loadGamevalType, hasLoaded, lookupGameval, lookupGamevalByName, getGamevalExtra } = useGamevals();
   const [openRef, setOpenRef] = React.useState<{ ref: InlineGamevalReference; id: number } | null>(null);
   const candidateRevisions = React.useMemo(() => {
@@ -904,7 +915,7 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
   );
 
   const hl =
-    findMarkActive && findQuery?.trim()
+    findMarkActive && findQuery?.trim() && !/^\[[^\]]+]$/.test(line.trim())
       ? { kind: findKind ?? "literal", query: findQuery.trim(), active: true as const }
       : null;
 
@@ -1141,7 +1152,7 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
       );
     return (
       <>
-        <span className="whitespace-pre">
+        <span className={lineClass}>
           <FindHighlightedText key="pfx" text={prefix} kind={hlKind} query={hlQuery} enabled={hlEnabled} />
           {wrapHoverValue(<>{valueParts}</>)}
         </span>
@@ -1166,7 +1177,7 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
     const hasInlineGamevals = findInlineGamevalReferences(mainValue).length > 0;
     return (
       <>
-        <span className="whitespace-pre">
+        <span className={lineClass}>
           <FindHighlightedText
             text={split.prefix}
             kind={hl?.kind ?? "literal"}
@@ -1200,7 +1211,7 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
 
   return (
     <>
-      <span className="whitespace-pre">{renderTextWithInlineGamevals(line || " ")}</span>
+      <span className={lineClass}>{renderTextWithInlineGamevals(line || " ")}</span>
       <GamevalReferenceDialog
         combinedRev={_combinedRev}
         openRef={openRef}
@@ -1377,6 +1388,7 @@ export type DiffConfigArchiveEntityViewProps = {
   combinedRev: number;
   baseRev: number;
   rev: number;
+  textOnly?: boolean;
 };
 
 export function DiffConfigArchiveEntityView({
@@ -1386,6 +1398,7 @@ export function DiffConfigArchiveEntityView({
   combinedRev,
   baseRev,
   rev,
+  textOnly = false,
 }: DiffConfigArchiveEntityViewProps) {
   const meta = React.useMemo(() => {
     const baseMeta = ENTITY_META_OVERRIDES[section] ?? defaultEntityMeta(section);
@@ -1463,9 +1476,11 @@ export function DiffConfigArchiveEntityView({
     }
   }, [section, combinedRev, hasLoaded, loadGamevalType]);
 
-  // Eagerly load all known gameval types so chips in text view and tables are immediately clickable.
+  // Eagerly load known gameval types so chips in text view and tables are immediately clickable.
   React.useEffect(() => {
+    if (combinedRev < GAMEVAL_MIN_REVISION) return;
     for (const type of Object.values(GAMEVAL_TYPE_MAP)) {
+      if (type === "varcs" && combinedRev < GAMEVAL_VARCS_MIN_REVISION) continue;
       if (!hasLoaded(type, combinedRev)) {
         void loadGamevalType(type, combinedRev);
       }
@@ -1831,6 +1846,7 @@ export function DiffConfigArchiveEntityView({
       combinedRev={combinedRev}
       baseRev={baseRev}
       rev={rev}
+      textOnly={textOnly}
       configType={section}
       tableBase={TABLE_BASE}
       title={meta.title}

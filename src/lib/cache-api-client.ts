@@ -92,6 +92,34 @@ export function gamevalUrl(cacheType: CacheTarget, type: string, search: URLSear
   return cacheServerUrl(cacheType, `/gameval/${type}?${search.toString()}`);
 }
 
+export function spritesCdnGameSlug(cacheType: CacheTarget): string {
+  const host = cacheType.ip.trim().toLowerCase();
+  if (host.includes("rs3")) return "rs3";
+  return "osrs";
+}
+
+/** Public sprite CDN origin (Cloudflare R2 custom domain). */
+export const SPRITES_CDN_BASE = "https://cdn.openrune.dev";
+
+export function spritesCdnBase(_cacheType?: CacheTarget): string {
+  return SPRITES_CDN_BASE;
+}
+
+/** @deprecated Use {@link spritesCdnBase}. */
+export function spritesCdnBaseFromEnv(cacheType: CacheTarget): string {
+  return spritesCdnBase(cacheType);
+}
+
+export function spritesCdnObjectUrl(params: {
+  cdnBase: string;
+  game: string;
+  rev: number;
+  id: string | number;
+}): string {
+  const base = params.cdnBase.replace(/\/$/, "");
+  return `${base}/${params.game}/rev/${params.rev}/sprites/${params.id}.png`;
+}
+
 export function spritesProxyUrl(
   cacheType: CacheTarget,
   params: {
@@ -101,15 +129,34 @@ export function spritesProxyUrl(
     keepAspectRatio?: boolean;
     base?: number;
     rev?: number;
+    source?: number;
     indexed?: number;
+    /** When set, prefer CDN for full-size sprites. */
+    cdnBase?: string | null;
+    cdnGame?: string | null;
   },
 ) {
+  const needsResize =
+    params.width != null || params.height != null || params.indexed != null;
+  const cdnBase = (params.cdnBase ?? spritesCdnBase(cacheType)).replace(/\/$/, "");
+  const cdnGame = params.cdnGame ?? spritesCdnGameSlug(cacheType);
+  const spriteRev = params.source ?? params.rev;
+  if (!needsResize && spriteRev != null) {
+    return spritesCdnObjectUrl({
+      cdnBase,
+      game: cdnGame,
+      rev: spriteRev,
+      id: params.id,
+    });
+  }
+
   const search = new URLSearchParams({ id: String(params.id) });
   if (params.width != null) search.set("width", String(params.width));
   if (params.height != null) search.set("height", String(params.height));
   if (params.keepAspectRatio != null) search.set("keepAspectRatio", String(params.keepAspectRatio));
   if (params.base != null) search.set("base", String(params.base));
   if (params.rev != null) search.set("rev", String(params.rev));
+  if (params.source != null) search.set("source", String(params.source));
   if (params.indexed != null) search.set("indexed", String(params.indexed));
   return cacheServerUrl(cacheType, `/sprites?${search.toString()}`);
 }
@@ -158,12 +205,26 @@ export function diffCacheOrderedPair(uiBase: number, uiCompare: number): { base:
 export function diffSpriteResolveUrl(
   cacheType: CacheTarget,
   spriteId: number,
-  params: { base: number; rev: number },
+  params: { base: number; rev: number; source?: number; width?: number; height?: number },
 ) {
+  const needsResize = params.width != null || params.height != null;
+  const cdnBase = spritesCdnBase(cacheType);
+  const spriteRev = params.source ?? params.rev;
+  if (!needsResize) {
+    return spritesCdnObjectUrl({
+      cdnBase,
+      game: spritesCdnGameSlug(cacheType),
+      rev: spriteRev,
+      id: spriteId,
+    });
+  }
   const search = new URLSearchParams({
     base: String(params.base),
     rev: String(params.rev),
   });
+  if (params.source != null) search.set("source", String(params.source));
+  if (params.width != null) search.set("width", String(params.width));
+  if (params.height != null) search.set("height", String(params.height));
   return cacheServerUrl(cacheType, `/diff/sprite/${spriteId}?${search.toString()}`);
 }
 
@@ -238,12 +299,13 @@ export function diffSpriteImageUrl(
   spriteId: number,
   params: { base: number; rev: number; source: number },
 ) {
-  const search = new URLSearchParams({
-    base: String(params.base),
-    rev: String(params.rev),
-    source: String(params.source),
+  // Full-size compare/base thumbs always hit the public CDN (not /diff/sprite).
+  return spritesCdnObjectUrl({
+    cdnBase: spritesCdnBase(cacheType),
+    game: spritesCdnGameSlug(cacheType),
+    rev: params.source,
+    id: spriteId,
   });
-  return cacheServerUrl(cacheType, `/diff/sprite/${spriteId}?${search.toString()}`);
 }
 
 export function diffDeltaSpritesUrl(cacheType: CacheTarget, params: { base: number; rev: number }) {

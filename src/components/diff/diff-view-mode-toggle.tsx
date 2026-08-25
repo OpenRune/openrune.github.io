@@ -38,7 +38,8 @@ export function DiffViewModeToggle<V extends string>({
 
   React.useEffect(() => {
     if (textOptionValue == null || tableOptionValue == null) return;
-    const target = searchParams.get("view") === "text" ? textOptionValue : tableOptionValue;
+    // Default is text; only `view=table` forces table mode.
+    const target = searchParams.get("view") === "table" ? tableOptionValue : textOptionValue;
     if (value !== target) {
       onChange(target);
     }
@@ -51,8 +52,8 @@ export function DiffViewModeToggle<V extends string>({
       if (textOptionValue == null || tableOptionValue == null) return;
 
       const params = new URLSearchParams(searchParams.toString());
-      if (next === textOptionValue) {
-        params.set("view", "text");
+      if (next === tableOptionValue) {
+        params.set("view", "table");
       } else {
         params.delete("view");
       }
