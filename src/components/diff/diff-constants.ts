@@ -142,6 +142,7 @@ export function applyNavConfigSections(navConfig: NavConfig | null): void {
     DIFF_ALL_SECTIONS = [
       "sprites",
       "textures",
+      "models",
       "gamevals",
       ...GAMEVAL_FULL_SECTIONS,
       ...CONFIG_TYPES,
@@ -172,6 +173,7 @@ export function applyNavConfigSections(navConfig: NavConfig | null): void {
   DIFF_ALL_SECTIONS = [
     "sprites",
     "textures",
+    "models",
     "gamevals",
     ...GAMEVAL_FULL_SECTIONS,
     ...CONFIG_TYPES,
@@ -182,6 +184,7 @@ export function applyNavConfigSections(navConfig: NavConfig | null): void {
 export let DIFF_ALL_SECTIONS: Section[] = [
   "sprites",
   "textures",
+  "models",
   "gamevals",
   ...GAMEVAL_FULL_SECTIONS,
   ...CONFIG_TYPES,
@@ -356,6 +359,8 @@ const GAMEVALS_FULL_LINES_BY_SECTION = Object.fromEntries(
 export const CONFIG_FULL_ROWS: Record<Section, ConfigRow[]> = {
   sprites: [],
   gamevals: [],
+  // Models are fetched from /models/table; no static preview rows.
+  models: [],
   textures: [
     { id: 0, type: "context", entries: { averageRgb: "127", animationDirection: "0", animationSpeed: "2" } },
     { id: 1, type: "context", entries: { averageRgb: "216", animationDirection: "1", animationSpeed: "4" } },
@@ -404,6 +409,7 @@ export const CONFIG_FULL_ROWS: Record<Section, ConfigRow[]> = {
 export const CONFIG_DIFF_LINES: Record<Section, ConfigLine[]> = {
   sprites: [],
   gamevals: [],
+  models: [],
   textures: [
     { type: "context", line: "// 12" },
     { type: "change", line: "averageRgb=17211" },

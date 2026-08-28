@@ -115,6 +115,10 @@ const DiffTextureViewer = dynamic(
   () => import("@/components/diff/diff-texture-viewer").then((m) => ({ default: m.DiffTextureViewer })),
   { loading: () => null },
 );
+const DiffModelsView = dynamic(
+  () => import("@/components/diff/diff-models-view").then((m) => ({ default: m.DiffModelsView })),
+  { loading: () => <DiffMainViewSkeleton /> },
+);
 const DiffInventoryView = dynamic(
   () => import("@/components/diff/diff-inventory-view").then((m) => ({ default: m.DiffInventoryView })),
   { loading: () => <DiffMainViewSkeleton /> },
@@ -434,6 +438,15 @@ function DiffExplorerInner() {
           }}
           onOpenTexture={openTextureViewer}
           selectedTextureId={selectedChange?.id ?? null}
+          onNavigateSection={(configType) => setSection(configType as Section)}
+        />
+      ) : section === "models" ? (
+        <DiffModelsView
+          diffViewMode={mode}
+          combinedRev={combinedRev}
+          baseRev={viewerBaseRev}
+          rev={viewerRev}
+          onNavigateSection={(configType) => setSection(configType as Section)}
         />
       ) : section === "inv" ? (
         <DiffInventoryView

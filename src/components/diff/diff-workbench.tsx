@@ -80,6 +80,10 @@ const DiffGamevalsFullView = dynamic(
   () => import("@/components/diff/diff-gamevals-full-view").then((m) => ({ default: m.DiffGamevalsFullView })),
   { loading: () => <DiffMainViewSkeleton /> },
 );
+const DiffModelsView = dynamic(
+  () => import("@/components/diff/diff-models-view").then((m) => ({ default: m.DiffModelsView })),
+  { loading: () => <DiffMainViewSkeleton /> },
+);
 const DiffInventoryView = dynamic(
   () => import("@/components/diff/diff-inventory-view").then((m) => ({ default: m.DiffInventoryView })),
   { loading: () => <DiffMainViewSkeleton /> },
@@ -632,6 +636,15 @@ function DiffWorkbenchInner({ mode }: { mode: DiffMode }) {
                   combinedRev={combinedRev}
                   baseRev={baseRev}
                   rev={rev}
+                  onNavigateSection={(configType) => setSectionAndUrl(configType as Section)}
+                />
+              ) : section === "models" ? (
+                <DiffModelsView
+                  diffViewMode={diffViewMode}
+                  combinedRev={combinedRev}
+                  baseRev={baseRev}
+                  rev={rev}
+                  onNavigateSection={(configType) => setSectionAndUrl(configType as Section)}
                 />
               ) : section === "gamevals" ? (
                 <DiffGamevalsFullView

@@ -8,6 +8,8 @@ export type GamevalsFullSection = `gamevals_${GamevalType}`;
 export type Section =
   | "sprites"
   | "textures"
+  /** Model archive (`?section=models`). */
+  | "models"
   /** Combined gameval dump explorer (`?section=gamevals`). */
   | "gamevals"
   | GamevalsFullSection

@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { Boxes } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow, Table } from "@/components/ui/table";
@@ -36,6 +38,7 @@ import { RSSprite } from "@/components/ui/RSSprite";
 import { RSTexture } from "@/components/ui/RSTexture";
 
 import { DiffConfigArchiveView } from "./diff-config-archive-view";
+import { DiffModelInfoModal, MODEL_OWNER_SECTIONS } from "./diff-model-info-modal";
 import type {
   ConfigArchiveTableRow,
   ConfigFieldRenderSchema,
@@ -1425,6 +1428,13 @@ export function DiffConfigArchiveEntityView({
   const [schemaHasGameval, setSchemaHasGameval] = React.useState<boolean | undefined>(undefined);
   const useGamevalColumn = schemaHasGameval ?? (sectionGamevalType != null);
   const showImageCol = section === "items" || section === "npcs" || section === "objects";
+  /** Definitions that reference models get a per-row "View model" button. */
+  const showsModelInfo = MODEL_OWNER_SECTIONS.has(section);
+  const [modelInfoId, setModelInfoId] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    setModelInfoId(null);
+  }, [combinedRev, section]);
 
   const [openRef, setOpenRef] = React.useState<{ ref: InlineGamevalReference; id: number } | null>(null);
   const [openEnumRow, setOpenEnumRow] = React.useState<EnumDialogState | null>(null);
@@ -1550,7 +1560,7 @@ export function DiffConfigArchiveEntityView({
         tableColumnPreferences,
       );
       const gvType = sectionGamevalType;
-      const colCount = keys.length + (showImageCol ? 1 : 0);
+      const colCount = keys.length + (showImageCol ? 1 : 0) + (showsModelInfo ? 1 : 0);
 
       return {
         colgroup: (
@@ -1562,6 +1572,7 @@ export function DiffConfigArchiveEntityView({
             {keys.map((colKey) => (
               <col key={colKey} className={colKey === "gameval" ? "min-w-[10rem]" : colKey === "tickDuration" ? "w-36" : colKey === "animationId" ? "min-w-[8rem]" : colKey === "key" || colKey === "value" ? "w-20" : colKey === "model" ? "min-w-[10rem]" : "min-w-[6rem]"} />
             ))}
+            {showsModelInfo ? <col className="w-28" /> : null}
           </colgroup>
         ),
         headerCellsAfterId: (
@@ -1574,6 +1585,9 @@ export function DiffConfigArchiveEntityView({
                 {openruneColumnHeaderLabel(key)}
               </TableHead>
             ))}
+            {showsModelInfo ? (
+              <TableHead className={DIFF_ARCHIVE_TABLE_HEAD_CLASS}>Model</TableHead>
+            ) : null}
           </>
         ),
         renderTableRow: (row: ConfigArchiveTableRow) => {
@@ -1755,6 +1769,26 @@ export function DiffConfigArchiveEntityView({
                   />
                 );
               })}
+              {showsModelInfo ? (
+                <TableCell className={DIFF_ARCHIVE_TABLE_CELL_CLASS}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1 rounded-none px-2 text-xs"
+                    title={`View model data for ${section} ${row.id}`}
+                    // Some sections make the row itself clickable; keep the two apart.
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setModelInfoId(row.id);
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    <Boxes className="size-3.5" aria-hidden />
+                    View model
+                  </Button>
+                </TableCell>
+              ) : null}
             </TableRow>
           );
         },
@@ -1777,6 +1811,11 @@ export function DiffConfigArchiveEntityView({
                   <Skeleton className="h-4 w-20" delayMs={Math.min(i, 24) * 18 + 10 + j * 6} shimmer={false} />
                 </TableCell>
               ))}
+              {showsModelInfo ? (
+                <TableCell className={DIFF_ARCHIVE_TABLE_CELL_CLASS}>
+                  <Skeleton className="h-7 w-24 rounded-none" delayMs={Math.min(i, 24) * 18 + 16} shimmer={false} />
+                </TableCell>
+              ) : null}
             </TableRow>
           )),
         emptyColSpan: Math.max(1, 1 + colCount),
@@ -1784,7 +1823,7 @@ export function DiffConfigArchiveEntityView({
         readyAriaLabel: `${meta.title} table`,
       };
     },
-    [lookupGameval, lookupGamevalByName, getGamevalExtra, sectionGamevalType, meta.tableEntityPlural, meta.title, rowEntriesForCell, section, setOpenRef, showImageCol, fieldRenderSchemaByField, tableColumnPreferences, useGamevalColumn],
+    [lookupGameval, lookupGamevalByName, getGamevalExtra, sectionGamevalType, meta.tableEntityPlural, meta.title, rowEntriesForCell, section, setOpenRef, showImageCol, showsModelInfo, fieldRenderSchemaByField, tableColumnPreferences, useGamevalColumn],
   );
 
   const tableSearchDisabledModes = React.useMemo((): readonly DiffSearchFieldMode[] => {
@@ -1873,6 +1912,17 @@ export function DiffConfigArchiveEntityView({
         TextLine={TextLineWithSchema}
         textRowHeight={TEXT_LINE_HEIGHT}
       />
+      {showsModelInfo ? (
+        <DiffModelInfoModal
+          type={section}
+          definitionId={modelInfoId}
+          rev={combinedRev}
+          open={modelInfoId != null}
+          onOpenChange={(open) => {
+            if (!open) setModelInfoId(null);
+          }}
+        />
+      ) : null}
       <GamevalReferenceDialog
         combinedRev={combinedRev}
         openRef={openRef}

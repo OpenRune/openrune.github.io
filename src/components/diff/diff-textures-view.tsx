@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { Link2 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { LazyWhenVisible } from "@/components/ui/lazy-when-visible";
 import { RsColorBox } from "@/components/ui/rs-color-box";
 import { RSTexture } from "@/components/ui/RSTexture";
@@ -23,6 +25,7 @@ import type {
 import { GAMEVAL_MIN_REVISION } from "./diff-constants";
 import type { ConfigFilterMode, DiffMode, DiffSearchFieldMode, SearchTag } from "./diff-types";
 import { DiffTexturesExplorerGrid, type TextureGridEntry } from "./diff-textures-explorer-grid";
+import { DiffTextureUsageModal } from "./diff-texture-usage-modal";
 import {
   DIFF_ARCHIVE_TABLE_CELL_CLASS,
   DIFF_ARCHIVE_TABLE_HEAD_CLASS,
@@ -55,6 +58,8 @@ type DiffTexturesViewProps = {
   /** Diff explorer: open shared texture dialog. */
   onOpenTexture?: (entry: TextureGridEntry) => void;
   selectedTextureId?: number | null;
+  /** Lets the usage modal jump to the item / npc / object / overlay that uses a texture. */
+  onNavigateSection?: (section: string) => void;
 };
 
 function formatBoolishCell(entries: Record<string, string>, key: string): string {
@@ -313,6 +318,7 @@ export function DiffTexturesView({
   controlledSearch = null,
   onOpenTexture,
   selectedTextureId = null,
+  onNavigateSection,
 }: DiffTexturesViewProps) {
   const { getGamevalExtra } = useGamevals();
   const { settings } = useSettings();
@@ -322,9 +328,11 @@ export function DiffTexturesView({
     fileId: number;
     textureDefinitionId?: number;
   } | null>(null);
+  const [usageTextureId, setUsageTextureId] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     setTextureModal(null);
+    setUsageTextureId(null);
   }, [combinedRev]);
 
   const buildTablePlan = React.useCallback(
@@ -339,6 +347,7 @@ export function DiffTexturesView({
           {dataKeys.map((colKey) => (
             <col key={colKey} className={colKey === "averageRgb" ? "w-28" : "min-w-[6rem]"} />
           ))}
+          <col className="w-24" />
         </>
       ),
       headerCellsAfterId: (
@@ -352,6 +361,7 @@ export function DiffTexturesView({
               {openruneColumnHeaderLabel(key)}
             </TableHead>
           ))}
+          <TableHead className={DIFF_ARCHIVE_TABLE_HEAD_CLASS}>Used by</TableHead>
         </>
       ),
       renderTableRow: (row: ConfigArchiveTableRow) => {
@@ -438,6 +448,24 @@ export function DiffTexturesView({
                 </TableCell>
               );
             })}
+            <TableCell className={DIFF_ARCHIVE_TABLE_CELL_CLASS}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1 rounded-none px-2 text-xs"
+                title={`Show everything using texture ${row.id}`}
+                // The row itself opens the image preview; keep the two actions apart.
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setUsageTextureId(row.id);
+                }}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                <Link2 className="size-3.5" aria-hidden />
+                Usage
+              </Button>
+            </TableCell>
           </TableRow>
         );
       },
@@ -460,9 +488,12 @@ export function DiffTexturesView({
                 <Skeleton className="h-4 w-14" delayMs={Math.min(i, 24) * 18 + 20 + j * 6} shimmer={false} />
               </TableCell>
             ))}
+            <TableCell className={DIFF_ARCHIVE_TABLE_CELL_CLASS}>
+              <Skeleton className="h-7 w-16 rounded-none" delayMs={Math.min(i, 24) * 18 + 26} shimmer={false} />
+            </TableCell>
           </TableRow>
         )),
-      emptyColSpan: 2 + dataKeys.length + (textureGamevalSupported ? 1 : 0),
+      emptyColSpan: 3 + dataKeys.length + (textureGamevalSupported ? 1 : 0),
       loadingAriaLabel: "Loading textures table",
       readyAriaLabel: "Textures table",
     };
@@ -568,6 +599,16 @@ export function DiffTexturesView({
         }
       />
       )}
+
+      <DiffTextureUsageModal
+        textureId={usageTextureId}
+        rev={combinedRev}
+        open={usageTextureId != null}
+        onOpenChange={(open) => {
+          if (!open) setUsageTextureId(null);
+        }}
+        onNavigateSection={onNavigateSection}
+      />
 
       {textureModal != null ? (
         <div className="sr-only fixed top-0 left-0 h-0 w-0 overflow-hidden" aria-hidden>

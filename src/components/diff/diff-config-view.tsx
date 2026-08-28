@@ -549,6 +549,7 @@ export function DiffConfigView({
           ) : null}
         </>
       )}
+
     </div>
   );
 }

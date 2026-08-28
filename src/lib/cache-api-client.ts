@@ -172,6 +172,46 @@ export function cacheTexturesSnapshotUrl(cacheType: CacheTarget, rev: number): s
   );
 }
 
+/**
+ * Everything using a texture at a revision: models, overlays, and the items / npcs / objects
+ * reached through them, plus definitions that retexture it directly.
+ */
+export function textureUsageUrl(cacheType: CacheTarget, id: number, rev: number): string {
+  return cacheServerUrl(cacheType, `/textures/${id}/usage?rev=${rev}`);
+}
+
+/** Paginated model rows for the models archive table. */
+export function modelsTableUrl(
+  cacheType: CacheTarget,
+  params: { rev: number; offset?: number; limit?: number; q?: string },
+): string {
+  const search = new URLSearchParams({ rev: String(params.rev) });
+  if (params.offset != null) search.set("offset", String(params.offset));
+  if (params.limit != null) search.set("limit", String(params.limit));
+  if (params.q?.trim()) search.set("q", params.q.trim());
+  return cacheServerUrl(cacheType, `/models/table?${search.toString()}`);
+}
+
+/** Model ids added / removed / changed between two revisions. */
+export function modelsDeltaUrl(cacheType: CacheTarget, base: number, rev: number): string {
+  return cacheServerUrl(cacheType, `/models/delta?base=${base}&rev=${rev}`);
+}
+
+/** Full metadata for one model: textures, colours, and what uses it. */
+export function modelDetailUrl(cacheType: CacheTarget, id: number, rev: number): string {
+  return cacheServerUrl(cacheType, `/models/${id}?rev=${rev}`);
+}
+
+/** Models used by one item / npc / object, each with metadata, plus combined totals. */
+export function modelsForDefinitionUrl(
+  cacheType: CacheTarget,
+  type: string,
+  id: number,
+  rev: number,
+): string {
+  return cacheServerUrl(cacheType, `/models/for/${encodeURIComponent(type)}/${id}?rev=${rev}`);
+}
+
 export function texturesProxyUrl(
   cacheType: CacheTarget,
   params: {

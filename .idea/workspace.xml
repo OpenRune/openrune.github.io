@@ -6,43 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="51982a52-4621-4b78-827a-2c8ff91c7405" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/(app)/diff/diffview/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/(app)/diff/diffview/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/(app)/diff/full/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/(app)/diff/full/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/(app)/diff/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/(app)/diff/layout.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/(app)/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/(app)/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/globals.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/globals.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/layout.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-config-archive-entity-view.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-config-archive-entity-view.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-config-archive-types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-config-archive-types.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-config-archive-view.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-config-archive-view.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-config-content.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-config-content.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-config-diff-text.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-config-diff-text.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-config-view.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-config-view.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-constants.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-constants.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-gamevals-full-view.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-gamevals-full-view.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-inventory-view.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-inventory-view.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-section-header.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-section-header.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-sidebar.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-sprites-view.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-sprites-view.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-textures-view.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-textures-view.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-types.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-view-mode-toggle.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-view-mode-toggle.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/diff/zip-archive-download-button.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/zip-archive-download-button.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/layout/app-shell.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/layout/app-shell.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/layout/settings-modal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/layout/settings-modal.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/layout/sidebar-nav.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/layout/sidebar-nav.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/ui/RSSprite.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/RSSprite.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/ui/RSTexture.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/RSTexture.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/ui/option-dropdown.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/option-dropdown.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/ui/per-page-dropdown.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/ui/per-page-dropdown.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/config/nav-pages.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/nav-pages.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/context/gameval-context.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/context/gameval-context.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/context/settings-context.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/context/settings-context.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lib/cache-api-client.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/cache-api-client.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lib/cache-status.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/cache-status.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lib/sse/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/sse/types.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -51,10 +14,12 @@
   </component>
   <component name="EmbeddingIndexingInfo">
     <option name="cachedIndexableFilesCount" value="316" />
-    <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/node_modules/typescript/lib/lib.es2015.collection.d.ts" root0="SKIP_INSPECTION" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;customColor&quot;: &quot;&quot;,
@@ -75,7 +40,7 @@
     &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
     &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1&quot;: &quot;true&quot;,
     &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;production&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;new&quot;,
     &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
     &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
     &quot;js.debugger.nextJs.config.created.client&quot;: &quot;true&quot;,
@@ -92,7 +57,7 @@
     &quot;npm.build.executor&quot;: &quot;Run&quot;,
     &quot;npm.lint.executor&quot;: &quot;Run&quot;,
     &quot;npm.start.executor&quot;: &quot;Run&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;settings.nodejs&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
     &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
     &quot;ts.external.directory.path&quot;: &quot;D:\\OpenRune\\openrune.github.io\\node_modules\\typescript\\lib&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
@@ -202,6 +167,7 @@
       <workItem from="1776723962469" duration="4182000" />
       <workItem from="1780857256834" duration="8000" />
       <workItem from="1786053183765" duration="2078000" />
+      <workItem from="1787945755072" duration="4537000" />
     </task>
     <servers />
   </component>
