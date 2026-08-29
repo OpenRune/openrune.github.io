@@ -197,6 +197,29 @@ export function modelsDeltaUrl(cacheType: CacheTarget, base: number, rev: number
   return cacheServerUrl(cacheType, `/models/delta?base=${base}&rev=${rev}`);
 }
 
+export function modelsCdnObjectUrl(params: {
+  cdnBase: string;
+  game: string;
+  rev: number;
+  id: string | number;
+}): string {
+  const base = params.cdnBase.replace(/\/$/, "");
+  return `${base}/${params.game}/rev/${params.rev}/models/${params.id}.dat`;
+}
+
+/**
+ * Raw model mesh bytes (`.dat`) for a revision. Every revision holds its own full copy on
+ * the CDN, so these objects are immutable and safe for the browser's HTTP cache.
+ */
+export function modelDatUrl(cacheType: CacheTarget, id: number, rev: number): string {
+  return modelsCdnObjectUrl({
+    cdnBase: spritesCdnBase(cacheType),
+    game: spritesCdnGameSlug(cacheType),
+    rev,
+    id,
+  });
+}
+
 /** Full metadata for one model: textures, colours, and what uses it. */
 export function modelDetailUrl(cacheType: CacheTarget, id: number, rev: number): string {
   return cacheServerUrl(cacheType, `/models/${id}?rev=${rev}`);

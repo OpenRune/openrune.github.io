@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { RSModel } from "@/components/ui/RSModel";
 import { RsColorBox } from "@/components/ui/rs-color-box";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCacheType } from "@/context/cache-type-context";
@@ -150,6 +151,7 @@ export function DiffModelDetailModal({
   const [detail, setDetail] = React.useState<ModelDetail | null>(null);
   const [status, setStatus] = React.useState<"idle" | "loading" | "ok" | "error">("idle");
   const [error, setError] = React.useState<string | null>(null);
+  const [stopRotation, setStopRotation] = React.useState(false);
 
   React.useEffect(() => {
     if (!open || modelId == null) return;
@@ -243,6 +245,33 @@ export function DiffModelDetailModal({
             </p>
           ) : detail ? (
             <>
+              <div className="relative mb-4">
+                <RSModel
+                  id={detail.id}
+                  rev={detail.rev || rev}
+                  modelUrl={detail.dat ?? undefined}
+                  height={260}
+                  className="w-full border border-border"
+                  autoRotate={!stopRotation}
+                  // Cache models face -Z, so the camera has to sit behind them to see the front.
+                  initialYaw={Math.PI}
+                  initialPitch={0}
+                />
+                <label
+                  htmlFor="model-detail-stop-rotation"
+                  className="absolute top-2 right-2 flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background/80 px-2 py-1 text-xs text-muted-foreground backdrop-blur-sm"
+                >
+                  <input
+                    id="model-detail-stop-rotation"
+                    type="checkbox"
+                    className="size-3.5 accent-primary"
+                    checked={stopRotation}
+                    onChange={(event) => setStopRotation(event.currentTarget.checked)}
+                  />
+                  Stop rotation
+                </label>
+              </div>
+
               <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <Stat label="Vertices" value={detail.vertexCount.toLocaleString()} />
                 <Stat label="Triangles" value={detail.faceCount.toLocaleString()} />

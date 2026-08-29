@@ -6,6 +6,9 @@
   <component name="ChangeListManager">
     <list default="true" id="51982a52-4621-4b78-827a-2c8ff91c7405" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/diff/diff-model-detail-modal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/diff/diff-model-detail-modal.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/config/nav-pages.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/config/nav-pages.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib/cache-api-client.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/cache-api-client.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -167,7 +170,7 @@
       <workItem from="1776723962469" duration="4182000" />
       <workItem from="1780857256834" duration="8000" />
       <workItem from="1786053183765" duration="2078000" />
-      <workItem from="1787945755072" duration="4537000" />
+      <workItem from="1787945755072" duration="6924000" />
     </task>
     <servers />
   </component>

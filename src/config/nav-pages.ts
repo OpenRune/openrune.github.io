@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import { DIFF_ROUTE_DIFFVIEW, DIFF_ROUTE_FULL } from "@/components/diff/diff-constants";
 import {
   BarChart3,
+  Boxes,
   Database,
   FileText,
   GitCompareArrows,
@@ -92,6 +93,12 @@ export const NAV_PAGES: NavPage[] = [
         path: "/117performance",
         icon: BarChart3,
         usableOffline: true,
+      },
+      {
+        label: "Model Viewer",
+        path: "/model-viewer",
+        icon: Boxes,
+        requiresOnline: true,
       },
     ],
   },
