@@ -252,9 +252,10 @@ function DiffWorkbenchInner({ mode }: { mode: DiffMode }) {
         }),
       );
 
+      // Carry an explicit view choice across section changes; diff mode has no table.
       const currentViewParam = searchParams.get("view");
-      if (nextMode === "combined" && currentViewParam === "table") {
-        params.set("view", "table");
+      if (nextMode === "combined" && (currentViewParam === "table" || currentViewParam === "text")) {
+        params.set("view", currentViewParam);
       } else {
         params.delete("view");
       }

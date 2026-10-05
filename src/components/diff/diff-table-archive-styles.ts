@@ -21,3 +21,12 @@ export const DIFF_ARCHIVE_TABLE_ROW_CLASS = "border-t align-top hover:bg-muted/3
 /** Combined sprite rows: archive hover + existing keyboard focus ring. */
 export const DIFF_ARCHIVE_TABLE_ROW_INTERACTIVE_CLASS =
   "border-t align-top hover:bg-muted/35 focus-visible:bg-muted/35 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+
+/**
+ * In-cell action button (e.g. "View model"). Sized to sit inside a `text-xs` row rather than
+ * dominate it, since one appears on every row of the column.
+ */
+export const DIFF_ARCHIVE_TABLE_ACTION_CLASS = "h-6 gap-1 rounded-none px-1.5 text-[11px] font-normal";
+
+/** Icon size matching `DIFF_ARCHIVE_TABLE_ACTION_CLASS`. */
+export const DIFF_ARCHIVE_TABLE_ACTION_ICON_CLASS = "size-3";

@@ -60,7 +60,12 @@ import {
   OpenRuneNpcImage,
   OpenRuneObjectImage,
 } from "./diff-openrune-archive-table-cell";
-import { DIFF_ARCHIVE_TABLE_CELL_CLASS, DIFF_ARCHIVE_TABLE_HEAD_CLASS } from "./diff-table-archive-styles";
+import {
+  DIFF_ARCHIVE_TABLE_ACTION_CLASS,
+  DIFF_ARCHIVE_TABLE_ACTION_ICON_CLASS,
+  DIFF_ARCHIVE_TABLE_CELL_CLASS,
+  DIFF_ARCHIVE_TABLE_HEAD_CLASS,
+} from "./diff-table-archive-styles";
 import { useSpotanimSequenceTicks } from "./diff-spotanim-sequence-ticks";
 
 export { ARCHIVE_ENTITY_SECTIONS, isArchiveEntitySection } from "./diff-openrune-archive-columns";
@@ -883,6 +888,8 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
   combinedRev: _combinedRev,
   lookupRevisions,
   hoverText,
+  refGroup,
+  refId,
   fieldRenderSchemaByField,
   showInline: _showInline,
   pipTooltip = true,
@@ -1074,7 +1081,8 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
       ? (fn != null && fn.toLowerCase().includes("rgb") ? "rgb" : "hsl")
       : null;
   const textureField = fn != null && schemaKind === "texture";
-  const spriteField = fn != null && schemaKind === "sprite";
+  // A `sprites.*` ref is a sprite even when the config type has no render schema for the field.
+  const spriteField = fn != null && (schemaKind === "sprite" || refGroup?.toLowerCase() === "sprites");
   if (fn && (colorKind || textureField || spriteField)) {
     const displayLine = displayTextureFieldLine(line);
     const eqIdx = displayLine.indexOf("=");
@@ -1108,7 +1116,9 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
       } else if (m[1] != null) {
         const parsed = parseInlineGamevalToken(m[1]);
         if (parsed) {
-          const id = resolveGamevalIdByName(parsed.type, parsed.name);
+          // Prefer the id the payload carried: sprite gameval names are not unique (1448, 1449 and
+          // 1450 are all `sprites.mapfunction`), so resolving by name alone cannot pick the right one.
+          const id = (spriteField ? refId : undefined) ?? resolveGamevalIdByName(parsed.type, parsed.name);
           if (id != null) {
             if (spriteField) spriteGamevalId = id;
             else widgetValue = id;
@@ -1572,6 +1582,7 @@ export function DiffConfigArchiveEntityView({
             {keys.map((colKey) => (
               <col key={colKey} className={colKey === "gameval" ? "min-w-[10rem]" : colKey === "tickDuration" ? "w-36" : colKey === "animationId" ? "min-w-[8rem]" : colKey === "key" || colKey === "value" ? "w-20" : colKey === "model" ? "min-w-[10rem]" : "min-w-[6rem]"} />
             ))}
+            {/* Fits "View model" at this button size; the button truncates if it ever does not. */}
             {showsModelInfo ? <col className="w-28" /> : null}
           </colgroup>
         ),
@@ -1617,11 +1628,11 @@ export function DiffConfigArchiveEntityView({
                     )}
                   >
                     {section === "items" ? (
-                      <OpenRuneItemImage id={row.id} />
+                      <OpenRuneItemImage id={row.id} rev={revArg} />
                     ) : section === "npcs" ? (
                       <OpenRuneNpcImage id={row.id} />
                     ) : (
-                      <OpenRuneObjectImage id={row.id} />
+                      <OpenRuneObjectImage id={row.id} rev={revArg} />
                     )}
                   </div>
                 </TableCell>
@@ -1770,12 +1781,17 @@ export function DiffConfigArchiveEntityView({
                 );
               })}
               {showsModelInfo ? (
-                <TableCell className={DIFF_ARCHIVE_TABLE_CELL_CLASS}>
+                <TableCell className={cn(DIFF_ARCHIVE_TABLE_CELL_CLASS, "min-w-0")}>
+                  {/*
+                    The button fills the column and truncates rather than sizing to its label:
+                    under `table-fixed`, a cell whose non-wrapping content is wider than its column
+                    pushes the whole table past its container and adds a horizontal scrollbar.
+                  */}
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-7 gap-1 rounded-none px-2 text-xs"
+                    className={cn(DIFF_ARCHIVE_TABLE_ACTION_CLASS, "w-full min-w-0 justify-start")}
                     title={`View model data for ${section} ${row.id}`}
                     // Some sections make the row itself clickable; keep the two apart.
                     onClick={(e) => {
@@ -1784,8 +1800,8 @@ export function DiffConfigArchiveEntityView({
                     }}
                     onKeyDown={(e) => e.stopPropagation()}
                   >
-                    <Boxes className="size-3.5" aria-hidden />
-                    View model
+                    <Boxes className={cn(DIFF_ARCHIVE_TABLE_ACTION_ICON_CLASS, "shrink-0")} aria-hidden />
+                    <span className="truncate">View model</span>
                   </Button>
                 </TableCell>
               ) : null}
@@ -1813,7 +1829,7 @@ export function DiffConfigArchiveEntityView({
               ))}
               {showsModelInfo ? (
                 <TableCell className={DIFF_ARCHIVE_TABLE_CELL_CLASS}>
-                  <Skeleton className="h-7 w-24 rounded-none" delayMs={Math.min(i, 24) * 18 + 16} shimmer={false} />
+                  <Skeleton className="h-6 w-full rounded-none" delayMs={Math.min(i, 24) * 18 + 16} shimmer={false} />
                 </TableCell>
               ) : null}
             </TableRow>

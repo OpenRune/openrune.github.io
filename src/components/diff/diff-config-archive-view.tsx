@@ -15,7 +15,6 @@ import {
   cacheDataUrl,
   combinedSpritesUrl,
   diffCacheOrderedPair,
-  diffConfigContentUrl,
   diffConfigTableAllUrl,
   diffConfigTableUrl,
 } from "@/lib/cache-api-client";
@@ -60,7 +59,8 @@ import {
   DIFF_ARCHIVE_TABLE_HEAD_CLASS,
   DIFF_ARCHIVE_TABLE_HEADER_CLASS,
 } from "./diff-table-archive-styles";
-import { configLinesFromCachePayload, configLinesFromContentPayload, relabelConfigSectionHeaders } from "./diff-config-content";
+import { streamConfigDiffLines } from "./diff-config-changes";
+import { configLinesFromCachePayload, relabelConfigSectionHeaders } from "./diff-config-content";
 import { useDiffExplorerFocus } from "./diff-explorer-focus";
 import {
   buildSectionMetas,
@@ -203,6 +203,8 @@ const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualText
   line,
   lineType,
   hoverText,
+  refGroup,
+  refId,
   sectionHover,
   definitionLabel,
   addedInRev,
@@ -224,6 +226,8 @@ const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualText
   line: string;
   lineType: ConfigLine["type"];
   hoverText?: string;
+  refGroup?: string;
+  refId?: number;
   sectionHover?: SectionTitleHoverInfo | null;
   definitionLabel?: string;
   addedInRev?: number;
@@ -340,6 +344,8 @@ const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualText
                   combinedRev={combinedRev}
                   lookupRevisions={lookupRevisions}
                   hoverText={hoverText}
+                  refGroup={refGroup}
+                  refId={refId}
                   showInline={getTextLineShowInline?.(settings)}
                   findKind={findKind}
                   findQuery={debouncedFindQuery}
@@ -374,6 +380,8 @@ const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualText
                   combinedRev={combinedRev}
                   lookupRevisions={lookupRevisions}
                   hoverText={hoverText}
+                  refGroup={refGroup}
+                  refId={refId}
                   showInline={getTextLineShowInline?.(settings)}
                   findKind={findKind}
                   findQuery={debouncedFindQuery}
@@ -412,6 +420,8 @@ const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualText
                     combinedRev={combinedRev}
                     lookupRevisions={lookupRevisions}
                     hoverText={hoverText}
+                    refGroup={refGroup}
+                    refId={refId}
                     showInline={getTextLineShowInline?.(settings)}
                     findKind={findKind}
                     findQuery={debouncedFindQuery}
@@ -434,6 +444,8 @@ const ConfigArchiveVirtualTextRow = React.memo(function ConfigArchiveVirtualText
             combinedRev={combinedRev}
             lookupRevisions={lookupRevisions}
             hoverText={hoverText}
+            refGroup={refGroup}
+            refId={refId}
             showInline={getTextLineShowInline?.(settings)}
             findKind={findKind}
             findQuery={debouncedFindQuery}
@@ -480,7 +492,12 @@ export function DiffConfigArchiveView({
   const { loadGamevalType, hasLoaded, lookupGameval, lookupGamevalByName, getGamevalExtra } = useGamevals();
   const isCombined = diffViewMode === "combined";
   const isDiff = diffViewMode === "diff";
-  const urlWantsTable = isCombined && searchParams.get("view") === "table";
+  /**
+   * The table is the default view wherever one exists — `textOnly` is how a section says it has
+   * none. `?view=` still pins the choice, so a shared link opens what the sender was looking at.
+   */
+  const combinedViewMode: "text" | "table" =
+    isCombined && searchParams.get("view") === "text" ? "text" : "table";
   const archiveGamevalRev = isCombined ? combinedRev : rev;
   const textLookupRevisions = React.useMemo(() => {
     if (!isDiff) return [archiveGamevalRev] as const;
@@ -495,7 +512,7 @@ export function DiffConfigArchiveView({
   }, [archiveGamevalRev, baseRev, isDiff, rev]);
 
   const [viewMode, setViewMode] = React.useState<"text" | "table">(() =>
-    textOnly || diffViewMode !== "combined" ? "text" : urlWantsTable ? "table" : "text",
+    textOnly || diffViewMode !== "combined" ? "text" : combinedViewMode,
   );
   const textLayoutCtx = useDiffTextLayoutOptional();
   const diffLayout = textLayoutCtx?.diffLayout ?? "split";
@@ -584,9 +601,9 @@ export function DiffConfigArchiveView({
     if (textOnly || isDiff) {
       setViewMode("text");
     } else if (isCombined) {
-      setViewMode(urlWantsTable ? "table" : "text");
+      setViewMode(combinedViewMode);
     }
-  }, [isDiff, isCombined, textOnly, urlWantsTable]);
+  }, [isDiff, isCombined, textOnly, combinedViewMode]);
 
   const disabledModesKey = tableSearch.disabledModes.join("\0");
 
@@ -1473,46 +1490,68 @@ export function DiffConfigArchiveView({
           }
         : undefined;
 
+    const ac = new AbortController();
+    const fail = (e: unknown) => {
+      if (requestId !== contentRequestRef.current || ac.signal.aborted) return;
+      setContentStatus("error");
+      setContentError(e instanceof Error ? e.message : `Failed to ${labels.contentErrorVerb}`);
+    };
+
+    // Diff text streams a page at a time, so the first screen paints after one small request
+    // instead of after the whole diff has been built and sent.
+    if (isDiff) {
+      const o = diffCacheOrderedPair(baseRev, rev);
+      streamConfigDiffLines({
+        cacheType: selectedCacheTypeRef.current,
+        configType,
+        base: o.base,
+        rev: o.rev,
+        headerLabelForId: diffHeaderOpts?.headerLabelForId,
+        signal: ac.signal,
+        onBatch: (batch, progress) => {
+          if (requestId !== contentRequestRef.current) return;
+          if (batch.length > 0) setContentLines((prev) => prev.concat(batch));
+          setTextFeed({
+            nextOffset: progress.loaded,
+            total: progress.total,
+            hasMore: !progress.done,
+            loadingMore: !progress.done,
+          });
+          setContentStatus("ok");
+        },
+      }).catch(fail);
+      return () => ac.abort();
+    }
+
     const run = async () => {
       try {
-        let url: string;
-        let cacheKey: string;
-        if (isDiff) {
-          const o = diffCacheOrderedPair(baseRev, rev);
-          url = diffConfigContentUrl(selectedCacheTypeRef.current, configType, o);
-          cacheKey = `diff:config:content:${cacheTypeId}:${configType}:pair:${o.base}:${o.rev}`;
-        } else {
-          const search = new URLSearchParams({
-            type: normalizeConfigTypeForCacheApi(configType),
-            rev: String(combinedRev),
-            offset: "0",
-            limit: String(COMBINED_TEXT_PAGE_SIZE),
-          });
-          url = cacheDataUrl(selectedCacheTypeRef.current, search);
-          cacheKey = `cache:config:content:${cacheTypeId}:${configType}:${combinedRev}:o0:l${COMBINED_TEXT_PAGE_SIZE}`;
-        }
+        const search = new URLSearchParams({
+          type: normalizeConfigTypeForCacheApi(configType),
+          rev: String(combinedRev),
+          offset: "0",
+          limit: String(COMBINED_TEXT_PAGE_SIZE),
+        });
+        const url = cacheDataUrl(selectedCacheTypeRef.current, search);
+        const cacheKey = `cache:config:content:${cacheTypeId}:${configType}:${combinedRev}:o0:l${COMBINED_TEXT_PAGE_SIZE}`;
         const { data } = await awaitDiffJson<unknown>(cacheKey, url);
 
         if (requestId !== contentRequestRef.current) return;
 
         const dataUnknown: unknown = data;
-        const linesResult = isDiff
-          ? configLinesFromContentPayload(dataUnknown, diffHeaderOpts)
-          : configLinesFromCachePayload(dataUnknown, configType, headerOpts);
+        const linesResult = configLinesFromCachePayload(dataUnknown, configType, headerOpts);
         if (linesResult === null) {
           setContentLines([]);
           setContentStatus("decoding");
           return;
         }
         setContentLines(linesResult);
-        if (!isDiff && dataUnknown && typeof dataUnknown === "object") {
+        if (dataUnknown && typeof dataUnknown === "object") {
           const o = dataUnknown as Record<string, unknown>;
           const total = typeof o.total === "number" ? o.total : linesResult.length;
-          const hasMore = o.hasMore === true;
           setTextFeed({
             nextOffset: COMBINED_TEXT_PAGE_SIZE,
             total,
-            hasMore,
+            hasMore: o.hasMore === true,
             loadingMore: false,
           });
         } else {
@@ -1520,10 +1559,7 @@ export function DiffConfigArchiveView({
         }
         setContentStatus("ok");
       } catch (e) {
-        if (requestId !== contentRequestRef.current) return;
-        setContentLines([]);
-        setContentStatus("error");
-        setContentError(e instanceof Error ? e.message : `Failed to ${labels.contentErrorVerb}`);
+        fail(e);
       }
     };
 
@@ -1955,6 +1991,17 @@ export function DiffConfigArchiveView({
     combinedSpriteIds,
   ]);
 
+  /** Name mode asks the server, so it needs no preloaded data and works for every config type. */
+  const nameAutocompleteForField = React.useMemo(
+    () => ({
+      cacheType: selectedCacheType,
+      configType,
+      rev: archiveGamevalRev,
+      enabled: isCombined && !tableSearch.disabledModes.includes("name"),
+    }),
+    [selectedCacheType, configType, archiveGamevalRev, isCombined, disabledModesKey],
+  );
+
   const gamevalAutocompleteForField = React.useMemo(() => {
     const auto = gamevalAutocompleteRef.current;
     if (!auto) return undefined;
@@ -1991,6 +2038,7 @@ export function DiffConfigArchiveView({
             <DiffViewModeToggle
               value={viewMode}
               onChange={setViewMode}
+              defaultValue="table"
               options={[
                 { value: "table", label: "Table" },
                 { value: "text", label: "Text" },
@@ -2060,6 +2108,7 @@ export function DiffConfigArchiveView({
             onTagRemove={(idx) => setGamevalTags((prev) => prev.filter((_, i) => i !== idx))}
             onClearTags={() => setGamevalTags([])}
             gamevalAutocomplete={gamevalAutocompleteForField}
+            nameAutocomplete={nameAutocompleteForField}
           />
           </div>
           {searchRowTrailing ? <div className="flex shrink-0 items-center">{searchRowTrailing}</div> : null}
@@ -2191,6 +2240,8 @@ export function DiffConfigArchiveView({
                             key={i}
                             line={row.line}
                             hoverText={row.hoverText}
+                            refGroup={row.refGroup}
+                            refId={row.refId}
                             sectionHover={sectionTitleHoverByLineIndex.get(i)}
                             definitionLabel={definitionLabel}
                             lineType={isDiff ? kind : "context"}
@@ -2215,12 +2266,14 @@ export function DiffConfigArchiveView({
                     </div>
                   )}
                 </div>
-                {isCombined && (textFeed.hasMore || textFeed.loadingMore || textFeed.total > 0) ? (
+                {(isCombined || isDiff) && (textFeed.hasMore || textFeed.loadingMore || textFeed.total > 0) ? (
                   <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-md border border-border/60 bg-background/90 px-2.5 py-1 text-[11px] text-muted-foreground shadow-sm backdrop-blur-sm">
                     {textFeed.loadingMore ? (
                       <span className="inline-flex items-center gap-1.5">
                         <Loader2 className="size-3 animate-spin" aria-hidden />
-                        Loading more…
+                        {textFeed.total > 0
+                          ? `Loaded ${Math.min(textFeed.nextOffset, textFeed.total).toLocaleString()} / ${textFeed.total.toLocaleString()}`
+                          : "Loading more…"}
                       </span>
                     ) : textFeed.hasMore ? (
                       <span>

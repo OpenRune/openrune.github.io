@@ -218,7 +218,15 @@ function normalizeGamevalDisplay(group: string, name: string, fallback = ""): st
 type RefRender = {
   display: string;
   hoverText?: string;
+  refGroup?: string;
+  refId?: number;
 };
+
+/** `"1448"` / `1448` → `1448`; anything else → undefined. */
+function refIdOf(value: unknown): number | undefined {
+  const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+  return Number.isFinite(n) ? n : undefined;
+}
 
 function renderValueWithRef(raw: unknown): RefRender | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
@@ -234,7 +242,12 @@ function renderValueWithRef(raw: unknown): RefRender | null {
   const display = normalizeGamevalDisplay(group, name, value);
   if (!display) return null;
   const hover = buildRefHoverText(group, name, id || value, value || id);
-  return { display, hoverText: hover || undefined };
+  return {
+    display,
+    hoverText: hover || undefined,
+    refGroup: group || undefined,
+    refId: refIdOf(ref.id) ?? refIdOf(obj.value),
+  };
 }
 
 function inferRawLineHoverText(line: string, before: string | undefined, raw: Record<string, unknown>): string | undefined {
@@ -341,6 +354,10 @@ export function configLineFromUnknownRecord(raw: unknown): ConfigLine | null {
   const beforeRaw = pickFromRecord(o, ["before", "Before", "oldValue", "OldValue", "previous", "Previous"]);
   const before = typeof beforeRaw === "string" ? beforeRaw : undefined;
   const hoverText = inferRawLineHoverText(line, before, o);
+  const refRaw = pickFromRecord(o, ["ref", "Ref"]);
+  const refRecord = refRaw && typeof refRaw === "object" ? (refRaw as Record<string, unknown>) : null;
+  const refGroup = typeof refRecord?.group === "string" ? refRecord.group : undefined;
+  const refId = refIdOf(refRecord?.id) ?? refIdOf(pickFromRecord(o, ["value", "Value"]));
 
   if (!line.startsWith("//")) {
     const ch = line.charAt(0);
@@ -357,7 +374,7 @@ export function configLineFromUnknownRecord(raw: unknown): ConfigLine | null {
     }
   }
 
-  return { line, type, addedInRev, changedInRev, before, hoverText, removedInRev };
+  return { line, type, addedInRev, changedInRev, before, hoverText, refGroup, refId, removedInRev };
 }
 
 /** Extract `lines` from a diff config JSON body (camel or Pascal `lines`). */
@@ -482,7 +499,14 @@ function fieldLinesFromKeyValue(key: string, value: unknown): ExpandedFieldLine[
   }
   const refRendered = renderValueWithRef(value);
   if (refRendered) {
-    return [{ line: `${key}=${refRendered.display}`, hoverText: refRendered.hoverText }];
+    return [
+      {
+        line: `${key}=${refRendered.display}`,
+        hoverText: refRendered.hoverText,
+        refGroup: refRendered.refGroup,
+        refId: refRendered.refId,
+      },
+    ];
   }
   const optPrefix = optionPrefixForKey(key);
   if (optPrefix != null && Array.isArray(value)) {
@@ -525,11 +549,15 @@ type FlattenedSubOp = {
 type ExpandedFieldLine = {
   line: string;
   hoverText?: string;
+  refGroup?: string;
+  refId?: number;
 };
 
 type ParamRender = {
   display: string;
   hoverText?: string;
+  refGroup?: string;
+  refId?: number;
 };
 
 function parseParamsObject(value: unknown): Record<string, unknown> | null {
@@ -558,7 +586,12 @@ function renderParamValue(raw: unknown): ParamRender | null {
   const display = normalizeGamevalDisplay(group, name, rawValue);
   if (!display) return null;
   const hoverText = buildRefHoverText(group, name, id);
-  return { display, hoverText: hoverText || undefined };
+  return {
+    display,
+    hoverText: hoverText || undefined,
+    refGroup: group || undefined,
+    refId: refIdOf(r.id) ?? refIdOf(value),
+  };
 }
 
 function renderEnumValue(raw: unknown): ParamRender | null {
@@ -573,7 +606,14 @@ function expandEnumValuesLines(value: unknown): ExpandedFieldLine[] {
     .flatMap(([key, raw], index) => {
       const rendered = renderEnumValue(raw);
       if (!rendered) return [];
-      return [{ line: `value${index + 1}=${key},${rendered.display}`, hoverText: rendered.hoverText } satisfies ExpandedFieldLine];
+      return [
+        {
+          line: `value${index + 1}=${key},${rendered.display}`,
+          hoverText: rendered.hoverText,
+          refGroup: rendered.refGroup,
+          refId: rendered.refId,
+        } satisfies ExpandedFieldLine,
+      ];
     });
 }
 
@@ -649,7 +689,14 @@ function expandParamsLines(value: unknown): ExpandedFieldLine[] {
     .flatMap((id) => {
       const rendered = renderParamValue(params[String(id)]);
       if (!rendered) return [];
-      return [{ line: `param=parm_${id}=${rendered.display}`, hoverText: rendered.hoverText } satisfies ExpandedFieldLine];
+      return [
+        {
+          line: `param=parm_${id}=${rendered.display}`,
+          hoverText: rendered.hoverText,
+          refGroup: rendered.refGroup,
+          refId: rendered.refId,
+        } satisfies ExpandedFieldLine,
+      ];
     });
 }
 
@@ -964,7 +1011,14 @@ function synthesizeLinesFromDiffPayload(
           if (isSnapshotMetaKey(k)) return;
           const rendered = fieldLinesFromKeyValue(k, map[k]);
           rendered.forEach((entry) =>
-            lines.push({ line: entry.line, hoverText: entry.hoverText, type: "add", addedInRev: rev }),
+            lines.push({
+              line: entry.line,
+              hoverText: entry.hoverText,
+              refGroup: entry.refGroup,
+              refId: entry.refId,
+              type: "add",
+              addedInRev: rev,
+            }),
           );
         });
     }
@@ -989,7 +1043,14 @@ function synthesizeLinesFromDiffPayload(
           if (!entry || typeof entry !== "object") {
             const rendered = fieldLinesFromKeyValue(k, entry);
             rendered.forEach((entryLine) =>
-              lines.push({ line: entryLine.line, hoverText: entryLine.hoverText, type: "change", changedInRev: rev }),
+              lines.push({
+                line: entryLine.line,
+                hoverText: entryLine.hoverText,
+                refGroup: entryLine.refGroup,
+                refId: entryLine.refId,
+                type: "change",
+                changedInRev: rev,
+              }),
             );
             return;
           }
@@ -1258,7 +1319,13 @@ export function configLinesFromCachePayload(
         if (isSnapshotMetaKey(k)) return;
         const rendered = fieldLinesFromKeyValue(k, map[k]);
         rendered.forEach((entry) => {
-          const line: ConfigLine = { line: entry.line, hoverText: entry.hoverText, type: "context" };
+          const line: ConfigLine = {
+            line: entry.line,
+            hoverText: entry.hoverText,
+            refGroup: entry.refGroup,
+            refId: entry.refId,
+            type: "context",
+          };
           if (!shouldDropConfigLine(line)) lines.push(line);
         });
       });

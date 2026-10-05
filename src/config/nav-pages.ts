@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 
 import { DIFF_ROUTE_DIFFVIEW, DIFF_ROUTE_FULL } from "@/components/diff/diff-constants";
 import {
+  Activity,
   BarChart3,
   Boxes,
   Database,
@@ -98,6 +99,12 @@ export const NAV_PAGES: NavPage[] = [
         label: "Model Viewer",
         path: "/model-viewer",
         icon: Boxes,
+        requiresOnline: true,
+      },
+      {
+        label: "Ingestion",
+        path: "/dev/ingestion",
+        icon: Activity,
         requiresOnline: true,
       },
     ],

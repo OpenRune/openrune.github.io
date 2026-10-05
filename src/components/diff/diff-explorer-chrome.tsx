@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 
 import { OptionDropdown } from "@/components/ui/option-dropdown";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,8 +35,8 @@ type DiffExplorerChromeProps = {
   diffLayout?: DiffTextLayout;
   onDiffLayoutChange?: (layout: DiffTextLayout) => void;
   /**
-   * `full` — Configs page: Unified/Split only (Cache revision lives in the left nav).
-   * `diff` — Diff explorer: Full/Diff, layout, Base/Compare.
+   * `full` — Configs page: no chrome controls (Cache revision lives in the left nav).
+   * `diff` — Diff explorer: Full/Diff, Unified/Split, Base/Compare.
    */
   variant?: "full" | "diff";
 };
@@ -61,9 +60,11 @@ export function DiffExplorerChrome({
   variant = "diff",
 }: DiffExplorerChromeProps) {
   const isFullChrome = variant === "full";
-  const searchParams = useSearchParams();
-  /** Configs page: Unified/Split only apply to text dumps (not table mode). */
-  const showLayoutToggle = !isFullChrome || searchParams.get("view") !== "table";
+  /**
+   * Unified/Split only mean anything when two revisions are side by side — a Configs dump has one
+   * side and renders unified regardless — so the control is absent rather than present and inert.
+   */
+  const showLayoutToggle = Boolean(onDiffLayoutChange) && mode === "diff";
 
   const revisionDropdownOptions = React.useMemo(
     () => [
@@ -94,7 +95,8 @@ export function DiffExplorerChrome({
         : "text-muted-foreground hover:text-foreground",
     );
 
-  const layoutEnabled = Boolean(onDiffLayoutChange) && (isFullChrome || mode === "diff");
+  // Configs page: every control lives in the left nav, so there is nothing left to render.
+  if (isFullChrome && !showLayoutToggle) return null;
 
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
@@ -146,19 +148,14 @@ export function DiffExplorerChrome({
 
       {showLayoutToggle ? (
         <div
-          className={cn(
-            "inline-flex h-7 items-center rounded-lg border border-border bg-muted/40 p-0.5",
-            !layoutEnabled && "opacity-45",
-          )}
+          className="inline-flex h-7 items-center rounded-lg border border-border bg-muted/40 p-0.5"
           role="group"
           aria-label="Diff layout"
-          aria-disabled={!layoutEnabled}
         >
           <button
             type="button"
             className={modeButtonClass(diffLayout === "unified")}
             aria-pressed={diffLayout === "unified"}
-            disabled={!layoutEnabled}
             onClick={() => onDiffLayoutChange?.("unified")}
           >
             Unified
@@ -167,7 +164,6 @@ export function DiffExplorerChrome({
             type="button"
             className={modeButtonClass(diffLayout === "split")}
             aria-pressed={diffLayout === "split"}
-            disabled={!layoutEnabled}
             onClick={() => onDiffLayoutChange?.("split")}
           >
             Split

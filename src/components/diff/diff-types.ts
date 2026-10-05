@@ -64,6 +64,13 @@ export type ConfigLine = {
   before?: string;
   /** Optional hover text for the rendered line (e.g. ref metadata for params). */
   hoverText?: string;
+  /**
+   * Gameval the value points at, when the payload carried one. The rendered text is `group.name`,
+   * which is not reversible — sprite names repeat across ids (1448, 1449 and 1450 are all
+   * `sprites.mapfunction`) — so the id is kept alongside it.
+   */
+  refGroup?: string;
+  refId?: number;
   removedInRev?: number;
 };
 

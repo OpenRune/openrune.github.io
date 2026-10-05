@@ -15,6 +15,8 @@ import { DiffModelDetailModal } from "./diff-model-detail-modal";
 import { sanitizeSpriteIdSearchInput } from "./diff-id-search";
 import { DIFF_COMBINED_SEARCH_WRAP_CLASS } from "./diff-constants";
 import {
+  DIFF_ARCHIVE_TABLE_ACTION_CLASS,
+  DIFF_ARCHIVE_TABLE_ACTION_ICON_CLASS,
   DIFF_ARCHIVE_TABLE_CELL_CLASS,
   DIFF_ARCHIVE_TABLE_HEAD_CLASS,
   DIFF_ARCHIVE_TABLE_HEADER_CLASS,
@@ -300,11 +302,11 @@ export function DiffModelsView({
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-7 gap-1 rounded-none px-2 text-xs"
+                      className={DIFF_ARCHIVE_TABLE_ACTION_CLASS}
                       title={`View model ${row.id}`}
                       onClick={() => setDetailId(row.id)}
                     >
-                      <Boxes className="size-3.5" aria-hidden />
+                      <Boxes className={DIFF_ARCHIVE_TABLE_ACTION_ICON_CLASS} aria-hidden />
                       More
                     </Button>
                   </TableCell>

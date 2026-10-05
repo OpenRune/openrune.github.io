@@ -10,13 +10,8 @@ import { useCacheType } from "@/context/cache-type-context";
 import type { GamevalType } from "@/context/gameval-context";
 import type { AppSettings } from "@/context/settings-context";
 import { useSettings } from "@/context/settings-context";
-import { DiffDecodeProgressBanner } from "@/components/diff/diff-decode-progress";
-import { diffCacheOrderedPair, diffConfigContentUrl } from "@/lib/cache-api-client";
-import {
-  conditionalJsonFetchAwaitingDecode,
-  isDiffDecodePayload,
-  type DiffDecodeProgress,
-} from "@/lib/diff-decode";
+import { useDiffChanges } from "@/hooks/use-diff-changes";
+import { diffCacheOrderedPair } from "@/lib/cache-api-client";
 import { onCopyApplyGamevalUppercaseSetting } from "@/lib/gameval-clipboard";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +23,6 @@ import {
   GAMEVAL_MIN_REVISION,
   sectionGamevalTypeForSection,
 } from "./diff-constants";
-import { configLinesFromDiffBody } from "./diff-config-content";
 import { ColorLineText, DiffConfigDiffText } from "./diff-config-diff-text";
 import { useDiffExplorerFocus } from "./diff-explorer-focus";
 import { parseFocusEntityId, bareFocusTitle } from "./diff-focus-match";
@@ -48,10 +42,6 @@ import {
   DIFF_ARCHIVE_TABLE_ROW_CLASS,
 } from "./diff-table-archive-styles";
 import type { ConfigLine, DiffMode, DiffSearchFieldMode, SearchTag, Section } from "./diff-types";
-
-function normalizeRemoteConfigLines(payload: unknown): ConfigLine[] {
-  return configLinesFromDiffBody(payload);
-}
 
 function configSectionGamevalType(section: Section): GamevalType | null {
   return sectionGamevalTypeForSection(section);
@@ -130,16 +120,22 @@ export function DiffConfigView({
   const configSearchInputRef = React.useRef<HTMLInputElement | null>(null);
   const { focusBracketTitle, focusNonce } = useDiffExplorerFocus();
 
-  const [remoteDiffLines, setRemoteDiffLines] = React.useState<ConfigLine[] | null>(null);
-  const [remoteDiffStatus, setRemoteDiffStatus] = React.useState<"idle" | "loading" | "ok" | "error" | "decoding">(
-    "idle",
-  );
-  const [remoteDiffError, setRemoteDiffError] = React.useState<string | null>(null);
-  const [decodeProgress, setDecodeProgress] = React.useState<DiffDecodeProgress | null>(null);
-  const diffFetchRef = React.useRef(0);
-
   const fetchableDiffSection = (CONFIG_TYPES as readonly string[]).includes(section);
   const liveDiffText = diffViewMode === "diff" && fetchableDiffSection;
+
+  const diffPair = React.useMemo(() => diffCacheOrderedPair(baseRev, rev), [baseRev, rev]);
+  const remoteDiff = useDiffChanges({
+    cacheType: selectedCacheType,
+    configType: section,
+    base: diffPair.base,
+    rev: diffPair.rev,
+    enabled: liveDiffText,
+  });
+  // Partial results are still worth showing if the stream fails partway through.
+  const remoteDiffReady =
+    remoteDiff.status === "ok" ||
+    remoteDiff.status === "streaming" ||
+    (remoteDiff.status === "error" && remoteDiff.lines.length > 0);
 
   React.useEffect(() => {
     if (diffViewMode === "diff" || textOnly) {
@@ -156,65 +152,6 @@ export function DiffConfigView({
     setConfigSearchQuery(id != null ? String(id) : bareFocusTitle(focusBracketTitle));
     setConfigViewMode("text");
   }, [focusBracketTitle, focusNonce]);
-
-  React.useEffect(() => {
-    if (!liveDiffText) {
-      setRemoteDiffLines(null);
-      setRemoteDiffStatus("idle");
-      setRemoteDiffError(null);
-      setDecodeProgress(null);
-      return;
-    }
-
-    if (baseRev === rev) {
-      setRemoteDiffLines([]);
-      setRemoteDiffStatus("ok");
-      setRemoteDiffError(null);
-      setDecodeProgress(null);
-      return;
-    }
-
-    const requestId = ++diffFetchRef.current;
-    const ac = new AbortController();
-    setRemoteDiffStatus("loading");
-    setRemoteDiffError(null);
-    setDecodeProgress(null);
-
-    const pair = diffCacheOrderedPair(baseRev, rev);
-    const url = diffConfigContentUrl(selectedCacheType, section, pair);
-    const cacheKey = `diff:config:content:${selectedCacheType.id}:${section}:${pair.base}:${pair.rev}`;
-
-    void (async () => {
-      try {
-        const { data: raw } = await conditionalJsonFetchAwaitingDecode<unknown>(cacheKey, url, {
-          cacheType: selectedCacheType,
-          signal: ac.signal,
-          onProgress: (progress) => {
-            if (requestId !== diffFetchRef.current) return;
-            setDecodeProgress(progress);
-            setRemoteDiffStatus("decoding");
-          },
-        });
-        if (requestId !== diffFetchRef.current) return;
-        if (isDiffDecodePayload(raw)) {
-          setRemoteDiffLines([]);
-          setRemoteDiffStatus("decoding");
-          return;
-        }
-        setRemoteDiffLines(normalizeRemoteConfigLines(raw));
-        setDecodeProgress(null);
-        setRemoteDiffStatus("ok");
-      } catch (e) {
-        if (ac.signal.aborted || requestId !== diffFetchRef.current) return;
-        setRemoteDiffLines(null);
-        setDecodeProgress(null);
-        setRemoteDiffStatus("error");
-        setRemoteDiffError(e instanceof Error ? e.message : "Failed to load config diff");
-      }
-    })();
-
-    return () => ac.abort();
-  }, [liveDiffText, section, baseRev, rev, selectedCacheType, fetchableDiffSection]);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -320,8 +257,7 @@ export function DiffConfigView({
     return staticDiffLines.filter((line) => line.line.toLowerCase().includes(q));
   }, [staticDiffLines, configSearchQuery]);
 
-  const linesForVirtualDiff =
-    liveDiffText && remoteDiffStatus === "ok" && remoteDiffLines != null ? remoteDiffLines : staticDiffLines;
+  const linesForVirtualDiff = liveDiffText && remoteDiffReady ? remoteDiff.lines : staticDiffLines;
 
   const configColumns = React.useMemo(() => {
     const keys = new Set<string>();
@@ -346,14 +282,20 @@ export function DiffConfigView({
       : null;
 
   const diffLineCount =
-    liveDiffText && remoteDiffStatus === "ok" && remoteDiffLines != null
-      ? remoteDiffLines.length
-      : fallbackDiffLines.length;
+    liveDiffText && remoteDiffReady ? remoteDiff.lines.length : fallbackDiffLines.length;
+
+  // While streaming, say how many entities of the diff have landed so the count is not misread as
+  // the total.
+  const diffProgress = remoteDiff.progress;
+  const diffLineLabel =
+    liveDiffText && remoteDiff.status === "streaming" && diffProgress && diffProgress.total > 0
+      ? `${diffLineCount} lines · ${diffProgress.loaded}/${diffProgress.total} entries`
+      : `${diffLineCount} lines`;
 
   const headlineCount = isConfigTable
     ? `${visibleSectionRows.length} configs`
     : diffViewMode === "diff"
-      ? `${diffLineCount} lines`
+      ? diffLineLabel
       : `${fallbackDiffLines.length} lines`;
 
   const configTableSearchDisabledModes = React.useMemo((): readonly DiffSearchFieldMode[] => {
@@ -377,13 +319,10 @@ export function DiffConfigView({
   const diffHeaderTitle =
     diffViewMode === "diff" ? `${sectionTitle} (Base ${baseRev} → Compare ${rev})` : sectionTitle;
 
-  const diffTextBooting =
-    liveDiffText &&
-    baseRev !== rev &&
-    remoteDiffStatus === "idle" &&
-    remoteDiffLines === null &&
-    remoteDiffError === null;
-  const diffContentBusy = liveDiffText && (remoteDiffStatus === "loading" || diffTextBooting);
+  // The hook starts in `idle` for one render before its effect runs; treat that as loading so the
+  // spinner does not flash the static sample lines first.
+  const diffTextBooting = liveDiffText && baseRev !== rev && remoteDiff.status === "idle";
+  const diffContentBusy = liveDiffText && (remoteDiff.status === "loading" || diffTextBooting);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -497,15 +436,10 @@ export function DiffConfigView({
               </div>
             </div>
           ) : null}
-          {liveDiffText && !diffContentBusy && remoteDiffStatus === "decoding" ? (
-            <DiffDecodeProgressBanner
-              progress={decodeProgress}
-              fallbackMessage="Config diff is decoding on the cache server…"
-            />
-          ) : null}
-          {liveDiffText && !diffContentBusy && remoteDiffStatus === "error" && remoteDiffError ? (
+          {liveDiffText && !diffContentBusy && remoteDiff.status === "error" && remoteDiff.error ? (
             <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {remoteDiffError} — showing sample lines below.
+              {remoteDiff.error}
+              {remoteDiff.lines.length > 0 ? " — showing what loaded before the error." : " — showing sample lines below."}
             </p>
           ) : null}
           {liveDiffText && !diffContentBusy ? (

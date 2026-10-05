@@ -10,12 +10,16 @@ import {
   useGamevalSearchSuggestions,
   type GamevalSearchAutocompleteConfig,
 } from "./gameval-search-suggestion-list";
+import {
+  useConfigNameSuggestions,
+  type ConfigNameAutocompleteConfig,
+} from "./config-name-suggestions";
 import { isGamevalSuggestPanelOpen, looksLikeSpriteIdQueryText, sanitizeSpriteIdSearchInput } from "./diff-id-search";
 import { DIFF_SEARCH_MODE_PLACEHOLDERS } from "./diff-search-modes";
 import { DIFF_SEARCH_FIELD_MODE_LABELS, DIFF_SEARCH_FIELD_MODES_ALL, type DiffSearchFieldMode, type SearchTag } from "./diff-types";
 import { DiffSearchTagRow } from "./diff-search-tag-row";
 
-export type { GamevalSearchAutocompleteConfig };
+export type { GamevalSearchAutocompleteConfig, ConfigNameAutocompleteConfig };
 
 export type DiffUnifiedSearchFieldProps = {
   mode: DiffSearchFieldMode;
@@ -39,6 +43,8 @@ export type DiffUnifiedSearchFieldProps = {
   searchAriaLabel?: string;
   /** Sprite-style gameval tag search: show matching enum names while typing in Gameval mode. */
   gamevalAutocomplete?: GamevalSearchAutocompleteConfig | null;
+  /** Matching definition names while typing in Name mode, answered by the server. */
+  nameAutocomplete?: ConfigNameAutocompleteConfig | null;
 };
 
 export function DiffUnifiedSearchField({
@@ -59,6 +65,7 @@ export function DiffUnifiedSearchField({
   size = "large",
   searchAriaLabel = "Search",
   gamevalAutocomplete = null,
+  nameAutocomplete = null,
 }: DiffUnifiedSearchFieldProps) {
   const [modeOpen, setModeOpen] = React.useState(false);
   const [openUpward, setOpenUpward] = React.useState(false);
@@ -74,12 +81,25 @@ export function DiffUnifiedSearchField({
 
   const gamevalSuggestEligible =
     Boolean(gamevalAutocomplete?.enabled) && mode === "gameval" && !isModeDisabled("gameval");
+  const nameSuggestEligible =
+    Boolean(nameAutocomplete?.enabled) && mode === "name" && !isModeDisabled("name");
 
-  const { suggestions: gamevalSuggestions, loaded: gamevalLoaded, loading: gamevalLoading } =
-    useGamevalSearchSuggestions(gamevalSuggestEligible ? gamevalAutocomplete : null, value, gamevalSuggestEligible);
+  const gameval = useGamevalSearchSuggestions(
+    gamevalSuggestEligible ? gamevalAutocomplete : null,
+    value,
+    gamevalSuggestEligible,
+  );
+  // Passed unconditionally so the name set loads with the page, not on the first keystroke.
+  const names = useConfigNameSuggestions(nameAutocomplete, value, nameSuggestEligible);
+
+  // One panel, whichever mode is currently offering suggestions.
+  const suggestEligible = gamevalSuggestEligible || nameSuggestEligible;
+  const { suggestions: gamevalSuggestions, loading: gamevalLoading, loaded: gamevalLoaded } =
+    nameSuggestEligible ? names : gameval;
+  const suggestNoun = nameSuggestEligible ? "names" : "gamevals";
 
   const showGamevalSuggestPanel = isGamevalSuggestPanelOpen({
-    enabled: gamevalSuggestEligible,
+    enabled: suggestEligible,
     open: gamevalSuggestOpen,
     value,
     loading: gamevalLoading,
@@ -92,8 +112,8 @@ export function DiffUnifiedSearchField({
   }, [value, gamevalSuggestions.length]);
 
   React.useEffect(() => {
-    if (!gamevalSuggestEligible) setGamevalSuggestOpen(false);
-  }, [gamevalSuggestEligible, mode]);
+    if (!suggestEligible) setGamevalSuggestOpen(false);
+  }, [suggestEligible, mode]);
 
   const labels = React.useMemo(
     () => ({ ...DIFF_SEARCH_MODE_PLACEHOLDERS, ...placeholders }),
@@ -196,7 +216,7 @@ export function DiffUnifiedSearchField({
               type="text"
               value={value}
               onChange={(e) => {
-                if (gamevalSuggestEligible) setGamevalSuggestOpen(true);
+                if (suggestEligible) setGamevalSuggestOpen(true);
                 let next = e.target.value;
                 const idSanitizable =
                   (mode === "id" && !isModeDisabled("id")) ||
@@ -211,7 +231,7 @@ export function DiffUnifiedSearchField({
                 }
               }}
               onFocus={() => {
-                if (gamevalSuggestEligible) setGamevalSuggestOpen(true);
+                if (suggestEligible) setGamevalSuggestOpen(true);
               }}
               onKeyDown={handleInputKeyDown}
               placeholder={placeholder}
@@ -303,6 +323,7 @@ export function DiffUnifiedSearchField({
             }}
             loading={gamevalLoading && !gamevalLoaded}
             showEmpty={gamevalLoaded && !gamevalLoading && gamevalSuggestions.length === 0}
+            noun={suggestNoun}
           />
         ) : null}
       </div>

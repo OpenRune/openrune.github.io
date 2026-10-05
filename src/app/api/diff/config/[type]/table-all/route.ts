@@ -24,7 +24,8 @@ function parseTargetFromQuery(request: NextRequest): CacheTarget | null {
 }
 
 const PAGE_SIZE = 500;
-const MAX_ROWS = 100_000;
+/** Hard ceiling for one aggregated response; larger types must be paged through `/table` directly. */
+const MAX_ROWS = 50_000;
 const PAGE_TIMEOUT_MS = 30_000;
 
 type TablePageRow = Record<string, unknown>;

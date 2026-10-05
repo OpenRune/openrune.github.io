@@ -25,6 +25,9 @@ export type DiffConfigArchiveTextLineProps = {
   /** Optional revision candidates for gameval name lookup (diff mode can include base+compare). */
   lookupRevisions?: readonly number[];
   hoverText?: string;
+  /** Gameval the value points at, when the payload carried one (see `ConfigLine.refId`). */
+  refGroup?: string;
+  refId?: number;
   fieldRenderSchemaByField?: Record<string, ConfigFieldRenderSchema>;
   /** Optional (e.g. texture inline previews from settings). */
   showInline?: boolean;

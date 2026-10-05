@@ -72,6 +72,8 @@ type GamevalSearchSuggestionListProps = {
   onPick: (name: string) => void;
   loading: boolean;
   showEmpty: boolean;
+  /** What the panel is suggesting, for the loading and empty lines. */
+  noun?: string;
   className?: string;
 };
 
@@ -82,6 +84,7 @@ export function GamevalSearchSuggestionList({
   onPick,
   loading,
   showEmpty,
+  noun = "gamevals",
   className,
 }: GamevalSearchSuggestionListProps) {
   if (loading) {
@@ -93,7 +96,7 @@ export function GamevalSearchSuggestionList({
         )}
         role="listbox"
       >
-        <li className="px-3 py-1.5">Loading gamevals…</li>
+        <li className="px-3 py-1.5">Loading {noun}…</li>
       </ul>
     );
   }
@@ -140,7 +143,7 @@ export function GamevalSearchSuggestionList({
           className,
         )}
       >
-        <li className="px-3 py-1.5">No matching gamevals</li>
+        <li className="px-3 py-1.5">No matching {noun}</li>
       </ul>
     );
   }

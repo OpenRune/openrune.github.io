@@ -127,6 +127,8 @@ export function spritesProxyUrl(
     width?: number;
     height?: number;
     keepAspectRatio?: boolean;
+    /** `false` makes width/height a maximum: a smaller sprite comes back at its own size. */
+    upscale?: boolean;
     base?: number;
     rev?: number;
     source?: number;
@@ -140,12 +142,15 @@ export function spritesProxyUrl(
     params.width != null || params.height != null || params.indexed != null;
   const cdnBase = (params.cdnBase ?? spritesCdnBase(cacheType)).replace(/\/$/, "");
   const cdnGame = params.cdnGame ?? spritesCdnGameSlug(cacheType);
-  const spriteRev = params.source ?? params.rev;
-  if (!needsResize && spriteRev != null) {
+  // Assets are only uploaded at the revision their content changed in, so `rev` alone is not
+  // enough to build a CDN key — an unchanged sprite lives under an older revision's prefix. With
+  // an explicit `source` the caller already knows which, and goes straight to the CDN; otherwise
+  // the request goes through the API, which resolves it and redirects (cached thereafter).
+  if (!needsResize && params.source != null) {
     return spritesCdnObjectUrl({
       cdnBase,
       game: cdnGame,
-      rev: spriteRev,
+      rev: params.source,
       id: params.id,
     });
   }
@@ -154,6 +159,7 @@ export function spritesProxyUrl(
   if (params.width != null) search.set("width", String(params.width));
   if (params.height != null) search.set("height", String(params.height));
   if (params.keepAspectRatio != null) search.set("keepAspectRatio", String(params.keepAspectRatio));
+  if (params.upscale === false) search.set("upscale", "false");
   if (params.base != null) search.set("base", String(params.base));
   if (params.rev != null) search.set("rev", String(params.rev));
   if (params.source != null) search.set("source", String(params.source));
@@ -211,13 +217,13 @@ export function modelsCdnObjectUrl(params: {
  * Raw model mesh bytes (`.dat`) for a revision. Every revision holds its own full copy on
  * the CDN, so these objects are immutable and safe for the browser's HTTP cache.
  */
+/**
+ * Mesh bytes are on the CDN under the revision the mesh last changed in, which `rev` alone does not
+ * identify. The API resolves that and redirects, so this points there rather than guessing a key.
+ * Callers holding the `dat` URL from `/models/*` should use that instead and skip the hop.
+ */
 export function modelDatUrl(cacheType: CacheTarget, id: number, rev: number): string {
-  return modelsCdnObjectUrl({
-    cdnBase: spritesCdnBase(cacheType),
-    game: spritesCdnGameSlug(cacheType),
-    rev,
-    id,
-  });
+  return cacheServerUrl(cacheType, `/models/${id}/dat?rev=${rev}`);
 }
 
 /** Full metadata for one model: textures, colours, and what uses it. */
@@ -272,12 +278,12 @@ export function diffSpriteResolveUrl(
 ) {
   const needsResize = params.width != null || params.height != null;
   const cdnBase = spritesCdnBase(cacheType);
-  const spriteRev = params.source ?? params.rev;
-  if (!needsResize) {
+  // Only a known source revision identifies a CDN object; without one the API resolves it.
+  if (!needsResize && params.source != null) {
     return spritesCdnObjectUrl({
       cdnBase,
       game: spritesCdnGameSlug(cacheType),
-      rev: spriteRev,
+      rev: params.source,
       id: spriteId,
     });
   }
@@ -347,6 +353,49 @@ export function diffConfigContentUrl(
   return cacheServerUrl(
     cacheType,
     `/diff/config/${encodeURIComponent(normalizeConfigTypeForApi(configType))}/content?${search.toString()}`,
+  );
+}
+
+/** One page of a config diff. Omit `kind` for all three kinds interleaved by id. */
+export function diffConfigChangesUrl(
+  cacheType: CacheTarget,
+  configType: string,
+  params: { base: number; rev: number; kind?: string; limit: number; after?: number },
+) {
+  const search = new URLSearchParams({
+    base: String(params.base),
+    rev: String(params.rev),
+    limit: String(params.limit),
+  });
+  if (params.kind) search.set("kind", params.kind);
+  if (params.after != null) search.set("after", String(params.after));
+  return cacheServerUrl(
+    cacheType,
+    `/diff/config/${encodeURIComponent(normalizeConfigTypeForApi(configType))}/changes?${search.toString()}`,
+  );
+}
+
+/**
+ * Rendered inventory / object image for one definition. The API resolves which revision the render
+ * last changed in and redirects to that CDN object, so a revision where nothing changed costs no
+ * storage and no upload.
+ */
+export function renderedImageUrl(
+  cacheType: CacheTarget,
+  kind: "items" | "objects",
+  id: number,
+  /** Omit to use the latest published revision, which is what most views want. */
+  rev?: number,
+): string {
+  const suffix = rev != null ? `?rev=${rev}` : "";
+  return cacheServerUrl(cacheType, `/${kind}/${id}/image${suffix}`);
+}
+
+/** Every `id -> name` for a config type at a revision, for client-side name search. */
+export function configNamesUrl(cacheType: CacheTarget, configType: string, rev: number) {
+  return cacheServerUrl(
+    cacheType,
+    `/diff/config/${encodeURIComponent(normalizeConfigTypeForApi(configType))}/names?rev=${rev}`,
   );
 }
 

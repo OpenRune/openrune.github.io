@@ -29,10 +29,21 @@ import type { RSModelMesh } from "@/lib/model/rs-model-mesh";
 import type { RSModelRenderMode } from "@/lib/model/rs-model-renderer";
 import type { RSTextureLayer } from "@/lib/model/rs-model-source";
 import { readCookie, writeCookie } from "@/lib/cookies";
+import { downloadBlob } from "@/lib/download-blob";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 100;
 const GRID_COOKIE = "openrune-model-grid";
+
+/**
+ * The render fills the screen rather than sitting at a fixed size, so a model gets as much room as
+ * the window allows. The subtraction covers the page padding, the card header and the hint line
+ * below it; the floor keeps it usable on a short window, where the page scrolls instead.
+ */
+const VIEWPORT_HEIGHT = "max(32rem, calc(100vh - 12rem))";
+
+/** Same idea for the id list, less the card header controls and the pager under it. */
+const LIST_HEIGHT = "max(26rem, calc(100vh - 19rem))";
 
 const RENDER_MODE_OPTIONS: { value: RSModelRenderMode; label: string }[] = [
   { value: "solid", label: "Solid" },
@@ -76,15 +87,6 @@ async function readJsonOrThrow(res: Response): Promise<unknown> {
   if (res.ok) return res.json();
   if (res.status === 404) throw new NoModelDataError("no model data");
   throw new Error(`HTTP ${res.status}`);
-}
-
-function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
 }
 
 export function ModelViewer() {
@@ -340,7 +342,10 @@ export function ModelViewer() {
           ) : rows.length === 0 ? (
             <p className="py-6 text-sm text-muted-foreground">No models match that id.</p>
           ) : (
-            <ul className="max-h-[30rem] min-h-0 overflow-y-auto rounded-md border border-border">
+            <ul
+              className="min-h-0 overflow-y-auto rounded-md border border-border"
+              style={{ maxHeight: LIST_HEIGHT }}
+            >
               {rows.map((row) => (
                 <li key={row.id}>
                   <button
@@ -405,7 +410,7 @@ export function ModelViewer() {
               id={selectedId}
               rev={rev}
               modelUrl={detailReady ? (detail.dat ?? undefined) : undefined}
-              height={520}
+              height={VIEWPORT_HEIGHT}
               className="w-full rounded-md border border-border"
               autoRotate={!stopRotation}
               // Cache models face -Z, so the camera has to sit behind them to see the front.
@@ -417,7 +422,10 @@ export function ModelViewer() {
               onLoad={handleModelLoad}
             />
           ) : (
-            <div className="flex h-[520px] items-center justify-center rounded-md border border-border bg-muted/20 text-sm text-muted-foreground">
+            <div
+              className="flex items-center justify-center rounded-md border border-border bg-muted/20 text-sm text-muted-foreground"
+              style={{ height: VIEWPORT_HEIGHT }}
+            >
               Pick a model from the list.
             </div>
           )}
