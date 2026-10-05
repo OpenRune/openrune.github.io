@@ -1,0 +1,57 @@
+name: OpenWiki Pages
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "OpenRune-Server branch/tag/SHA to publish"
+        required: false
+        default: main
+  schedule:
+    - cron: "0 5 * * *"
+  repository_dispatch:
+    types: [openwiki-updated]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout wiki source
+        uses: actions/checkout@v4
+        with:
+          repository: OpenRune/OpenRune-Server
+          ref: main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install OpenWiki
+        run: npm install --global openwiki@0.7.0
+
+      - name: Export visualizer
+        run: openwiki visualize openwiki --export _site
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload visualizer
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
