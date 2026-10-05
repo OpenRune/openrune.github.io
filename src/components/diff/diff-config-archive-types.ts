@@ -25,6 +25,9 @@ export type DiffConfigArchiveTextLineProps = {
   /** Optional revision candidates for gameval name lookup (diff mode can include base+compare). */
   lookupRevisions?: readonly number[];
   hoverText?: string;
+  /** Gameval the value points at, when the payload carried one (see `ConfigLine.refId`). */
+  refGroup?: string;
+  refId?: number;
   fieldRenderSchemaByField?: Record<string, ConfigFieldRenderSchema>;
   /** Optional (e.g. texture inline previews from settings). */
   showInline?: boolean;
@@ -87,6 +90,11 @@ export type DiffConfigArchiveViewProps = {
   combinedRev: number;
   baseRev: number;
   rev: number;
+  /**
+   * Force combined mode into text only (hide table / Table↔Text toggle).
+   * Used by Diff explorer Full mode.
+   */
+  textOnly?: boolean;
 
   /** `diff/config/{configType}/…` */
   configType: string;
@@ -122,6 +130,20 @@ export type DiffConfigArchiveViewProps = {
   textFindDebounceMs?: number;
   /** Shown on the search row, aligned to the far right (e.g. zip download). */
   searchRowTrailing?: React.ReactNode;
+  /** Hide the table search field (sidebar owns search). Trailing actions still render if set. */
+  hideSearchChrome?: boolean;
+  /**
+   * When set, table search state is owned by the parent (e.g. Diff explorer sidebar).
+   * Filters the table the same as the in-pane search field.
+   */
+  controlledSearch?: {
+    mode: DiffSearchFieldMode;
+    onModeChange: (mode: DiffSearchFieldMode) => void;
+    text: string;
+    onTextChange: (text: string) => void;
+    tags: SearchTag[];
+    onTagsChange: (tags: SearchTag[]) => void;
+  } | null;
   /** Optional search control size for table mode. */
   tableSearchSize?: "default" | "large";
   /** Optional wrapper classes for table-mode search container width/layout. */

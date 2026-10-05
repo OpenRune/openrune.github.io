@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { useCacheType } from "@/context/cache-type-context";
+import { cacheServerUrl, type CacheTarget } from "@/lib/cache-api-client";
 import { cn } from "@/lib/utils";
 
 type QueryParam = {
@@ -29,6 +31,7 @@ type EndpointInfo = {
   description: string;
   category: string;
   queryParams: QueryParam[];
+  examples: string[];
   responseType?: string | null;
   pathOptions?: string[] | null;
 };
@@ -40,6 +43,16 @@ type EndpointsData = {
 
 const ID_RANGE_PARTS = ["idRangeMin", "idRangeMax"] as const;
 const COMMON_PARAM_NAMES = ["limit", "searchmode", "q", "idrange", "id", "gameval"] as const;
+
+/** The registry sends no descriptions for these, so the sidebar supplies them. */
+const COMMON_PARAM_DOCS: Record<string, string> = {
+  limit: "Maximum rows to return. Paginated endpoints also return a nextCursor.",
+  searchmode: "How q is matched: ID, GAMEVAL, REGEX or NAME.",
+  q: "Free-text search over names.",
+  idrange: "Inclusive id range, written min..max.",
+  id: "A single entity id.",
+  gameval: "Filter by gameval name.",
+};
 
 function nameEq(name: string, expected: string): boolean {
   return name.trim().toLowerCase() === expected.trim().toLowerCase();
@@ -97,21 +110,27 @@ function normalizeEndpointsData(input: unknown): EndpointsData {
         ? pathOptionsRaw.filter((v): v is string => typeof v === "string" && v.length > 0)
         : null;
 
-      return { method, path, description, category, queryParams, responseType, pathOptions };
+      const examplesRaw = Array.isArray(endpoint.examples)
+        ? endpoint.examples
+        : (Array.isArray(endpoint.exampleUrls) ? endpoint.exampleUrls : []);
+      const examples = examplesRaw.filter((v): v is string => typeof v === "string" && v.length > 0);
+
+      return { method, path, description, category, queryParams, examples, responseType, pathOptions };
     })
     .filter((endpoint) => endpoint.path.length > 0);
 
   return { baseUrl, endpoints };
 }
 
-async function fetchApiJson<T>(path: string): Promise<T> {
-  const normalized = path.startsWith("/") ? path : `/${path}`;
-  const response = await fetch(`/api${normalized}`, {
-    method: "GET",
-    cache: "no-store",
-  });
+/**
+ * These are served by the cache server, not by this site. The old `/api/...` path resolved against
+ * the site's own origin, where no such route exists, so every request 404'd.
+ */
+async function fetchApiJson<T>(cacheType: CacheTarget, path: string): Promise<T> {
+  const url = cacheServerUrl(cacheType, path.startsWith("/") ? path : `/${path}`);
+  const response = await fetch(url, { method: "GET", cache: "no-store" });
   if (!response.ok) {
-    throw new Error(`Failed to fetch ${path}: ${response.status} ${response.statusText}`);
+    throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
   }
   return (await response.json()) as T;
 }
@@ -151,28 +170,114 @@ function endpointSpecificParams(endpoint: EndpointInfo): QueryParam[] {
   return endpoint.queryParams.filter((param) => !COMMON_PARAM_NAMES.includes(param.name.toLowerCase() as (typeof COMMON_PARAM_NAMES)[number]));
 }
 
+const PLACEHOLDER_RE = /\{([^}/]+)\}/g;
+const INT_PARAM_NAMES = new Set(["rev", "base", "id", "size", "width", "height", "limit", "offset", "source", "fileid", "regionid", "objectid", "min", "max"]);
+const BOOL_PARAM_NAMES = new Set(["keepaspectratio", "keepaspect", "upscale", "includeextras", "indexed", "names", "collapse"]);
+
+/** `/map/objects/{objectId}` → `["objectId"]`. */
+function pathPlaceholders(path: string): string[] {
+  return Array.from(path.matchAll(PLACEHOLDER_RE), (m) => m[1]);
+}
+
+function paramTypeFor(name: string): string {
+  const key = name.toLowerCase();
+  if (BOOL_PARAM_NAMES.has(key)) return "Boolean";
+  if (INT_PARAM_NAMES.has(key)) return "Int";
+  return "String";
+}
+
+/** The first example, split into its path and its query string. */
+function exampleParts(endpoint: EndpointInfo): { path: string; query: URLSearchParams } | null {
+  const example = endpoint.examples[0];
+  if (!example) return null;
+  const split = example.indexOf("?");
+  return split < 0
+    ? { path: example, query: new URLSearchParams() }
+    : { path: example.slice(0, split), query: new URLSearchParams(example.slice(split + 1)) };
+}
+
+/**
+ * Seed each `{placeholder}` from the endpoint's own example, so an endpoint opens on a URL that
+ * already resolves. `1` is the fallback for an endpoint documented without one.
+ */
+function placeholderDefaults(endpoint: EndpointInfo): Record<string, string> {
+  const names = pathPlaceholders(endpoint.path);
+  if (names.length === 0) return {};
+  const defaults: Record<string, string> = Object.fromEntries(names.map((name) => [name, "1"]));
+
+  const example = exampleParts(endpoint)?.path;
+  if (!example) return defaults;
+  const pattern = new RegExp(
+    `^${endpoint.path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\\{[^}]*\\\}/g, "([^/]+)")}$`,
+  );
+  const match = pattern.exec(example);
+  if (match) names.forEach((name, i) => { defaults[name] = match[i + 1] ?? defaults[name]; });
+  return defaults;
+}
+
+/** Names from a prose query list: "Query: rev, size, source." */
+function describedQueryNames(description: string): string[] {
+  const match = /Query:\s*([^.]+)/.exec(description);
+  if (!match) return [];
+  return match[1]
+    .split(",")
+    .map((part) => /^[A-Za-z][A-Za-z0-9_]*/.exec(part.trim())?.[0] ?? "")
+    .filter((name) => name.length > 0);
+}
+
+/** Path placeholders share a namespace with query params — `{id}` and `?id=` can both exist. */
+function pathParamKey(name: string): string {
+  return `__path.${name}`;
+}
+
+/** Inputs for the `{placeholders}` in the path. */
+function pathBuilderParams(endpoint: EndpointInfo): QueryParam[] {
+  const defaults = placeholderDefaults(endpoint);
+  return pathPlaceholders(endpoint.path).map((name) => ({
+    name,
+    type: paramTypeFor(name),
+    required: true,
+    description: `Path segment {${name}}`,
+    defaultValue: defaults[name],
+  }));
+}
+
+/**
+ * The registry documents query strings in prose and by example rather than as structured params, so
+ * both are mined here: the example supplies names *and* values that are known to work, the prose
+ * list fills in anything the example leaves out.
+ */
 function allBuilderParams(endpoint: EndpointInfo): QueryParam[] {
-  if (endpoint.path.includes("/models/{param}")) {
-    const idParam = endpoint.queryParams.find((p) => p.name === "id");
-    return idParam ? [idParam] : [];
-  }
-
-  if (endpoint.path === "/sprites") {
-    const allowed = new Set(["id", "width", "height", "keepAspectRatio", "indexed"]);
-    return endpoint.queryParams.filter((p) => allowed.has(p.name));
-  }
-
   const params = [...endpoint.queryParams];
-  if (!params.some((p) => p.name === "dataType")) {
-    params.unshift({
-      name: "dataType",
-      type: "String",
-      required: false,
-      description: "Data type: web (default) or cache",
-      defaultValue: "web",
-    });
-  }
+  const seen = new Set(params.map((p) => p.name.toLowerCase()));
+
+  const add = (name: string, defaultValue: string | null) => {
+    if (seen.has(name.toLowerCase())) return;
+    seen.add(name.toLowerCase());
+    // The examples cite whatever revision they were written against; the live server may not have
+    // it. `rev` always starts at "latest" instead.
+    params.push({ name, type: paramTypeFor(name), required: false, description: "", defaultValue: nameEq(name, "rev") ? null : defaultValue });
+  };
+
+  exampleParts(endpoint)?.query.forEach((value, name) => add(name, value));
+  describedQueryNames(endpoint.description).forEach((name) => add(name, null));
   return params;
+}
+
+/** What the builder puts in the box: the user's own edit, else the example's value. */
+function builderValue(param: QueryParam, values: Record<string, string>, key: string): string {
+  const typed = values[key];
+  return typed === undefined ? (param.defaultValue ?? "") : typed;
+}
+
+type BuilderField = { param: QueryParam; key: string; isPath: boolean };
+
+/** Path segments first, then the query string, in the order the URL reads. */
+function builderFields(endpoint: EndpointInfo): BuilderField[] {
+  return [
+    ...pathBuilderParams(endpoint).map((param) => ({ param, key: pathParamKey(param.name), isPath: true })),
+    ...allBuilderParams(endpoint).map((param) => ({ param, key: param.name, isPath: false })),
+  ];
 }
 
 function buildUrlForEndpoint(
@@ -188,10 +293,11 @@ function buildUrlForEndpoint(
     path = `/${selected}`;
   }
 
-  const isModelsParam = path.includes("/models/{param}");
-  if (isModelsParam) {
-    const id = values.id?.trim() || "id";
-    path = path.replace("{param}", encodeURIComponent(id));
+  // Every `{placeholder}` has to be filled or the request hits a route that does not exist — the
+  // literal `/map/objects/{objectId}` is not a path the server serves.
+  for (const param of pathBuilderParams(endpoint)) {
+    const value = builderValue(param, values, pathParamKey(param.name)).trim() || param.defaultValue || "1";
+    path = path.replace(`{${param.name}}`, encodeURIComponent(value));
   }
 
   const params: string[] = [];
@@ -202,7 +308,6 @@ function buildUrlForEndpoint(
   for (const param of allBuilderParams(endpoint)) {
     const name = param.name;
     if (name === "__pathOption") continue;
-    if (isModelsParam && nameEq(name, "id")) continue;
     if (nameEq(name, "id") && hasIdRange) continue;
 
     if (nameEq(name, "idRange")) {
@@ -220,20 +325,15 @@ function buildUrlForEndpoint(
       continue;
     }
 
-    const value = values[name]?.trim();
-    if (value) {
-      params.push(`${encodeURIComponent(name)}=${encodeURIComponent(value)}`);
-    } else if (nameEq(name, "dataType")) {
-      params.push("dataType=web");
-    } else if (param.required && param.defaultValue) {
-      params.push(`${encodeURIComponent(name)}=${encodeURIComponent(param.defaultValue)}`);
-    }
+    const value = builderValue(param, values, name).trim();
+    if (value) params.push(`${encodeURIComponent(name)}=${encodeURIComponent(value)}`);
   }
 
   return `${baseUrl}${path}${params.length ? `?${params.join("&")}` : ""}`;
 }
 
 export default function ApiDocsPage() {
+  const { selectedCacheType } = useCacheType();
   const [data, setData] = React.useState<EndpointsData | null>(null);
   const [configPathSegments, setConfigPathSegments] = React.useState<string[]>([]);
   const [revisionOptions, setRevisionOptions] = React.useState<string[]>(["latest"]);
@@ -261,15 +361,15 @@ export default function ApiDocsPage() {
       setError(null);
       try {
         const [endpointsDataRaw] = await Promise.all([
-          fetchApiJson<unknown>("/endpoints/data"),
-          fetchApiJson<{ pathSegments?: string[] }>("/config-types")
+          fetchApiJson<unknown>(selectedCacheType, "/endpoints/data"),
+          fetchApiJson<{ pathSegments?: string[] }>(selectedCacheType, "/config-types")
             .then((v) => {
               if (!cancelled && Array.isArray(v.pathSegments)) setConfigPathSegments(v.pathSegments);
             })
             .catch(() => {
               // Optional endpoint.
             }),
-          fetchApiJson<{ revisionOptions?: string[]; serverRevision?: number }>("/revisions")
+          fetchApiJson<{ revisionOptions?: string[]; serverRevision?: number }>(selectedCacheType, "/revisions")
             .then((v) => {
               if (cancelled) return;
               if (Array.isArray(v.revisionOptions) && v.revisionOptions.length > 0) {
@@ -311,7 +411,8 @@ export default function ApiDocsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // Switching cache server reloads the docs: each one advertises its own endpoints and revisions.
+  }, [selectedCacheType]);
 
   const grouped = React.useMemo(() => {
     if (!data) return {} as Record<string, EndpointInfo[]>;
@@ -327,10 +428,12 @@ export default function ApiDocsPage() {
     if (!data) return [] as QueryParam[];
     const byName = new Map<string, QueryParam>();
     for (const endpoint of data.endpoints) {
-      for (const param of endpoint.queryParams) {
+      // allBuilderParams, not queryParams: the registry documents its query strings in prose and by
+      // example, so the structured list is empty and this panel had nothing to show.
+      for (const param of allBuilderParams(endpoint)) {
         const key = param.name.toLowerCase();
         if (COMMON_PARAM_NAMES.includes(key as (typeof COMMON_PARAM_NAMES)[number]) && !byName.has(key)) {
-          byName.set(key, param);
+          byName.set(key, { ...param, description: param.description || COMMON_PARAM_DOCS[key] || "" });
         }
       }
     }
@@ -365,9 +468,12 @@ export default function ApiDocsPage() {
     setTestMethod(method);
 
     try {
+      // The built URL comes from the server's own reported baseUrl; re-point it at the cache server
+      // this page is pointed at. The old `/api${pathname}` resolved against the *site* origin, which
+      // answered every call with its own 404 page.
       const target = new URL(fullUrl);
-      const response = await fetch(`/api${target.pathname}${target.search}`, {
-        method: "GET",
+      const response = await fetch(cacheServerUrl(selectedCacheType, `${target.pathname}${target.search}`), {
+        method: method.toUpperCase(),
         cache: "no-store",
       });
 
@@ -391,7 +497,7 @@ export default function ApiDocsPage() {
     } finally {
       setTestLoading(false);
     }
-  }, []);
+  }, [selectedCacheType]);
 
   React.useEffect(() => {
     if (!testModalOpen && testResponse && typeof testResponse === "object") {
@@ -493,6 +599,23 @@ export default function ApiDocsPage() {
                       <div className="space-y-4 border-t px-3 py-3">
                         <p className="text-sm text-muted-foreground">{endpoint.description}</p>
 
+                        {endpoint.examples.length > 0 ? (
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-semibold">Examples</h4>
+                            {endpoint.examples.map((example) => (
+                              <button
+                                key={example}
+                                type="button"
+                                onClick={() => runQuery(endpoint.method, `${data.baseUrl}${example}`)}
+                                className="flex w-full items-center gap-2 rounded border border-border/60 bg-muted/40 px-2 py-1.5 text-left hover:border-blue-500/40 hover:bg-muted/70"
+                              >
+                                <Play className="size-3 shrink-0 text-blue-400" />
+                                <code className="break-all text-xs">{example}</code>
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+
                         {pathOptions.length > 0 ? (
                           <div className="space-y-1">
                             <Label className="text-xs">Path option</Label>
@@ -538,28 +661,42 @@ export default function ApiDocsPage() {
                         <div>
                           <h4 className="mb-3 text-sm font-semibold">URL Builder</h4>
                           <div className="space-y-2.5 mb-3">
-                            {allBuilderParams(endpoint).map((param) => {
-                              const inputId = `${endpointKey}-${param.name}`;
-                              const value = values[param.name] ?? "";
+                            {builderFields(endpoint).map(({ param, key, isPath }) => {
+                              const inputId = `${endpointKey}-${key}`;
+                              const value = builderValue(param, values, key);
                               const isBool = param.type.toLowerCase().includes("boolean");
                               const isRev = nameEq(param.name, "rev");
                               const isIdRange = nameEq(param.name, "idRange");
                               const isSearchMode = nameEq(param.name, "searchMode");
-                              const isDataType = nameEq(param.name, "dataType");
+                              // A `{type}` segment is always a config type, and we already fetched the list.
+                              const typeOptions = isPath && nameEq(param.name, "type") ? configPathSegments : [];
 
                               return (
-                                <div key={param.name} className="grid grid-cols-[13rem_minmax(0,1fr)] items-center gap-2">
+                                <div key={key} className="grid grid-cols-[13rem_minmax(0,1fr)] items-center gap-2">
                                   <Label htmlFor={inputId} className="text-xs">
-                                    {param.name}
+                                    {isPath ? `{${param.name}}` : param.name}
                                     {param.required ? <span className="ml-1 text-destructive">*</span> : null}
-                                    <span className="ml-2 text-[11px] text-muted-foreground">{formatParamType(param.type)}</span>
+                                    <span className="ml-2 text-[11px] text-muted-foreground">
+                                      {isPath ? "path" : formatParamType(param.type)}
+                                    </span>
                                   </Label>
 
-                                  {isBool ? (
+                                  {typeOptions.length > 0 ? (
+                                    <NativeSelect
+                                      id={inputId}
+                                      value={value || typeOptions[0]}
+                                      onChange={(e) => setParam(endpointKey, key, e.target.value)}
+                                      className="h-8 px-2 text-xs"
+                                    >
+                                      {typeOptions.map((option) => (
+                                        <option key={option} value={option}>{option}</option>
+                                      ))}
+                                    </NativeSelect>
+                                  ) : isBool ? (
                                     <NativeSelect
                                       id={inputId}
                                       value={value}
-                                      onChange={(e) => setParam(endpointKey, param.name, e.target.value)}
+                                      onChange={(e) => setParam(endpointKey, key, e.target.value)}
                                       className="h-8 px-2 text-xs"
                                     >
                                       <option value="">Select</option>
@@ -570,7 +707,7 @@ export default function ApiDocsPage() {
                                     <NativeSelect
                                       id={inputId}
                                       value={value}
-                                      onChange={(e) => setParam(endpointKey, param.name, e.target.value)}
+                                      onChange={(e) => setParam(endpointKey, key, e.target.value)}
                                       className="h-8 px-2 text-xs"
                                     >
                                       <option value="">Select</option>
@@ -579,24 +716,15 @@ export default function ApiDocsPage() {
                                       <option value="REGEX">REGEX</option>
                                       <option value="NAME">NAME</option>
                                     </NativeSelect>
-                                  ) : isDataType ? (
-                                    <NativeSelect
-                                      id={inputId}
-                                      value={value || "web"}
-                                      onChange={(e) => setParam(endpointKey, param.name, e.target.value)}
-                                      className="h-8 px-2 text-xs"
-                                    >
-                                      <option value="web">web</option>
-                                      <option value="cache">cache</option>
-                                    </NativeSelect>
                                   ) : isRev ? (
                                     <NativeSelect
                                       id={inputId}
-                                      value={value || "latest"}
-                                      onChange={(e) => setParam(endpointKey, param.name, e.target.value)}
+                                      value={value || (isPath ? String(serverRevision ?? param.defaultValue ?? "") : "latest")}
+                                      onChange={(e) => setParam(endpointKey, key, e.target.value)}
                                       className="h-8 px-2 text-xs"
                                     >
-                                      {revisionOptions.map((option) => (
+                                      {/* A `{rev}` segment has to be a number: `/diff/manifest/latest` is not a route. */}
+                                      {revisionOptions.filter((option) => !(isPath && option === "latest")).map((option) => (
                                         <option key={option} value={option}>
                                           {option === "latest" && serverRevision != null ? `latest (${serverRevision})` : option}
                                         </option>
@@ -625,7 +753,7 @@ export default function ApiDocsPage() {
                                       id={inputId}
                                       type="text"
                                       value={value}
-                                      onChange={(e) => setParam(endpointKey, param.name, e.target.value)}
+                                      onChange={(e) => setParam(endpointKey, key, e.target.value)}
                                       placeholder={param.defaultValue ? `Default: ${param.defaultValue}` : param.name}
                                       className="h-8 px-2 text-xs"
                                     />

@@ -2,8 +2,7 @@
 
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { LazyWhenVisible } from "@/components/ui/lazy-when-visible";
 import { OptionDropdown } from "@/components/ui/option-dropdown";
 import { RSSprite } from "@/components/ui/RSSprite";
@@ -20,9 +19,15 @@ import {
   diffDeltaSpritesUrl,
   diffSpriteImageUrl,
 } from "@/lib/cache-api-client";
-import { conditionalJsonFetch } from "@/lib/openrune-idb-cache";
+import { DiffDecodeProgressBanner } from "@/components/diff/diff-decode-progress";
+import {
+  conditionalJsonFetchAwaitingDecode,
+  isDiffDecodePayload,
+  type DiffDecodeProgress,
+} from "@/lib/diff-decode";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { DIFF_COMBINED_SEARCH_WRAP_CLASS, GAMEVAL_MIN_REVISION, SPRITE_PER_PAGE_OPTIONS } from "./diff-constants";
 import { DiffArchiveTable } from "./diff-archive-table";
@@ -38,6 +43,8 @@ import {
 } from "./diff-sprite-gameval-filter";
 import { idQueryMatchesNumericId, looksLikeSpriteIdQueryText } from "./diff-id-search";
 import { CombinedSpriteGridTile, CombinedSpriteTableRow } from "./diff-sprites-combined-rows";
+import { DiffSpritePngViewer } from "./diff-sprite-png-viewer";
+import { clearSpriteViewerParams, parseSpriteViewerUrlState } from "./diff-sprite-viewer-url";
 import {
   DIFF_ARCHIVE_TABLE_CELL_CLASS,
   DIFF_ARCHIVE_TABLE_HEAD_CLASS,
@@ -69,12 +76,6 @@ function asIntRevMap(v: unknown): Record<number, number> {
   return out;
 }
 
-function isDecodePayload(data: unknown): boolean {
-  if (!data || typeof data !== "object") return false;
-  const s = (data as { status?: unknown }).status;
-  return s === "decoding" || s === "missing";
-}
-
 function diffSpriteSourceRev(
   kind: SpriteDiffEntry["kind"],
   id: number,
@@ -94,6 +95,23 @@ type DiffSpritesViewProps = {
   combinedRev: number;
   baseRev: number;
   rev: number;
+  /**
+   * When set (Diff explorer), open the shared center PNG viewer instead of a local modal.
+   */
+  onOpenSprite?: (id: number, kind: SpriteDiffEntry["kind"]) => void;
+  /** Hide search / download toolbar (repository sidebar owns them). */
+  hideSearchChrome?: boolean;
+  /** Shared search with the repository sidebar (filters the grid/table). */
+  controlledSearch?: {
+    mode: DiffSearchFieldMode;
+    onModeChange: (mode: DiffSearchFieldMode) => void;
+    text: string;
+    onTextChange: (text: string) => void;
+    tags: SearchTag[];
+    onTagsChange: (tags: SearchTag[]) => void;
+    deltaFilterMode: ConfigFilterMode;
+    onDeltaFilterModeChange: (mode: ConfigFilterMode) => void;
+  } | null;
 };
 
 function normalizeSourceRevById(raw: unknown): Record<number, number> {
@@ -121,10 +139,24 @@ export function DiffSpritesView({
   combinedRev,
   baseRev,
   rev,
+  onOpenSprite,
+  hideSearchChrome = false,
+  controlledSearch = null,
 }: DiffSpritesViewProps) {
   const { selectedCacheType } = useCacheType();
   const { settings } = useSettings();
   const { loadGamevalType, hasLoaded, lookupGameval, getGamevalExtra } = useGamevals();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const clearSpriteViewerUrl = React.useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (!params.has("sprite")) return;
+    clearSpriteViewerParams(params);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams]);
 
   const [spritePage, setSpritePage] = React.useState(1);
   const [spritePerPage, setSpritePerPage] = React.useState<number>(105);
@@ -148,17 +180,69 @@ export function DiffSpritesView({
     return { name: spritesOnly, regex: spritesOnly } as const;
   }, [spriteGamevalSupported, spriteGamevalRev]);
 
-  const [spriteSearchMode, setSpriteSearchMode] = React.useState<DiffSearchFieldMode>(() => {
+  const [localSpriteSearchMode, setLocalSpriteSearchMode] = React.useState<DiffSearchFieldMode>(() => {
     const gRev = gamevalRevisionForSprites(diffViewMode, combinedRev, baseRev, rev);
     const supported = gRev >= GAMEVAL_MIN_REVISION;
     const disabled: DiffSearchFieldMode[] = supported ? ["name", "regex"] : ["gameval", "name", "regex"];
     return pickDefaultArchiveTableSearchMode(gRev, disabled);
   });
-  const [spriteSearchText, setSpriteSearchText] = React.useState("");
-  const [spriteTags, setSpriteTags] = React.useState<SearchTag[]>([]);
+  const [localSpriteSearchText, setLocalSpriteSearchText] = React.useState("");
+  const [localSpriteTags, setLocalSpriteTags] = React.useState<SearchTag[]>([]);
   /** Diff mode only: narrow the delta list before ID / gameval / name / regex filters. */
-  const [spriteDeltaFilterMode, setSpriteDeltaFilterMode] = React.useState<ConfigFilterMode>("all");
+  const [localSpriteDeltaFilterMode, setLocalSpriteDeltaFilterMode] =
+    React.useState<ConfigFilterMode>("changed");
+
+  const spriteSearchMode = controlledSearch?.mode ?? localSpriteSearchMode;
+  const spriteSearchText = controlledSearch?.text ?? localSpriteSearchText;
+  const spriteTags = controlledSearch?.tags ?? localSpriteTags;
+  const spriteDeltaFilterMode = controlledSearch?.deltaFilterMode ?? localSpriteDeltaFilterMode;
+
+  const setSpriteSearchMode = React.useCallback(
+    (next: DiffSearchFieldMode | ((prev: DiffSearchFieldMode) => DiffSearchFieldMode)) => {
+      if (controlledSearch) {
+        const resolved = typeof next === "function" ? next(controlledSearch.mode) : next;
+        controlledSearch.onModeChange(resolved);
+        return;
+      }
+      setLocalSpriteSearchMode(next);
+    },
+    [controlledSearch],
+  );
+  const setSpriteSearchText = React.useCallback(
+    (next: string) => {
+      if (controlledSearch) {
+        controlledSearch.onTextChange(next);
+        return;
+      }
+      setLocalSpriteSearchText(next);
+    },
+    [controlledSearch],
+  );
+  const setSpriteTags = React.useCallback(
+    (next: SearchTag[] | ((prev: SearchTag[]) => SearchTag[])) => {
+      if (controlledSearch) {
+        const resolved = typeof next === "function" ? next(controlledSearch.tags) : next;
+        controlledSearch.onTagsChange(resolved);
+        return;
+      }
+      setLocalSpriteTags(next);
+    },
+    [controlledSearch],
+  );
+  const setSpriteDeltaFilterMode = React.useCallback(
+    (next: ConfigFilterMode) => {
+      if (controlledSearch) {
+        controlledSearch.onDeltaFilterModeChange(next);
+        return;
+      }
+      setLocalSpriteDeltaFilterMode(next);
+    },
+    [controlledSearch],
+  );
   const [spriteFullViewMode, setSpriteFullViewMode] = React.useState<"grid" | "table">("grid");
+  /** Diff explorer (and Diff mode) stay grid-only — no Table toggle. */
+  const spriteListViewMode: "grid" | "table" =
+    hideSearchChrome || diffViewMode === "diff" ? "grid" : spriteFullViewMode;
 
   const [combinedSpriteIds, setCombinedSpriteIds] = React.useState<number[]>([]);
   const [sourceRevById, setSourceRevById] = React.useState<Record<number, number>>({});
@@ -175,6 +259,7 @@ export function DiffSpritesView({
   const [deltaRemovedInRev, setDeltaRemovedInRev] = React.useState<Record<number, number>>({});
   const [deltaStatus, setDeltaStatus] = React.useState<"idle" | "loading" | "ok" | "error" | "decoding">("idle");
   const [deltaError, setDeltaError] = React.useState<string | null>(null);
+  const [decodeProgress, setDecodeProgress] = React.useState<DiffDecodeProgress | null>(null);
   const [compare, setCompare] = React.useState<{ id: number; kind: SpriteDiffEntry["kind"] } | null>(null);
   const closingCompareRef = React.useRef(false);
 
@@ -189,18 +274,29 @@ export function DiffSpritesView({
   React.useEffect(() => {
     if (diffViewMode !== "combined") {
       setCombinedStatus("idle");
+      setDecodeProgress(null);
       return;
     }
 
     const requestId = ++combinedRequestRef.current;
+    const ac = new AbortController();
     setCombinedStatus("loading");
     setCombinedError(null);
+    setDecodeProgress(null);
 
     const run = async () => {
       try {
         const url = combinedSpritesUrl(selectedCacheType, combinedRev, COMBINED_SPRITE_BASE);
         const cacheKey = `diff:combined:sprites:${selectedCacheType.id}:${COMBINED_SPRITE_BASE}:${combinedRev}`;
-        const { data: rawData } = await conditionalJsonFetch<unknown>(cacheKey, url);
+        const { data: rawData } = await conditionalJsonFetchAwaitingDecode<unknown>(cacheKey, url, {
+          cacheType: selectedCacheType,
+          signal: ac.signal,
+          onProgress: (progress) => {
+            if (requestId !== combinedRequestRef.current) return;
+            setDecodeProgress(progress);
+            setCombinedStatus("decoding");
+          },
+        });
 
         const data = rawData as {
           status?: string;
@@ -210,7 +306,7 @@ export function DiffSpritesView({
 
         if (requestId !== combinedRequestRef.current) return;
 
-        if (data.status === "decoding" || data.status === "missing") {
+        if (isDiffDecodePayload(data)) {
           setCombinedSpriteIds([]);
           setSourceRevById({});
           setCombinedStatus("decoding");
@@ -221,18 +317,21 @@ export function DiffSpritesView({
         const spriteIds = rawIds.filter((x): x is number => typeof x === "number" && Number.isFinite(x));
         setCombinedSpriteIds(spriteIds);
         setSourceRevById(normalizeSourceRevById(data.sourceRevById));
+        setDecodeProgress(null);
         setCombinedStatus("ok");
       } catch (e) {
-        if (requestId !== combinedRequestRef.current) return;
+        if (ac.signal.aborted || requestId !== combinedRequestRef.current) return;
         setCombinedSpriteIds([]);
         setSourceRevById({});
+        setDecodeProgress(null);
         setCombinedStatus("error");
         setCombinedError(e instanceof Error ? e.message : "Failed to load sprites");
       }
     };
 
     void run();
-  }, [diffViewMode, combinedRev, selectedCacheType.id]);
+    return () => ac.abort();
+  }, [diffViewMode, combinedRev, selectedCacheType]);
 
   React.useEffect(() => {
     if (diffViewMode === "combined") {
@@ -252,21 +351,32 @@ export function DiffSpritesView({
       setDeltaRemovedInRev({});
       setDeltaStatus("ok");
       setDeltaError(null);
+      setDecodeProgress(null);
       return;
     }
 
     const requestId = ++deltaRequestRef.current;
+    const ac = new AbortController();
     setDeltaStatus("loading");
     setDeltaError(null);
+    setDecodeProgress(null);
 
     const url = diffDeltaSpritesUrl(selectedCacheType, spriteDiffApi);
     const cacheKey = `diff:delta:sprites:${selectedCacheType.id}:${spriteDiffApi.base}:${spriteDiffApi.rev}`;
 
     void (async () => {
       try {
-        const { data: raw } = await conditionalJsonFetch<unknown>(cacheKey, url);
+        const { data: raw } = await conditionalJsonFetchAwaitingDecode<unknown>(cacheKey, url, {
+          cacheType: selectedCacheType,
+          signal: ac.signal,
+          onProgress: (progress) => {
+            if (requestId !== deltaRequestRef.current) return;
+            setDecodeProgress(progress);
+            setDeltaStatus("decoding");
+          },
+        });
         if (requestId !== deltaRequestRef.current) return;
-        if (isDecodePayload(raw)) {
+        if (isDiffDecodePayload(raw)) {
           setDeltaEntries([]);
           setDeltaStatus("decoding");
           return;
@@ -285,15 +395,19 @@ export function DiffSpritesView({
         setDeltaAddedInRev(asIntRevMap(o.addedInRev));
         setDeltaChangedInRev(asIntRevMap(o.changedInRev));
         setDeltaRemovedInRev(asIntRevMap(o.removedInRev));
+        setDecodeProgress(null);
         setDeltaStatus("ok");
       } catch (e) {
-        if (requestId !== deltaRequestRef.current) return;
+        if (ac.signal.aborted || requestId !== deltaRequestRef.current) return;
         setDeltaEntries([]);
+        setDecodeProgress(null);
         setDeltaStatus("error");
         setDeltaError(e instanceof Error ? e.message : "Failed to load sprite delta");
       }
     })();
-  }, [diffViewMode, baseRev, rev, selectedCacheType.id]);
+
+    return () => ac.abort();
+  }, [diffViewMode, baseRev, rev, selectedCacheType, spriteDiffApi]);
 
   React.useEffect(() => {
     if (diffViewMode !== "diff") return;
@@ -303,16 +417,18 @@ export function DiffSpritesView({
   const spriteSearchDisabledModesKey = spriteSearchDisabledModes.join("\0");
 
   React.useEffect(() => {
+    if (controlledSearch) return;
     if (spriteGamevalRev >= GAMEVAL_MIN_REVISION) return;
     setSpriteSearchMode("id");
     setSpriteTags([]);
-  }, [spriteGamevalRev]);
+  }, [controlledSearch, setSpriteSearchMode, setSpriteTags, spriteGamevalRev]);
 
   /** Prefer gameval when Full/Diff or revision support changes which modes exist. */
   React.useEffect(() => {
+    if (controlledSearch) return;
     setSpriteSearchMode(pickDefaultArchiveTableSearchMode(spriteGamevalRev, spriteSearchDisabledModes));
     // spriteGamevalRev read for pickDefault; omit from deps so revision-only changes do not reset mode.
-  }, [diffViewMode, spriteSearchDisabledModesKey]);
+  }, [controlledSearch, diffViewMode, setSpriteSearchMode, spriteSearchDisabledModesKey]);
 
   React.useEffect(() => {
     if (spriteGamevalRev < GAMEVAL_MIN_REVISION) return;
@@ -331,30 +447,12 @@ export function DiffSpritesView({
 
   React.useEffect(() => {
     if (diffViewMode === "combined") setSpriteDeltaFilterMode("all");
+    else setSpriteDeltaFilterMode("changed");
   }, [diffViewMode]);
 
   React.useEffect(() => {
     setSpriteModalId(null);
   }, [combinedRev]);
-
-  const openSpriteModal = React.useCallback((id: number) => {
-    setSpriteModalId(id);
-  }, []);
-
-  const modalSpriteSrc = React.useMemo(() => {
-    if (spriteModalId == null) return "";
-    const source = sourceRevById[spriteModalId] ?? combinedRev;
-    return diffSpriteImageUrl(selectedCacheType,spriteModalId, {
-      base: COMBINED_SPRITE_BASE,
-      rev: combinedRev,
-      source,
-    });
-  }, [spriteModalId, sourceRevById, combinedRev]);
-
-  const modalSpriteGameval =
-    spriteModalId != null && spriteGamevalSupported
-      ? (lookupGameval(SPRITETYPES, spriteModalId, combinedRev) ?? undefined)
-      : undefined;
 
   const combinedBaseSpriteIds = React.useMemo(() => {
     if (diffViewMode !== "combined") return [];
@@ -522,56 +620,58 @@ export function DiffSpritesView({
     [diffViewMode],
   );
 
-  const toAbsoluteUrl = React.useCallback((url: string) => {
-    if (/^https?:\/\//i.test(url)) return url;
-    if (typeof window === "undefined") return url;
-    return new URL(url, window.location.origin).toString();
-  }, []);
+  const openSpriteCompare = React.useCallback(
+    (id: number, kind: SpriteDiffEntry["kind"]) => {
+      if (onOpenSprite) {
+        onOpenSprite(id, kind);
+        return;
+      }
+      if (closingCompareRef.current) return;
+      setCompare({ id, kind });
+    },
+    [onOpenSprite],
+  );
 
-  const openSpriteCompare = React.useCallback((id: number, kind: SpriteDiffEntry["kind"]) => {
-    if (closingCompareRef.current) return;
-    setCompare({ id, kind });
-  }, []);
+  const openSpriteModal = React.useCallback(
+    (id: number) => {
+      if (onOpenSprite) {
+        onOpenSprite(id, "changed");
+        return;
+      }
+      setSpriteModalId(id);
+    },
+    [onOpenSprite],
+  );
 
-  const onCompareDialogOpenChange = React.useCallback((open: boolean) => {
-    if (!open) {
-      closingCompareRef.current = true;
-      setCompare(null);
-      window.setTimeout(() => {
-        closingCompareRef.current = false;
-      }, 150);
+  const onCompareDialogOpenChange = React.useCallback(
+    (open: boolean) => {
+      if (!open) {
+        closingCompareRef.current = true;
+        setCompare(null);
+        clearSpriteViewerUrl();
+        window.setTimeout(() => {
+          closingCompareRef.current = false;
+        }, 150);
+      }
+    },
+    [clearSpriteViewerUrl],
+  );
+
+  /** Workbench / modal path: restore open sprite from a shared URL. */
+  React.useEffect(() => {
+    if (onOpenSprite) return;
+    const parsed = parseSpriteViewerUrlState(searchParams);
+    if (parsed.spriteId == null) return;
+    if (diffViewMode === "diff") {
+      const entry = deltaEntries.find((e) => e.id === parsed.spriteId);
+      setCompare({
+        id: parsed.spriteId,
+        kind: parsed.kind ?? entry?.kind ?? "changed",
+      });
+      return;
     }
-  }, []);
-
-  const copyUrl = React.useCallback(async (url: string) => {
-    try {
-      await navigator.clipboard.writeText(toAbsoluteUrl(url));
-    } catch {
-      /* ignore */
-    }
-  }, [toAbsoluteUrl]);
-
-  const downloadSprite = React.useCallback(async (url: string, filename: string) => {
-    try {
-      const res = await fetch(url);
-      const blob = await res.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objectUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(objectUrl);
-    } catch {
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    }
-  }, []);
+    setSpriteModalId(parsed.spriteId);
+  }, [deltaEntries, diffViewMode, onOpenSprite, searchParams]);
 
   const titleCount = diffViewMode === "combined" ? fullSpriteIds.length : filteredDiffSprites.length;
 
@@ -587,25 +687,6 @@ export function DiffSpritesView({
     spriteTags.length > 0 &&
     spriteGamevalRev < GAMEVAL_MIN_REVISION;
 
-  const compareUrls = React.useMemo(() => {
-    if (!compare) return { before: null as string | null, after: null as string | null };
-    const before =
-      compare.kind === "added"
-        ? null
-        : diffSpriteImageUrl(selectedCacheType,compare.id, { ...spriteDiffApi, source: spriteOlderRev });
-    const after =
-      compare.kind === "removed"
-        ? null
-        : diffSpriteImageUrl(selectedCacheType,compare.id, {
-            ...spriteDiffApi,
-            source:
-              compare.kind === "added"
-                ? (deltaAddedInRev[compare.id] ?? spriteNewerRev)
-                : (deltaChangedInRev[compare.id] ?? spriteNewerRev),
-          });
-    return { before, after };
-  }, [compare, spriteDiffApi, spriteOlderRev, spriteNewerRev, deltaAddedInRev, deltaChangedInRev]);
-
   return (
     <>
       <DiffSectionHeader
@@ -613,7 +694,7 @@ export function DiffSpritesView({
         tooltipContent={diffSearchModeTooltipHelp(spriteSearchMode)}
         countLabel={`· ${titleCount.toLocaleString()} sprite${titleCount !== 1 ? "s" : ""}`}
         trailing={
-          diffViewMode === "combined" ? (
+          diffViewMode === "combined" && !hideSearchChrome ? (
             <DiffViewModeToggle
               value={spriteFullViewMode}
               onChange={setSpriteFullViewMode}
@@ -632,9 +713,12 @@ export function DiffSpritesView({
         </p>
       ) : null}
       {diffViewMode === "combined" && combinedStatus === "decoding" ? (
-        <p className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-100">
-          Sprite index is still decoding on the cache server. Try again in a moment.
-        </p>
+        <div className="mb-3">
+          <DiffDecodeProgressBanner
+            progress={decodeProgress}
+            fallbackMessage="Sprite index is decoding on the cache server…"
+          />
+        </div>
       ) : null}
       {showGamevalPending ? (
         <div className="mb-3" aria-busy="true" aria-label="Loading gameval data">
@@ -648,6 +732,7 @@ export function DiffSpritesView({
         </p>
       ) : null}
 
+      {!hideSearchChrome ? (
       <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2 justify-between">
         <div className={cn(DIFF_COMBINED_SEARCH_WRAP_CLASS, "!mb-0")}>
           <DiffUnifiedSearchField
@@ -702,10 +787,11 @@ export function DiffSpritesView({
           tableBase={COMBINED_SPRITE_BASE}
         />
       </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
         {diffViewMode === "combined" && combinedStatus === "loading" ? (
-          spriteFullViewMode === "grid" ? (
+          spriteListViewMode === "grid" ? (
             <div
               className="grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(80px,1fr))] content-start gap-2 overflow-auto"
               aria-busy="true"
@@ -757,7 +843,7 @@ export function DiffSpritesView({
             </DiffArchiveTable>
           )
         ) : diffViewMode === "combined" ? (
-          spriteFullViewMode === "grid" ? (
+          spriteListViewMode === "grid" ? (
             <div
               className="grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(80px,1fr))] content-start gap-2 overflow-auto"
               aria-busy={pendingPage !== dataPage}
@@ -873,9 +959,10 @@ export function DiffSpritesView({
             ))}
           </div>
         ) : deltaStatus === "decoding" ? (
-          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-100">
-            Sprite delta is still decoding on the cache server. Try again in a moment.
-          </p>
+          <DiffDecodeProgressBanner
+            progress={decodeProgress}
+            fallbackMessage="Sprite delta is decoding on the cache server…"
+          />
         ) : deltaStatus === "error" && deltaError ? (
           <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {deltaError}
@@ -1019,25 +1106,33 @@ export function DiffSpritesView({
           </div>
         )}
 
-        {diffViewMode === "combined" && spriteModalId != null && modalSpriteSrc ? (
-          <div className="sr-only fixed top-0 left-0 h-0 w-0 overflow-hidden" aria-hidden>
-            <RSSprite
-              key={spriteModalId}
-              id={spriteModalId}
-              width={1}
-              height={1}
-              keepAspectRatio
-              enableClickModel
-              modalOpen
-              onModalOpenChange={(open) => {
-                if (!open) setSpriteModalId(null);
-              }}
-              imageUrl={modalSpriteSrc}
-              fullSizeImageUrl={modalSpriteSrc}
-              gameval={modalSpriteGameval}
-              gamevalRevision={combinedRev}
-            />
-          </div>
+        {diffViewMode === "combined" && spriteModalId != null ? (
+          <Dialog
+            open
+            onOpenChange={(open) => {
+              if (!open) {
+                setSpriteModalId(null);
+                clearSpriteViewerUrl();
+              }
+            }}
+          >
+            <DialogContent
+              className="flex h-[min(90vh,52rem)] w-full max-w-[min(100%,72rem)] flex-col gap-3 overflow-hidden p-4 sm:max-w-[min(100%,72rem)]"
+              showCloseButton
+            >
+              <DialogTitle className="sr-only">Sprite {spriteModalId}</DialogTitle>
+              <DiffSpritePngViewer
+                spriteId={spriteModalId}
+                kind="changed"
+                diffViewMode="combined"
+                combinedRev={combinedRev}
+                baseRev={1}
+                rev={combinedRev}
+                showBack={false}
+                className="min-h-0"
+              />
+            </DialogContent>
+          </Dialog>
         ) : null}
 
         <TablePaginationBar
@@ -1059,135 +1154,24 @@ export function DiffSpritesView({
 
       <Dialog open={compare != null} onOpenChange={onCompareDialogOpenChange}>
         <DialogContent
-          className={cn(
-            "max-h-[85vh] overflow-auto",
-            compare?.kind === "added"
-              ? "max-w-[min(100%,22rem)] gap-3 p-4 sm:max-w-sm"
-              : "max-w-4xl sm:max-w-4xl",
-          )}
+          className="flex h-[min(90vh,52rem)] w-full max-w-[min(100%,72rem)] flex-col gap-3 overflow-hidden p-4 sm:max-w-[min(100%,72rem)]"
+          showCloseButton
         >
-          {compare && (
+          {compare ? (
             <>
-              <DialogHeader className={compare.kind === "added" ? "gap-1" : undefined}>
-                <DialogTitle className={compare.kind === "added" ? "text-base" : undefined}>
-                  Sprite {compare.id} comparison
-                </DialogTitle>
-              </DialogHeader>
-              <div
-                className={cn(
-                  "grid",
-                  compare.kind === "added" ? "grid-cols-1 gap-3" : "grid-cols-1 gap-4 md:grid-cols-2",
-                )}
-              >
-                {compare.kind !== "added" ? (
-                  <div className="rounded-md border bg-muted/20 p-3">
-                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                      <div className="text-sm font-medium">Before (rev {spriteOlderRev})</div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={!compareUrls.before}
-                          onClick={() => compareUrls.before && void copyUrl(compareUrls.before)}
-                        >
-                          Copy URL
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={!compareUrls.before}
-                          onClick={() =>
-                            compareUrls.before &&
-                            void downloadSprite(
-                              compareUrls.before,
-                              `sprite-${compare.id}-before-r${spriteOlderRev}.png`,
-                            )
-                          }
-                        >
-                          Download
-                        </Button>
-                      </div>
-                    </div>
-                    {compareUrls.before ? (
-                      <div className="flex min-h-[10rem] items-center justify-center rounded border bg-background p-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={compareUrls.before}
-                          alt={`${compare.id} before`}
-                          className="max-h-64 w-auto object-contain"
-                          style={{ imageRendering: "pixelated" }}
-                          decoding="async"
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-                <div
-                  className={cn(
-                    "rounded-md border bg-muted/20",
-                    compare.kind === "added" ? "p-2" : "p-3",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "flex flex-wrap items-center justify-between gap-2",
-                      compare.kind === "added" ? "mb-1.5" : "mb-2",
-                    )}
-                  >
-                    <div className="text-sm font-medium">After (rev {spriteNewerRev})</div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={compare.kind === "removed" || !compareUrls.after}
-                        onClick={() => compareUrls.after && void copyUrl(compareUrls.after)}
-                      >
-                        Copy URL
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={compare.kind === "removed" || !compareUrls.after}
-                        onClick={() =>
-                          compareUrls.after &&
-                          void downloadSprite(
-                            compareUrls.after,
-                            `sprite-${compare.id}-after-r${spriteNewerRev}.png`,
-                          )
-                        }
-                      >
-                        Download
-                      </Button>
-                    </div>
-                  </div>
-                  {compare.kind === "removed" ? (
-                    <div className="flex min-h-[10rem] items-center justify-center text-sm text-muted-foreground">
-                      Removed in this revision
-                    </div>
-                  ) : compareUrls.after ? (
-                    <div
-                      className={cn(
-                        "flex items-center justify-center rounded border bg-background p-2",
-                        compare.kind === "added" ? "min-h-0" : "min-h-[10rem]",
-                      )}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={compareUrls.after}
-                        alt={`${compare.id} after`}
-                        className={cn(
-                          "w-auto object-contain",
-                          compare.kind === "added" ? "max-h-40" : "max-h-64",
-                        )}
-                        style={{ imageRendering: "pixelated" }}
-                        decoding="async"
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              </div>
+              <DialogTitle className="sr-only">Sprite {compare.id} comparison</DialogTitle>
+              <DiffSpritePngViewer
+                spriteId={compare.id}
+                kind={compare.kind}
+                diffViewMode="diff"
+                combinedRev={combinedRev}
+                baseRev={baseRev}
+                rev={rev}
+                showBack={false}
+                className="min-h-0"
+              />
             </>
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
     </>

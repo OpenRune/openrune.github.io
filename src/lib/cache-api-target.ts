@@ -8,49 +8,30 @@ export function isLocalCacheHost(host: string): boolean {
   return trimmed === "localhost" || trimmed === "127.0.0.1";
 }
 
-/** Local dev uses `http://host:port`; production hosts use `https://host` (no port). */
+const UPSTREAM_ENV: Record<string, string> = {
+  "osrs.openrune.dev": "OSRS_CACHE_UPSTREAM",
+  "rs3.openrune.dev": "RS3_CACHE_UPSTREAM",
+};
+
+function upstreamFromEnv(host: string): string | null {
+  const envKey = UPSTREAM_ENV[host.trim().toLowerCase()];
+  const value = envKey ? process.env[envKey]?.trim() : undefined;
+  return value ? value.replace(/\/$/, "") : null;
+}
+
+/** Base URL for a cache server (browser direct calls + server-side table-all aggregation). */
 export function cacheServerOrigin(cacheType: CacheTarget): string {
   const host = cacheType.ip.trim();
   if (isLocalCacheHost(host)) {
     return `http://${host}:${cacheType.port}`;
   }
-  return `https://${host}`;
-}
 
-function parseCacheTargetJson(raw: string | null | undefined): CacheTarget | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<CacheTarget>;
-    const ip = typeof parsed.ip === "string" ? parsed.ip.trim() : "";
-    const port = Number(parsed.port);
-    if (!ip || !Number.isFinite(port) || port < 1 || port > 65535) return null;
-    return { ip, port };
-  } catch {
-    return null;
+  const fromEnv = upstreamFromEnv(host);
+  if (fromEnv) return fromEnv;
+
+  // 8090 in cache-types is the local-dev label; production OSRS is served on 443.
+  if (cacheType.port === 8090) {
+    return `https://${host}`;
   }
-}
-
-export function parseCacheTarget(
-  searchParams: URLSearchParams,
-  headerValue?: string | null,
-  cookieValue?: string | null,
-): CacheTarget | null {
-  const host = searchParams.get("_host")?.trim();
-  const portRaw = searchParams.get("_port");
-  if (host && portRaw) {
-    const port = Number(portRaw);
-    if (Number.isFinite(port) && port >= 1 && port <= 65535) {
-      return { ip: host, port };
-    }
-  }
-
-  return parseCacheTargetJson(headerValue) ?? parseCacheTargetJson(cookieValue);
-}
-
-/** Strip routing params before forwarding to the upstream cache server. */
-export function stripCacheRoutingParams(searchParams: URLSearchParams): URLSearchParams {
-  const next = new URLSearchParams(searchParams);
-  next.delete("_host");
-  next.delete("_port");
-  return next;
+  return `https://${host}:${cacheType.port}`;
 }

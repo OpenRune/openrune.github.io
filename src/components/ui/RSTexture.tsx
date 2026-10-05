@@ -14,6 +14,7 @@ import { RSSprite } from "@/components/ui/RSSprite";
 import { useCacheType } from "@/context/cache-type-context";
 import { SPRITETYPES, useGamevals } from "@/context/gameval-context";
 import { cacheTexturesSnapshotUrl, diffSpriteResolveUrl, texturesProxyUrl } from "@/lib/cache-api-client";
+import { downloadUrlAsFile } from "@/lib/download-url";
 import { conditionalJsonFetch } from "@/lib/openrune-idb-cache";
 import { cn } from "@/lib/utils";
 
@@ -334,10 +335,14 @@ function RSTextureFromArchive({
   const downloadImage = () => {
     const url = fullSizeTextureUrl;
     if (!url) return;
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `texture-${id}.png`;
-    link.click();
+    void downloadUrlAsFile(url, `texture-${id}.png`).catch(() => {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `texture-${id}.png`;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.click();
+    });
   };
 
   React.useEffect(() => {

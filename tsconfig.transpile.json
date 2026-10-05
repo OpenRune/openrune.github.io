@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "es2022",
+    "target": "es2022",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "outDir": ".tsout",
+    "declaration": false,
+    "skipLibCheck": true
+  },
+  "include": ["src/components/diff/diff-config-content.ts", "src/lib/diff-changes.ts"]
+}

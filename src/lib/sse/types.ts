@@ -4,6 +4,7 @@ export enum SseEventType {
   STATUS = "STATUS",
   ACTIVITY = "ACTIVITY",
   ZIP_PROGRESS = "ZIP_PROGRESS",
+  DECODE_PROGRESS = "DECODE_PROGRESS",
 }
 
 export interface StatusResponse {
@@ -31,8 +32,18 @@ export type ZipProgressSsePayload = {
   downloadUrl: string | null;
 };
 
+/** Payload from cache server `SseEventType.DECODE_PROGRESS` broadcasts. */
+export type DecodeProgressSsePayload = {
+  revision: number;
+  status: string;
+  progress: number;
+  message: string;
+  error?: string | null;
+};
+
 export type SseEventDataMap = {
   [SseEventType.STATUS]: StatusResponse;
   [SseEventType.ACTIVITY]: unknown;
   [SseEventType.ZIP_PROGRESS]: ZipProgressSsePayload;
+  [SseEventType.DECODE_PROGRESS]: DecodeProgressSsePayload;
 };

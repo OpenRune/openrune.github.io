@@ -1,6 +1,6 @@
 "use client";
 
-import type { CacheTarget } from "@/lib/cache-api-target";
+import { cacheServerOrigin, type CacheTarget } from "@/lib/cache-api-target";
 import type { SseEvent, SseEventDataMap, SseEventType } from "@/lib/sse/types";
 
 export type SseEventCallback<T extends SseEventType> = (
@@ -16,12 +16,8 @@ export interface SseConnection {
 function buildSseUrl(type: SseEventType, cacheType?: CacheTarget): string | null {
   if (!cacheType) return null;
 
-  const search = new URLSearchParams({
-    type,
-    _host: cacheType.ip.trim(),
-    _port: String(cacheType.port),
-  });
-  return `/api/cache/sse?${search.toString()}`;
+  const search = new URLSearchParams({ type });
+  return `${cacheServerOrigin(cacheType)}/sse?${search.toString()}`;
 }
 
 function parseSsePayload<T extends SseEventType>(

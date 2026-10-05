@@ -271,14 +271,18 @@ export function RSSprite({
     if (imageUrlOverride) return;
 
     const cacheTypeId = selectedCacheType?.id ?? "default";
-    const cacheKey = `sprite:png:${cacheTypeId}_${id}_${width}_${height}_${keepAspectRatio}_${base ?? ""}_${rev ?? ""}`;
+    // `fitMax` treats width/height as a maximum, so the server must not enlarge a sprite that is
+    // already smaller — most cache sprites are tiny (map icons are 15x15) and upscaling them to
+    // fill the box is exactly the blur `fitMax` exists to avoid.
+    const upscale = !fitMax;
+    const cacheKey = `sprite:png:${cacheTypeId}_${id}_${width}_${height}_${keepAspectRatio}_${upscale}_${base ?? ""}_${rev ?? ""}`;
 
     let cancelled = false;
     setLoading(true);
     setDecodeError(false);
     setError(null);
 
-    const url = spritesProxyUrl(selectedCacheType, { id, width, height, keepAspectRatio, base, rev });
+    const url = spritesProxyUrl(selectedCacheType, { id, width, height, keepAspectRatio, upscale, base, rev });
     void conditionalBlobFetch(cacheKey, url, undefined, {
       onBackgroundBlob: (nb) => {
         if (cancelled) return;
@@ -319,6 +323,7 @@ export function RSSprite({
     width,
     height,
     keepAspectRatio,
+    fitMax,
     retryCount,
     revokeThumbBlobUrl,
     selectedCacheType.id,

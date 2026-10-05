@@ -1,0 +1,182 @@
+name: Release
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - production
+  workflow_dispatch:
+
+concurrency:
+  group: openrune-site-release
+  cancel-in-progress: false
+
+env:
+  DEPLOY_DIR: /opt/openrune-site
+  SERVICE_NAME: openrune-site
+  PORT: "3000"
+  NODE_MAJOR: "22"
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_MAJOR }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      # `output: "standalone"` emits a server plus a trimmed node_modules, but Next leaves static
+      # assets out of it on purpose — they are expected to be served by a CDN. We serve them
+      # ourselves, so they are copied in beside the server.
+      - name: Assemble standalone bundle
+        run: |
+          set -euo pipefail
+          test -f .next/standalone/server.js
+          mkdir -p .next/standalone/.next
+          cp -r .next/static .next/standalone/.next/static
+          if [ -d public ]; then cp -r public .next/standalone/public; fi
+          tar -czf site.tar.gz -C .next/standalone .
+          ls -lh site.tar.gz
+
+      - name: Upload bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: openrune-site
+          path: site.tar.gz
+          retention-days: 7
+
+  deploy:
+    name: Deploy to server
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Download bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: openrune-site
+          path: dist
+
+      - name: Ensure Node on the server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -euo pipefail
+
+            mkdir -p "${{ env.DEPLOY_DIR }}"
+
+            # The bundle is built against Node ${{ env.NODE_MAJOR }}; a mismatched major can fail at
+            # runtime on native bindings, so pin rather than take whatever is present.
+            have=""
+            if command -v node >/dev/null 2>&1; then have="$(node -p 'process.versions.node.split(".")[0]')"; fi
+            if [ "${have}" != "${{ env.NODE_MAJOR }}" ]; then
+              echo "Installing Node ${{ env.NODE_MAJOR }} (found: ${have:-none})"
+              curl -fsSL "https://deb.nodesource.com/setup_${{ env.NODE_MAJOR }}.x" | bash -
+              apt-get install -y nodejs
+            fi
+            node --version
+
+      - name: Upload bundle and unit
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: "dist/site.tar.gz,deploy/openrune-site.service"
+          target: ${{ env.DEPLOY_DIR }}
+          strip_components: 1
+
+      - name: Install and restart
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          OSRS_CACHE_UPSTREAM: ${{ secrets.OSRS_CACHE_UPSTREAM }}
+          RS3_CACHE_UPSTREAM: ${{ secrets.RS3_CACHE_UPSTREAM }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          envs: OSRS_CACHE_UPSTREAM,RS3_CACHE_UPSTREAM
+          script: |
+            set -euo pipefail
+
+            DEPLOY_DIR="${{ env.DEPLOY_DIR }}"
+            SERVICE_NAME="${{ env.SERVICE_NAME }}"
+
+            # Unpack into a fresh directory and swap, so a half-extracted bundle is never live and
+            # stale files from the previous build cannot linger.
+            rm -rf "${DEPLOY_DIR}/next"
+            mkdir -p "${DEPLOY_DIR}/next"
+            tar -xzf "${DEPLOY_DIR}/site.tar.gz" -C "${DEPLOY_DIR}/next"
+            test -f "${DEPLOY_DIR}/next/server.js"
+
+            # Keep the previous release for one cycle to roll back by hand if needed.
+            rm -rf "${DEPLOY_DIR}/previous"
+            if [ -d "${DEPLOY_DIR}/current" ]; then mv "${DEPLOY_DIR}/current" "${DEPLOY_DIR}/previous"; fi
+            mv "${DEPLOY_DIR}/next" "${DEPLOY_DIR}/current"
+            rm -f "${DEPLOY_DIR}/site.tar.gz"
+
+            # The unit runs from DEPLOY_DIR, so point the stable paths at the new release.
+            ln -sfn "${DEPLOY_DIR}/current/server.js" "${DEPLOY_DIR}/server.js"
+            ln -sfn "${DEPLOY_DIR}/current/.next" "${DEPLOY_DIR}/.next"
+            ln -sfn "${DEPLOY_DIR}/current/node_modules" "${DEPLOY_DIR}/node_modules"
+            [ -d "${DEPLOY_DIR}/current/public" ] && ln -sfn "${DEPLOY_DIR}/current/public" "${DEPLOY_DIR}/public"
+
+            cat > "${DEPLOY_DIR}/site.env" <<EOF
+            NODE_ENV=production
+            PORT=${{ env.PORT }}
+            HOSTNAME=127.0.0.1
+            OSRS_CACHE_UPSTREAM=${OSRS_CACHE_UPSTREAM}
+            RS3_CACHE_UPSTREAM=${RS3_CACHE_UPSTREAM}
+            EOF
+            chmod 600 "${DEPLOY_DIR}/site.env"
+
+            install -m 644 "${DEPLOY_DIR}/openrune-site.service" /etc/systemd/system/
+            systemctl daemon-reload
+            systemctl enable "${SERVICE_NAME}"
+            systemctl restart "${SERVICE_NAME}"
+
+            # Fail the deploy if the site does not come up, rather than reporting success blindly.
+            for i in $(seq 1 30); do
+              if curl -fsS -m 3 -o /dev/null "http://127.0.0.1:${{ env.PORT }}/"; then
+                echo "site healthy after ${i}s"
+                exit 0
+              fi
+              sleep 1
+            done
+
+            echo "site did not become healthy:"
+            journalctl -u "${SERVICE_NAME}" -n 50 --no-pager
+            exit 1

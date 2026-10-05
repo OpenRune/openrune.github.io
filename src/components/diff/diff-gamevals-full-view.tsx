@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, ChevronUp, Loader2, Search } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
 import {
@@ -27,6 +27,7 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 import { ArchivePlainTextLine } from "./diff-config-archive-entity-view";
 import { DiffArchiveTable } from "./diff-archive-table";
+import { lineMatchesTextQuery, queryHighlightNeedles } from "./diff-text-query-match";
 import {
   DIFF_COMBINED_SEARCH_WRAP_CLASS,
   GAMEVAL_FULL_TAB_ORDER,
@@ -401,7 +402,7 @@ export function DiffGamevalsFullView({
   const { selectedCacheType } = useCacheType();
   const { loadGamevalType, getGamevalEntries, getGamevalExtra, hasLoaded, isLoading } = useGamevals();
   const { settings } = useSettings();
-  const urlWantsText = diffViewMode === "combined" && searchParams.get("view") === "text";
+  const urlWantsTable = diffViewMode === "combined" && searchParams.get("view") === "table";
 
   const [gamevalGroupsById, setGamevalGroupsById] = React.useState<Map<string, GamevalGroup>>(new Map());
 
@@ -456,7 +457,7 @@ export function DiffGamevalsFullView({
     activeGamevalTab === "dbrows" ? "dbrows" : dbTableViewMode === "columns" ? "dbcolumns" : "dbtables";
 
   const [viewMode, setViewMode] = React.useState<"table" | "text">(() =>
-    urlWantsText ? "text" : "table",
+    urlWantsTable ? "table" : "text",
   );
   const [searchText, setSearchText] = React.useState("");
   const [searchFieldMode, setSearchFieldMode] = React.useState<DiffSearchFieldMode>("name");
@@ -467,7 +468,6 @@ export function DiffGamevalsFullView({
   const [loadError, setLoadError] = React.useState<string | null>(null);
 
   const [textFindQuery, setTextFindQuery] = React.useState("");
-  const [textFindKind, setTextFindKind] = React.useState<"literal" | "regex">("literal");
   const [textFindActiveIdx, setTextFindActiveIdx] = React.useState(0);
   const debouncedTextFindQuery = useDebouncedValue(textFindQuery.trim(), TEXT_FIND_DEBOUNCE_MS);
 
@@ -512,8 +512,8 @@ export function DiffGamevalsFullView({
   const gamevalApiSupported = gamevalRev >= activeTabMinRevision && !varcsBlocked;
 
   React.useEffect(() => {
-    setViewMode(urlWantsText ? "text" : "table");
-  }, [urlWantsText]);
+    setViewMode(urlWantsTable ? "table" : "text");
+  }, [urlWantsTable]);
 
   React.useEffect(() => {
     setSearchText("");
@@ -660,47 +660,16 @@ export function DiffGamevalsFullView({
     | { mode: "ok"; test: (line: string) => boolean } => {
     const q = debouncedTextFindQuery.trim();
     if (!q) return { mode: "empty" };
-    if (textFindKind === "literal") {
-      const lower = q.toLowerCase();
-      return {
-        mode: "ok",
-        test: (line: string) => line.toLowerCase().includes(lower),
-      };
-    }
-    try {
-      const re = new RegExp(q, "i");
-      return {
-        mode: "ok",
-        test: (line: string) => {
-          try {
-            re.lastIndex = 0;
-            return re.test(line);
-          } catch {
-            return false;
-          }
-        },
-      };
-    } catch (e) {
-      return {
-        mode: "bad",
-        error: e instanceof Error ? e.message : "Invalid regular expression",
-      };
-    }
-  }, [debouncedTextFindQuery, textFindKind]);
+    return {
+      mode: "ok",
+      test: (line: string) => lineMatchesTextQuery(line, q),
+    };
+  }, [debouncedTextFindQuery]);
 
-  const textRegexErrorImmediate = React.useMemo(() => {
-    if (textFindKind !== "regex") return null;
-    const q = textFindQuery.trim();
-    if (!q) return null;
-    try {
-      new RegExp(q);
-      return null;
-      } catch (e) {
-      return e instanceof Error ? e.message : "Invalid regular expression";
-    }
-  }, [textFindKind, textFindQuery]);
-
-  const textFindDisplayedError = textFindKind === "regex" ? textRegexErrorImmediate : null;
+  const textFindHighlightQuery = React.useMemo(() => {
+    const needles = queryHighlightNeedles(debouncedTextFindQuery);
+    return needles[0] ?? debouncedTextFindQuery;
+  }, [debouncedTextFindQuery]);
 
   const textMatchIndices = React.useMemo(() => {
     if (textFindMatcher.mode !== "ok") return [];
@@ -713,15 +682,6 @@ export function DiffGamevalsFullView({
   }, [textLines, textFindMatcher]);
 
   const textMatchSet = React.useMemo(() => new Set(textMatchIndices), [textMatchIndices]);
-
-  const textFindHasMatches = textMatchIndices.length > 0;
-  const textFindHasQuery = textFindQuery.trim().length > 0;
-  const textFindNavDisabled =
-    !textFindHasQuery ||
-    Boolean(textRegexErrorImmediate) ||
-    !textFindHasMatches ||
-    textFindMatcher.mode === "bad" ||
-    textFindMatcher.mode === "empty";
 
   React.useEffect(() => {
     const n = textMatchIndices.length;
@@ -828,8 +788,6 @@ export function DiffGamevalsFullView({
       clientHeight: el.clientHeight > 0 ? el.clientHeight : v.clientHeight,
     }));
   }, [viewMode, textLines.length, loadingList]);
-
-  const findErrorId = `gv-text-find-${activeGamevalTab}`;
 
   const ifaceDetailSubRows = React.useMemo(() => {
     if (!ifaceDetailEntry || !gamevalApiSupported) return [];
@@ -1065,7 +1023,7 @@ export function DiffGamevalsFullView({
         tooltipContent={
           viewMode === "table"
             ? gamevalsTableSearchTooltip
-            : "Find in text: String = case-insensitive substring. Regex = JavaScript pattern (case-insensitive). Enter = next match, Shift+Enter = previous."
+            : "Use Search all below the viewer to describe or query gameval text."
         }
         countLabel={`· ${headlineCount.toLocaleString()} ${headlineWord}`}
         trailing={
@@ -1100,154 +1058,6 @@ export function DiffGamevalsFullView({
                 gamevalAutocomplete={null}
         />
       </div>
-          ) : null}
-
-          {viewMode === "text" ? (
-            <div className="mb-3 w-fit max-w-full min-w-0 shrink-0 self-start">
-              <div className="relative z-[70] flex min-w-0 max-w-full flex-col gap-1.5">
-                <div
-                  className={cn(
-                    "relative z-50 flex h-8 min-w-0 max-w-full flex-nowrap items-stretch rounded-md border border-border bg-muted/25 shadow-sm",
-                    "dark:bg-muted/20",
-                  )}
-                >
-                  <label className="flex min-h-0 w-[min(13rem,100%)] shrink cursor-text items-center gap-2 pl-2 pr-0.5 sm:w-[min(14rem,100%)]">
-                    <span className="sr-only">Find in gameval text</span>
-                    <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                    <input
-                      type="text"
-                      value={textFindQuery}
-                      onChange={(e) => setTextFindQuery(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          if (e.shiftKey) {
-                            if (!textFindNavDisabled) {
-                              const n = textMatchIndices.length;
-                              setTextFindActiveIdx((i) => (i - 1 + n) % n);
-                            }
-                          } else if (!textFindNavDisabled) {
-                            const n = textMatchIndices.length;
-                            setTextFindActiveIdx((i) => (i + 1) % n);
-                          }
-                        }
-                      }}
-                      placeholder={textFindKind === "regex" ? "Regex…" : "Find…"}
-                      aria-invalid={textFindDisplayedError != null}
-                      aria-describedby={textFindDisplayedError ? findErrorId : undefined}
-                      className={cn(
-                        "min-h-0 min-w-0 w-full bg-transparent py-1 font-mono text-xs text-foreground outline-none",
-                        "placeholder:text-muted-foreground",
-                      )}
-                    />
-                  </label>
-
-                  <div className="w-px shrink-0 self-stretch bg-border" aria-hidden />
-
-                  <div className="flex h-full shrink-0 items-center px-1">
-                    <div
-                      className="flex h-6 items-stretch gap-0.5 rounded border border-border bg-background/95 p-px shadow-sm dark:bg-background/50"
-                      role="group"
-                      aria-label="Find mode"
-                    >
-                      <button
-                        type="button"
-                        aria-pressed={textFindKind === "literal"}
-                        className={cn(
-                          "min-w-[3.25rem] rounded-sm px-1.5 text-xs font-medium transition-colors",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                          textFindKind === "literal"
-                            ? "bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/40"
-                            : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
-                        )}
-                        onClick={() => setTextFindKind("literal")}
-                      >
-                        String
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={textFindKind === "regex"}
-                        className={cn(
-                          "min-w-[3.25rem] rounded-sm px-1.5 text-xs font-medium transition-colors",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                          textFindKind === "regex"
-                            ? "bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/40"
-                            : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
-                        )}
-                        onClick={() => setTextFindKind("regex")}
-                      >
-                        Regex
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex shrink-0 flex-nowrap items-stretch" aria-label="Match navigation">
-                    <div className="w-px shrink-0 self-stretch bg-border" aria-hidden />
-                    <div className="flex h-full w-8 shrink-0 flex-col divide-y divide-border">
-                      <button
-                        type="button"
-                        title="Previous match (Shift+Enter)"
-                        aria-label="Previous match"
-                        disabled={textFindNavDisabled}
-                        className={cn(
-                          "flex min-h-0 flex-1 items-center justify-center border-0 bg-muted/50 text-foreground",
-                          "hover:bg-muted/80 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-                          "dark:bg-muted/35 dark:hover:bg-muted/55",
-                          "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40",
-                        )}
-                        onClick={() => {
-                          const n = textMatchIndices.length;
-                          setTextFindActiveIdx((i) => (i - 1 + n) % n);
-                        }}
-                      >
-                        <ChevronUp className="size-3 shrink-0 opacity-80" aria-hidden />
-                      </button>
-                      <button
-                        type="button"
-                        title="Next match (Enter)"
-                        aria-label="Next match"
-                        disabled={textFindNavDisabled}
-                        className={cn(
-                          "flex min-h-0 flex-1 items-center justify-center border-0 bg-muted/50 text-foreground",
-                          "hover:bg-muted/80 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-                          "dark:bg-muted/35 dark:hover:bg-muted/55",
-                          "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40",
-                        )}
-                        onClick={() => {
-                          const n = textMatchIndices.length;
-                          setTextFindActiveIdx((i) => (i + 1) % n);
-                        }}
-                      >
-                        <ChevronDown className="size-3 shrink-0 opacity-80" aria-hidden />
-                      </button>
-                    </div>
-                    <div className="w-px shrink-0 self-stretch bg-border" aria-hidden />
-                    <div
-                      className={cn(
-                        "flex h-full min-w-[4.75rem] shrink-0 items-center justify-center bg-muted/50 px-1 text-[11px] leading-none tabular-nums text-muted-foreground",
-                        "dark:bg-muted/35",
-                        textFindNavDisabled && "opacity-40",
-                      )}
-                      aria-live="polite"
-                      aria-label={
-                        textFindNavDisabled ? "Match count unavailable" : `Match ${textFindActiveIdx + 1} of ${textMatchIndices.length}`
-                      }
-                    >
-                      {textFindMatcher.mode === "bad"
-                        ? "—"
-                        : textFindHasMatches
-                          ? `${textFindActiveIdx + 1}/${textMatchIndices.length}`
-                          : "—"}
-                    </div>
-                  </div>
-                </div>
-                {textFindHasQuery && textFindDisplayedError ? (
-                  <p id={findErrorId} className="text-xs text-destructive">
-                    {textFindDisplayedError}
-                  </p>
-                ) : null}
-              </div>
-            </div>
           ) : null}
 
           {loadError ? (
@@ -1301,7 +1111,7 @@ export function DiffGamevalsFullView({
               </DiffArchiveTable>
             ) : (
               <div
-                className="flex min-h-0 flex-1 items-center justify-center rounded-md border bg-background p-6"
+                className="flex min-h-0 flex-1 items-center justify-center bg-background p-6"
                 aria-busy="true"
                 aria-label="Loading gamevals text"
               >
@@ -1421,7 +1231,7 @@ export function DiffGamevalsFullView({
         <div
               ref={textScrollRef}
               onScroll={onTextScroll}
-          className="min-h-0 flex-1 overflow-auto rounded-md border bg-background"
+          className="min-h-0 flex-1 overflow-auto bg-background"
         >
           <div
             className="relative font-mono text-xs"
@@ -1450,8 +1260,8 @@ export function DiffGamevalsFullView({
                             <ArchivePlainTextLine
                               line={line}
                               combinedRev={combinedRev}
-                              findKind={textFindKind}
-                              findQuery={debouncedQ}
+                              findKind="literal"
+                              findQuery={textFindHighlightQuery.trim() || debouncedQ}
                               findMarkActive={findOk && textMatchSet.has(i)}
                             />
                           </div>

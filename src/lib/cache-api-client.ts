@@ -2,32 +2,18 @@ import { cacheServerOrigin, type CacheTarget } from "@/lib/cache-api-target";
 
 export type { CacheTarget };
 
-const CACHE_PROXY_PREFIX = "/api/cache";
-
 export { cacheServerOrigin };
 
-export function cacheApiHeaders(cacheType: CacheTarget) {
-  return {
-    "x-cache-type": JSON.stringify({ ip: cacheType.ip, port: cacheType.port }),
-  };
-}
-
-/** Same-origin proxy URL — avoids browser CORS when calling openrune.dev cache APIs. */
+/** Direct cache-server URL (e.g. https://osrs.openrune.dev/cache/nav). */
 export function cacheServerUrl(cacheType: CacheTarget, path: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
-  const qIndex = normalized.indexOf("?");
-  const pathname = qIndex >= 0 ? normalized.slice(0, qIndex) : normalized;
-  const params = new URLSearchParams(qIndex >= 0 ? normalized.slice(qIndex + 1) : "");
-  params.set("_host", cacheType.ip.trim());
-  params.set("_port", String(cacheType.port));
-  return `${CACHE_PROXY_PREFIX}${pathname}?${params.toString()}`;
+  return `${cacheServerOrigin(cacheType)}${normalized}`;
 }
 
-/** True for same-origin cache API requests (used by app-shell offline gate). */
+/** True for direct cache-server fetch/EventSource URLs (used by app-shell offline gate). */
 export function isCacheServerRequestUrl(url: string): boolean {
   try {
     const parsed = new URL(url, typeof window !== "undefined" ? window.location.origin : "http://localhost");
-    if (parsed.pathname.startsWith("/api/cache")) return true;
     if (parsed.pathname === "/status" || parsed.pathname.endsWith("/status")) return true;
 
     if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
@@ -106,6 +92,34 @@ export function gamevalUrl(cacheType: CacheTarget, type: string, search: URLSear
   return cacheServerUrl(cacheType, `/gameval/${type}?${search.toString()}`);
 }
 
+export function spritesCdnGameSlug(cacheType: CacheTarget): string {
+  const host = cacheType.ip.trim().toLowerCase();
+  if (host.includes("rs3")) return "rs3";
+  return "osrs";
+}
+
+/** Public sprite CDN origin (Cloudflare R2 custom domain). */
+export const SPRITES_CDN_BASE = "https://cdn.openrune.dev";
+
+export function spritesCdnBase(_cacheType?: CacheTarget): string {
+  return SPRITES_CDN_BASE;
+}
+
+/** @deprecated Use {@link spritesCdnBase}. */
+export function spritesCdnBaseFromEnv(cacheType: CacheTarget): string {
+  return spritesCdnBase(cacheType);
+}
+
+export function spritesCdnObjectUrl(params: {
+  cdnBase: string;
+  game: string;
+  rev: number;
+  id: string | number;
+}): string {
+  const base = params.cdnBase.replace(/\/$/, "");
+  return `${base}/${params.game}/rev/${params.rev}/sprites/${params.id}.png`;
+}
+
 export function spritesProxyUrl(
   cacheType: CacheTarget,
   params: {
@@ -113,17 +127,42 @@ export function spritesProxyUrl(
     width?: number;
     height?: number;
     keepAspectRatio?: boolean;
+    /** `false` makes width/height a maximum: a smaller sprite comes back at its own size. */
+    upscale?: boolean;
     base?: number;
     rev?: number;
+    source?: number;
     indexed?: number;
+    /** When set, prefer CDN for full-size sprites. */
+    cdnBase?: string | null;
+    cdnGame?: string | null;
   },
 ) {
+  const needsResize =
+    params.width != null || params.height != null || params.indexed != null;
+  const cdnBase = (params.cdnBase ?? spritesCdnBase(cacheType)).replace(/\/$/, "");
+  const cdnGame = params.cdnGame ?? spritesCdnGameSlug(cacheType);
+  // Assets are only uploaded at the revision their content changed in, so `rev` alone is not
+  // enough to build a CDN key — an unchanged sprite lives under an older revision's prefix. With
+  // an explicit `source` the caller already knows which, and goes straight to the CDN; otherwise
+  // the request goes through the API, which resolves it and redirects (cached thereafter).
+  if (!needsResize && params.source != null) {
+    return spritesCdnObjectUrl({
+      cdnBase,
+      game: cdnGame,
+      rev: params.source,
+      id: params.id,
+    });
+  }
+
   const search = new URLSearchParams({ id: String(params.id) });
   if (params.width != null) search.set("width", String(params.width));
   if (params.height != null) search.set("height", String(params.height));
   if (params.keepAspectRatio != null) search.set("keepAspectRatio", String(params.keepAspectRatio));
+  if (params.upscale === false) search.set("upscale", "false");
   if (params.base != null) search.set("base", String(params.base));
   if (params.rev != null) search.set("rev", String(params.rev));
+  if (params.source != null) search.set("source", String(params.source));
   if (params.indexed != null) search.set("indexed", String(params.indexed));
   return cacheServerUrl(cacheType, `/sprites?${search.toString()}`);
 }
@@ -137,6 +176,69 @@ export function cacheTexturesSnapshotUrl(cacheType: CacheTarget, rev: number): s
     cacheType,
     new URLSearchParams({ type: "textures", rev: String(rev) }),
   );
+}
+
+/**
+ * Everything using a texture at a revision: models, overlays, and the items / npcs / objects
+ * reached through them, plus definitions that retexture it directly.
+ */
+export function textureUsageUrl(cacheType: CacheTarget, id: number, rev: number): string {
+  return cacheServerUrl(cacheType, `/textures/${id}/usage?rev=${rev}`);
+}
+
+/** Paginated model rows for the models archive table. */
+export function modelsTableUrl(
+  cacheType: CacheTarget,
+  params: { rev: number; offset?: number; limit?: number; q?: string },
+): string {
+  const search = new URLSearchParams({ rev: String(params.rev) });
+  if (params.offset != null) search.set("offset", String(params.offset));
+  if (params.limit != null) search.set("limit", String(params.limit));
+  if (params.q?.trim()) search.set("q", params.q.trim());
+  return cacheServerUrl(cacheType, `/models/table?${search.toString()}`);
+}
+
+/** Model ids added / removed / changed between two revisions. */
+export function modelsDeltaUrl(cacheType: CacheTarget, base: number, rev: number): string {
+  return cacheServerUrl(cacheType, `/models/delta?base=${base}&rev=${rev}`);
+}
+
+export function modelsCdnObjectUrl(params: {
+  cdnBase: string;
+  game: string;
+  rev: number;
+  id: string | number;
+}): string {
+  const base = params.cdnBase.replace(/\/$/, "");
+  return `${base}/${params.game}/rev/${params.rev}/models/${params.id}.dat`;
+}
+
+/**
+ * Raw model mesh bytes (`.dat`) for a revision. Every revision holds its own full copy on
+ * the CDN, so these objects are immutable and safe for the browser's HTTP cache.
+ */
+/**
+ * Mesh bytes are on the CDN under the revision the mesh last changed in, which `rev` alone does not
+ * identify. The API resolves that and redirects, so this points there rather than guessing a key.
+ * Callers holding the `dat` URL from `/models/*` should use that instead and skip the hop.
+ */
+export function modelDatUrl(cacheType: CacheTarget, id: number, rev: number): string {
+  return cacheServerUrl(cacheType, `/models/${id}/dat?rev=${rev}`);
+}
+
+/** Full metadata for one model: textures, colours, and what uses it. */
+export function modelDetailUrl(cacheType: CacheTarget, id: number, rev: number): string {
+  return cacheServerUrl(cacheType, `/models/${id}?rev=${rev}`);
+}
+
+/** Models used by one item / npc / object, each with metadata, plus combined totals. */
+export function modelsForDefinitionUrl(
+  cacheType: CacheTarget,
+  type: string,
+  id: number,
+  rev: number,
+): string {
+  return cacheServerUrl(cacheType, `/models/for/${encodeURIComponent(type)}/${id}?rev=${rev}`);
 }
 
 export function texturesProxyUrl(
@@ -172,12 +274,26 @@ export function diffCacheOrderedPair(uiBase: number, uiCompare: number): { base:
 export function diffSpriteResolveUrl(
   cacheType: CacheTarget,
   spriteId: number,
-  params: { base: number; rev: number },
+  params: { base: number; rev: number; source?: number; width?: number; height?: number },
 ) {
+  const needsResize = params.width != null || params.height != null;
+  const cdnBase = spritesCdnBase(cacheType);
+  // Only a known source revision identifies a CDN object; without one the API resolves it.
+  if (!needsResize && params.source != null) {
+    return spritesCdnObjectUrl({
+      cdnBase,
+      game: spritesCdnGameSlug(cacheType),
+      rev: params.source,
+      id: spriteId,
+    });
+  }
   const search = new URLSearchParams({
     base: String(params.base),
     rev: String(params.rev),
   });
+  if (params.source != null) search.set("source", String(params.source));
+  if (params.width != null) search.set("width", String(params.width));
+  if (params.height != null) search.set("height", String(params.height));
   return cacheServerUrl(cacheType, `/diff/sprite/${spriteId}?${search.toString()}`);
 }
 
@@ -240,6 +356,49 @@ export function diffConfigContentUrl(
   );
 }
 
+/** One page of a config diff. Omit `kind` for all three kinds interleaved by id. */
+export function diffConfigChangesUrl(
+  cacheType: CacheTarget,
+  configType: string,
+  params: { base: number; rev: number; kind?: string; limit: number; after?: number },
+) {
+  const search = new URLSearchParams({
+    base: String(params.base),
+    rev: String(params.rev),
+    limit: String(params.limit),
+  });
+  if (params.kind) search.set("kind", params.kind);
+  if (params.after != null) search.set("after", String(params.after));
+  return cacheServerUrl(
+    cacheType,
+    `/diff/config/${encodeURIComponent(normalizeConfigTypeForApi(configType))}/changes?${search.toString()}`,
+  );
+}
+
+/**
+ * Rendered inventory / object image for one definition. The API resolves which revision the render
+ * last changed in and redirects to that CDN object, so a revision where nothing changed costs no
+ * storage and no upload.
+ */
+export function renderedImageUrl(
+  cacheType: CacheTarget,
+  kind: "items" | "objects",
+  id: number,
+  /** Omit to use the latest published revision, which is what most views want. */
+  rev?: number,
+): string {
+  const suffix = rev != null ? `?rev=${rev}` : "";
+  return cacheServerUrl(cacheType, `/${kind}/${id}/image${suffix}`);
+}
+
+/** Every `id -> name` for a config type at a revision, for client-side name search. */
+export function configNamesUrl(cacheType: CacheTarget, configType: string, rev: number) {
+  return cacheServerUrl(
+    cacheType,
+    `/diff/config/${encodeURIComponent(normalizeConfigTypeForApi(configType))}/names?rev=${rev}`,
+  );
+}
+
 export function diffConfigSchemaUrl(cacheType: CacheTarget, configType: string) {
   return cacheServerUrl(
     cacheType,
@@ -252,12 +411,13 @@ export function diffSpriteImageUrl(
   spriteId: number,
   params: { base: number; rev: number; source: number },
 ) {
-  const search = new URLSearchParams({
-    base: String(params.base),
-    rev: String(params.rev),
-    source: String(params.source),
+  // Full-size compare/base thumbs always hit the public CDN (not /diff/sprite).
+  return spritesCdnObjectUrl({
+    cdnBase: spritesCdnBase(cacheType),
+    game: spritesCdnGameSlug(cacheType),
+    rev: params.source,
+    id: spriteId,
   });
-  return cacheServerUrl(cacheType, `/diff/sprite/${spriteId}?${search.toString()}`);
 }
 
 export function diffDeltaSpritesUrl(cacheType: CacheTarget, params: { base: number; rev: number }) {

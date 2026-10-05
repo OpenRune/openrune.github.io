@@ -7,8 +7,10 @@ import { RsColorBox } from "@/components/ui/rs-color-box";
 import { RSSprite } from "@/components/ui/RSSprite";
 import { RSTexture } from "@/components/ui/RSTexture";
 import { TableCell } from "@/components/ui/table";
+import { useCacheType } from "@/context/cache-type-context";
 import { GAMEVAL_TYPE_MAP, IFTYPES, type GamevalType } from "@/context/gameval-context";
 import { useSettings } from "@/context/settings-context";
+import { renderedImageUrl } from "@/lib/cache-api-client";
 import { onCopyApplyGamevalUppercaseSetting } from "@/lib/gameval-clipboard";
 import { cn } from "@/lib/utils";
 
@@ -29,9 +31,8 @@ function isGamevalRef(value: unknown): value is { value: unknown; ref: { group: 
 
 
 
-const ITEM_IMAGE_BASE = "https://chisel.weirdgloop.org/static/img/osrs-sprite/";
+// Items and objects now render from our own cache; only npcs still come from here.
 const NPC_IMAGE_BASE = "https://chisel.weirdgloop.org/static/img/osrs-npc/";
-const OBJECT_IMAGE_BASE = "https://chisel.weirdgloop.org/static/img/osrs-object/";
 const TABLE_PIP_BUTTON_CLASS =
   "cursor-pointer rounded border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 text-xs font-mono text-sky-800 transition-colors hover:bg-sky-500/20 hover:border-sky-500/60 dark:text-sky-200 dark:hover:bg-sky-500/20";
 
@@ -108,9 +109,22 @@ function ChiselStaticThumb({
   );
 }
 
-export const OpenRuneItemImage = React.memo(function OpenRuneItemImage({ id }: { id: number }) {
+// Items and objects are rendered during ingestion and served from our own CDN. NPCs still come from
+// chisel until an npc render is wired up the same way.
+export const OpenRuneItemImage = React.memo(function OpenRuneItemImage({
+  id,
+  rev,
+}: {
+  id: number;
+  rev?: number;
+}) {
+  const { selectedCacheType } = useCacheType();
   return (
-    <ChiselStaticThumb src={`${ITEM_IMAGE_BASE}${id}.png`} pixelSize={32} boxClassName="h-8 w-8" />
+    <ChiselStaticThumb
+      src={renderedImageUrl(selectedCacheType, "items", id, rev)}
+      pixelSize={32}
+      boxClassName="h-8 w-8"
+    />
   );
 });
 
@@ -120,9 +134,20 @@ export const OpenRuneNpcImage = React.memo(function OpenRuneNpcImage({ id }: { i
   );
 });
 
-export const OpenRuneObjectImage = React.memo(function OpenRuneObjectImage({ id }: { id: number }) {
+export const OpenRuneObjectImage = React.memo(function OpenRuneObjectImage({
+  id,
+  rev,
+}: {
+  id: number;
+  rev?: number;
+}) {
+  const { selectedCacheType } = useCacheType();
   return (
-    <ChiselStaticThumb src={`${OBJECT_IMAGE_BASE}${id}_orient3.png`} pixelSize={48} boxClassName="h-12 w-12" />
+    <ChiselStaticThumb
+      src={renderedImageUrl(selectedCacheType, "objects", id, rev)}
+      pixelSize={48}
+      boxClassName="h-12 w-12"
+    />
   );
 });
 
@@ -306,7 +331,11 @@ export const OpenRuneArchiveTableCell = React.memo(function OpenRuneArchiveTable
     if (!Number.isNaN(spriteId) && spriteId >= 0) {
       return (
         <TableCellWrap>
-          <RSSprite id={spriteId} rev={combinedRev} width={32} height={32} fitMax keepAspectRatio rounded className="shrink-0 rounded-[2px]" enableClickModel />
+          {/* Fixed box so rows stay level; the sprite sits at its own pixel size inside it, since
+              most are far smaller than 32x32 (map element icons are 15x15). */}
+          <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center">
+            <RSSprite id={spriteId} rev={combinedRev} width={32} height={32} fitMax keepAspectRatio rounded className="shrink-0 rounded-[2px]" enableClickModel />
+          </div>
         </TableCellWrap>
       );
     }

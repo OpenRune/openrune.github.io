@@ -23,7 +23,7 @@ export const BASE_CACHE_TYPES: CacheType[] = [
     id: "rs3",
     name: "RS3",
     ip: "rs3.openrune.dev",
-    port: 8092,
+    port: 2034,
     image: "/cache-rs3.png",
     description: "RuneScape 3 cache server",
   },

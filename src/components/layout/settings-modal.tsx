@@ -58,7 +58,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <IconSettings size={20} />
@@ -66,8 +66,9 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
           </DialogTitle>
         </DialogHeader>
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-4">
+          <TabsList className="mb-4 grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4">
             <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="editor">Editor</TabsTrigger>
             <TabsTrigger value="suggestion-display">Suggestion Display</TabsTrigger>
             <TabsTrigger value="themes">Themes</TabsTrigger>
           </TabsList>
@@ -161,6 +162,21 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 onCheckedChange={(value) => updateSettings({ diffTextViewPreviews: value })}
               />
             </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5 pr-4">
+                <Label htmlFor="hide-non-transmitted-configs">Hide non-transmitted configs</Label>
+                <p className="text-sm text-muted-foreground">
+                  Remove ID-only config files from the Config file list.
+                </p>
+              </div>
+              <Switch
+                id="hide-non-transmitted-configs"
+                checked={settings.hideNonTransmittedConfigs}
+                onCheckedChange={(value) => updateSettings({ hideNonTransmittedConfigs: value })}
+              />
+            </div>
+
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label>Navigation item size</Label>
@@ -197,6 +213,35 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                   Large
                 </Button>
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="editor" className="mt-4 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5 pr-4">
+                <Label htmlFor="editor-word-wrap">Word wrap</Label>
+                <p className="text-sm text-muted-foreground">
+                  Wrap long lines within the editor viewport.
+                </p>
+              </div>
+              <Switch
+                id="editor-word-wrap"
+                checked={settings.editorWordWrap}
+                onCheckedChange={(value) => updateSettings({ editorWordWrap: value })}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5 pr-4">
+                <Label htmlFor="editor-font-ligatures">Font ligatures</Label>
+                <p className="text-sm text-muted-foreground">
+                  Combine code sequences such as -&gt;, !=, and =&gt; using JetBrains Mono glyphs.
+                </p>
+              </div>
+              <Switch
+                id="editor-font-ligatures"
+                checked={settings.editorFontLigatures}
+                onCheckedChange={(value) => updateSettings({ editorFontLigatures: value })}
+              />
             </div>
           </TabsContent>
 

@@ -1,0 +1,21 @@
+[Unit]
+Description=OpenRune website (Next.js)
+After=network.target
+# The site works without the APIs — it just shows them as unreachable — so this is a preference,
+# not a requirement.
+Wants=openrune-webserver@osrs.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/openrune-site
+EnvironmentFile=/opt/openrune-site/site.env
+# `output: "standalone"` in next.config.ts produces this self-contained server; it needs the
+# matching .next/static and public directories beside it, which the deploy copies in.
+ExecStart=/usr/bin/node /opt/openrune-site/server.js
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target

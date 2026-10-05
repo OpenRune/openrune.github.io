@@ -27,6 +27,7 @@ type OptionDropdownProps = {
   ariaLabel?: string;
   /** Classes for the selected-label span (default truncates). */
   labelClassName?: string;
+  disabled?: boolean;
   /**
    * When true: clicking the label applies the current value (see `onAffirmPrimary`);
    * only the chevron opens/closes the menu.
@@ -47,6 +48,7 @@ export function OptionDropdown({
   menuClassName,
   ariaLabel,
   labelClassName,
+  disabled = false,
   splitAffirm = false,
   onAffirmPrimary,
 }: OptionDropdownProps) {
@@ -73,6 +75,10 @@ export function OptionDropdown({
   React.useEffect(() => {
     setMounted(true);
   }, []);
+
+  React.useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
 
   React.useLayoutEffect(() => {
     if (!open) return;
@@ -149,12 +155,13 @@ export function OptionDropdown({
 
   if (splitAffirm) {
     return (
-      <div className={cn("relative", className)}>
+      <div className={cn("relative", className, disabled && "pointer-events-none opacity-45")}>
         <div
           ref={rootRef}
           role="group"
           aria-label={ariaLabel}
           aria-expanded={open}
+          aria-disabled={disabled || undefined}
           className={cn(
             buttonVariants({ variant: buttonVariant }),
             "flex w-full min-w-0 items-stretch gap-0 overflow-hidden p-0 text-sm shadow-none [&_svg]:pointer-events-none",
@@ -163,6 +170,7 @@ export function OptionDropdown({
         >
           <button
             type="button"
+            disabled={disabled}
             className={cn(
               "inline-flex min-h-0 min-w-0 flex-1 cursor-pointer items-center px-2 py-0 text-left outline-none",
               "hover:bg-muted/50 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring/50",
@@ -179,6 +187,7 @@ export function OptionDropdown({
           </button>
           <button
             type="button"
+            disabled={disabled}
             className={cn(
               "inline-flex shrink-0 cursor-pointer items-center justify-center border-l border-border/60 px-1.5 outline-none",
               "hover:bg-muted/50 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring/50",
@@ -201,10 +210,11 @@ export function OptionDropdown({
   }
 
   return (
-    <div ref={rootRef} className={cn("relative", className)}>
+    <div ref={rootRef} className={cn("relative", className, disabled && "opacity-45")}>
       <Button
         type="button"
         variant={buttonVariant}
+        disabled={disabled}
         className={cn("h-9 w-full justify-between gap-1.5 px-2 text-sm", buttonClassName)}
         onClick={() => setOpen((prev) => !prev)}
         aria-haspopup="listbox"

@@ -26,6 +26,7 @@ type DiffInventoryViewProps = {
   combinedRev: number;
   baseRev: number;
   rev: number;
+  textOnly?: boolean;
 };
 
 type HighlightSeg = { text: string; highlight: boolean };
@@ -179,7 +180,13 @@ const DiffInvTextLine = React.memo(function DiffInvTextLine({
   );
 });
 
-export function DiffInventoryView({ diffViewMode, combinedRev, baseRev, rev }: DiffInventoryViewProps) {
+export function DiffInventoryView({
+  diffViewMode,
+  combinedRev,
+  baseRev,
+  rev,
+  textOnly = false,
+}: DiffInventoryViewProps) {
   const { lookupGameval, getGamevalExtra } = useGamevals();
   const { settings } = useSettings();
 
@@ -260,6 +267,7 @@ export function DiffInventoryView({ diffViewMode, combinedRev, baseRev, rev }: D
       combinedRev={combinedRev}
       baseRev={baseRev}
       rev={rev}
+      textOnly={textOnly}
       configType={INV_CONFIG_TYPE}
       tableBase={TABLE_BASE}
       title="Inventory"

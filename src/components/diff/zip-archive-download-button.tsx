@@ -6,6 +6,7 @@ import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useZipDownload } from "@/context/zip-download-context";
 import type { ZipArchiveKind } from "@/lib/zip-download";
+import { cn } from "@/lib/utils";
 import type { DiffMode } from "./diff-types";
 
 type Props = {
@@ -24,7 +25,8 @@ export function ZipArchiveDownloadButton({
   baseRev,
   rev,
   tableBase = 1,
-}: Props) {
+  className,
+}: Props & { className?: string }) {
   const { startZipExport } = useZipDownload();
 
   return (
@@ -32,7 +34,7 @@ export function ZipArchiveDownloadButton({
       type="button"
       variant="outline"
       size="default"
-      className="!h-9 shrink-0 gap-1.5 px-3 text-sm"
+      className={cn("!h-9 shrink-0 gap-1.5 px-3 text-sm", className)}
       onClick={() =>
         startZipExport({
           kind,

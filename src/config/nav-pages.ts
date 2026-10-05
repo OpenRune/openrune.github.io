@@ -2,9 +2,12 @@ import type { LucideIcon } from "lucide-react";
 
 import { DIFF_ROUTE_DIFFVIEW, DIFF_ROUTE_FULL } from "@/components/diff/diff-constants";
 import {
+  Activity,
   BarChart3,
+  Boxes,
   Database,
-  GitMerge,
+  FileText,
+  GitCompareArrows,
   Home,
   Map,
   Palette,
@@ -41,12 +44,10 @@ export function getLeafNavPages(pages: NavPage[]): NavPage[] {
 export function findLeafNavPageByPath(pathname: string): NavPage | undefined {
   return getLeafNavPages(NAV_PAGES).find((page) => {
     if (page.path === DIFF_ROUTE_FULL) {
-      return (
-        pathname === DIFF_ROUTE_FULL ||
-        pathname === "/diff" ||
-        pathname === DIFF_ROUTE_DIFFVIEW ||
-        pathname.startsWith(`${DIFF_ROUTE_DIFFVIEW}/`)
-      );
+      return pathname === DIFF_ROUTE_FULL || pathname === "/diff" || pathname.startsWith(`${DIFF_ROUTE_FULL}/`);
+    }
+    if (page.path === DIFF_ROUTE_DIFFVIEW) {
+      return pathname === DIFF_ROUTE_DIFFVIEW || pathname.startsWith(`${DIFF_ROUTE_DIFFVIEW}/`);
     }
     return page.path === pathname;
   });
@@ -66,9 +67,15 @@ export const NAV_PAGES: NavPage[] = [
     usableOffline: true,
   },
   {
-    label: "Configs / Diff",
-    path: "/diff/full",
-    icon: GitMerge,
+    label: "Configs",
+    path: DIFF_ROUTE_FULL,
+    icon: FileText,
+    requiresOnline: true,
+  },
+  {
+    label: "Diff",
+    path: DIFF_ROUTE_DIFFVIEW,
+    icon: GitCompareArrows,
     requiresOnline: true,
   },
   {
@@ -87,6 +94,18 @@ export const NAV_PAGES: NavPage[] = [
         path: "/117performance",
         icon: BarChart3,
         usableOffline: true,
+      },
+      {
+        label: "Model Viewer",
+        path: "/model-viewer",
+        icon: Boxes,
+        requiresOnline: true,
+      },
+      {
+        label: "Ingestion",
+        path: "/dev/ingestion",
+        icon: Activity,
+        requiresOnline: true,
       },
     ],
   },

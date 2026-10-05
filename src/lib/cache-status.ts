@@ -18,6 +18,10 @@ export interface StatusResponse {
   progress?: number | null;
   /** ORDF v9+ per-chunk CRC32 (items, npcs, sprites, …); absent on old binaries. */
   fileCrcs?: Record<string, number> | null;
+  /** Public CloudFront origin for sprites (no trailing slash). */
+  spritesCdnBase?: string | null;
+  /** CDN path slug (osrs / rs3). */
+  spritesCdnGame?: string | null;
 }
 
 export interface CacheStatusInfo {

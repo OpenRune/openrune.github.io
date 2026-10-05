@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { Boxes } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow, Table } from "@/components/ui/table";
@@ -27,6 +29,7 @@ import {
   useGamevals,
 } from "@/context/gameval-context";
 import type { AppSettings } from "@/context/settings-context";
+import { useSettings } from "@/context/settings-context";
 import { cacheDataUrl, diffConfigSchemaUrl, diffSpriteResolveUrl } from "@/lib/cache-api-client";
 import { conditionalJsonFetch } from "@/lib/openrune-idb-cache";
 import { cn } from "@/lib/utils";
@@ -35,12 +38,13 @@ import { RSSprite } from "@/components/ui/RSSprite";
 import { RSTexture } from "@/components/ui/RSTexture";
 
 import { DiffConfigArchiveView } from "./diff-config-archive-view";
+import { DiffModelInfoModal, MODEL_OWNER_SECTIONS } from "./diff-model-info-modal";
 import type {
   ConfigArchiveTableRow,
   ConfigFieldRenderSchema,
   DiffConfigArchiveTextLineProps,
 } from "./diff-config-archive-types";
-import { GAMEVAL_MIN_REVISION, interfaceComponentCombinedId, normalizeConfigTypeForCacheApi, sectionGamevalTypeForSection } from "./diff-constants";
+import { GAMEVAL_MIN_REVISION, GAMEVAL_VARCS_MIN_REVISION, interfaceComponentCombinedId, normalizeConfigTypeForCacheApi, sectionGamevalTypeForSection } from "./diff-constants";
 import { configLinesFromCachePayload } from "./diff-config-content";
 import type { ConfigLine, DiffMode, DiffSearchFieldMode } from "./diff-types";
 import {
@@ -56,7 +60,12 @@ import {
   OpenRuneNpcImage,
   OpenRuneObjectImage,
 } from "./diff-openrune-archive-table-cell";
-import { DIFF_ARCHIVE_TABLE_CELL_CLASS, DIFF_ARCHIVE_TABLE_HEAD_CLASS } from "./diff-table-archive-styles";
+import {
+  DIFF_ARCHIVE_TABLE_ACTION_CLASS,
+  DIFF_ARCHIVE_TABLE_ACTION_ICON_CLASS,
+  DIFF_ARCHIVE_TABLE_CELL_CLASS,
+  DIFF_ARCHIVE_TABLE_HEAD_CLASS,
+} from "./diff-table-archive-styles";
 import { useSpotanimSequenceTicks } from "./diff-spotanim-sequence-ticks";
 
 export { ARCHIVE_ENTITY_SECTIONS, isArchiveEntitySection } from "./diff-openrune-archive-columns";
@@ -606,6 +615,7 @@ function GamevalReferenceDialog({
   getGamevalExtra: (type: GamevalType, id: number, rev?: number | "latest") => GamevalExtraData | undefined;
 }) {
   const { selectedCacheType } = useCacheType();
+  const { loadGamevalType } = useGamevals();
   const [configLines, setConfigLines] = React.useState<ConfigLine[] | null>(null);
   const [configStatus, setConfigStatus] = React.useState<"idle" | "loading" | "ok" | "error">("idle");
   const [configError, setConfigError] = React.useState<string | null>(null);
@@ -672,10 +682,16 @@ function GamevalReferenceDialog({
 
     const run = async () => {
       try {
+        if (combinedRev >= GAMEVAL_MIN_REVISION) {
+          await loadGamevalType(openRef.ref.type, combinedRev);
+        }
         const { data } = await conditionalJsonFetch<unknown>(cacheKey, url);
         if (cancelled) return;
         const lines = configLinesFromCachePayload(data, configType, {
-          headerLabelForId: (id) => lookupGameval(openRef.ref.type, id, combinedRev),
+          headerLabelForId: (id) =>
+            lookupGameval(openRef.ref.type, id, combinedRev)?.trim() ||
+            getGamevalExtra(openRef.ref.type, id, combinedRev)?.searchable?.trim() ||
+            undefined,
           includeCommentWithoutHeaderLabel: true,
         });
         setConfigLines(lines ?? []);
@@ -692,7 +708,7 @@ function GamevalReferenceDialog({
     return () => {
       cancelled = true;
     };
-  }, [openRef, combinedRev, selectedCacheType, lookupGameval]);
+  }, [openRef, combinedRev, selectedCacheType, lookupGameval, getGamevalExtra, loadGamevalType]);
 
   return (
     <Dialog open={openRef != null} onOpenChange={onOpenChange}>
@@ -872,6 +888,8 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
   combinedRev: _combinedRev,
   lookupRevisions,
   hoverText,
+  refGroup,
+  refId,
   fieldRenderSchemaByField,
   showInline: _showInline,
   pipTooltip = true,
@@ -879,6 +897,9 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
   findQuery,
   findMarkActive,
 }: DiffConfigArchiveTextLineProps) {
+  const { settings } = useSettings();
+  const wordWrap = settings.editorWordWrap;
+  const lineClass = cn("diff-editor-line", wordWrap ? "whitespace-pre-wrap break-words [overflow-wrap:anywhere]" : "whitespace-pre");
   const { loadGamevalType, hasLoaded, lookupGameval, lookupGamevalByName, getGamevalExtra } = useGamevals();
   const [openRef, setOpenRef] = React.useState<{ ref: InlineGamevalReference; id: number } | null>(null);
   const candidateRevisions = React.useMemo(() => {
@@ -904,7 +925,7 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
   );
 
   const hl =
-    findMarkActive && findQuery?.trim()
+    findMarkActive && findQuery?.trim() && !/^\[[^\]]+]$/.test(line.trim())
       ? { kind: findKind ?? "literal", query: findQuery.trim(), active: true as const }
       : null;
 
@@ -1060,7 +1081,8 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
       ? (fn != null && fn.toLowerCase().includes("rgb") ? "rgb" : "hsl")
       : null;
   const textureField = fn != null && schemaKind === "texture";
-  const spriteField = fn != null && schemaKind === "sprite";
+  // A `sprites.*` ref is a sprite even when the config type has no render schema for the field.
+  const spriteField = fn != null && (schemaKind === "sprite" || refGroup?.toLowerCase() === "sprites");
   if (fn && (colorKind || textureField || spriteField)) {
     const displayLine = displayTextureFieldLine(line);
     const eqIdx = displayLine.indexOf("=");
@@ -1094,7 +1116,9 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
       } else if (m[1] != null) {
         const parsed = parseInlineGamevalToken(m[1]);
         if (parsed) {
-          const id = resolveGamevalIdByName(parsed.type, parsed.name);
+          // Prefer the id the payload carried: sprite gameval names are not unique (1448, 1449 and
+          // 1450 are all `sprites.mapfunction`), so resolving by name alone cannot pick the right one.
+          const id = (spriteField ? refId : undefined) ?? resolveGamevalIdByName(parsed.type, parsed.name);
           if (id != null) {
             if (spriteField) spriteGamevalId = id;
             else widgetValue = id;
@@ -1141,7 +1165,7 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
       );
     return (
       <>
-        <span className="whitespace-pre">
+        <span className={lineClass}>
           <FindHighlightedText key="pfx" text={prefix} kind={hlKind} query={hlQuery} enabled={hlEnabled} />
           {wrapHoverValue(<>{valueParts}</>)}
         </span>
@@ -1166,7 +1190,7 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
     const hasInlineGamevals = findInlineGamevalReferences(mainValue).length > 0;
     return (
       <>
-        <span className="whitespace-pre">
+        <span className={lineClass}>
           <FindHighlightedText
             text={split.prefix}
             kind={hl?.kind ?? "literal"}
@@ -1200,7 +1224,7 @@ export const ArchivePlainTextLine = React.memo(function ArchivePlainTextLine({
 
   return (
     <>
-      <span className="whitespace-pre">{renderTextWithInlineGamevals(line || " ")}</span>
+      <span className={lineClass}>{renderTextWithInlineGamevals(line || " ")}</span>
       <GamevalReferenceDialog
         combinedRev={_combinedRev}
         openRef={openRef}
@@ -1377,6 +1401,7 @@ export type DiffConfigArchiveEntityViewProps = {
   combinedRev: number;
   baseRev: number;
   rev: number;
+  textOnly?: boolean;
 };
 
 export function DiffConfigArchiveEntityView({
@@ -1386,6 +1411,7 @@ export function DiffConfigArchiveEntityView({
   combinedRev,
   baseRev,
   rev,
+  textOnly = false,
 }: DiffConfigArchiveEntityViewProps) {
   const meta = React.useMemo(() => {
     const baseMeta = ENTITY_META_OVERRIDES[section] ?? defaultEntityMeta(section);
@@ -1412,6 +1438,13 @@ export function DiffConfigArchiveEntityView({
   const [schemaHasGameval, setSchemaHasGameval] = React.useState<boolean | undefined>(undefined);
   const useGamevalColumn = schemaHasGameval ?? (sectionGamevalType != null);
   const showImageCol = section === "items" || section === "npcs" || section === "objects";
+  /** Definitions that reference models get a per-row "View model" button. */
+  const showsModelInfo = MODEL_OWNER_SECTIONS.has(section);
+  const [modelInfoId, setModelInfoId] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    setModelInfoId(null);
+  }, [combinedRev, section]);
 
   const [openRef, setOpenRef] = React.useState<{ ref: InlineGamevalReference; id: number } | null>(null);
   const [openEnumRow, setOpenEnumRow] = React.useState<EnumDialogState | null>(null);
@@ -1463,9 +1496,11 @@ export function DiffConfigArchiveEntityView({
     }
   }, [section, combinedRev, hasLoaded, loadGamevalType]);
 
-  // Eagerly load all known gameval types so chips in text view and tables are immediately clickable.
+  // Eagerly load known gameval types so chips in text view and tables are immediately clickable.
   React.useEffect(() => {
+    if (combinedRev < GAMEVAL_MIN_REVISION) return;
     for (const type of Object.values(GAMEVAL_TYPE_MAP)) {
+      if (type === "varcs" && combinedRev < GAMEVAL_VARCS_MIN_REVISION) continue;
       if (!hasLoaded(type, combinedRev)) {
         void loadGamevalType(type, combinedRev);
       }
@@ -1535,7 +1570,7 @@ export function DiffConfigArchiveEntityView({
         tableColumnPreferences,
       );
       const gvType = sectionGamevalType;
-      const colCount = keys.length + (showImageCol ? 1 : 0);
+      const colCount = keys.length + (showImageCol ? 1 : 0) + (showsModelInfo ? 1 : 0);
 
       return {
         colgroup: (
@@ -1547,6 +1582,8 @@ export function DiffConfigArchiveEntityView({
             {keys.map((colKey) => (
               <col key={colKey} className={colKey === "gameval" ? "min-w-[10rem]" : colKey === "tickDuration" ? "w-36" : colKey === "animationId" ? "min-w-[8rem]" : colKey === "key" || colKey === "value" ? "w-20" : colKey === "model" ? "min-w-[10rem]" : "min-w-[6rem]"} />
             ))}
+            {/* Fits "View model" at this button size; the button truncates if it ever does not. */}
+            {showsModelInfo ? <col className="w-28" /> : null}
           </colgroup>
         ),
         headerCellsAfterId: (
@@ -1559,6 +1596,9 @@ export function DiffConfigArchiveEntityView({
                 {openruneColumnHeaderLabel(key)}
               </TableHead>
             ))}
+            {showsModelInfo ? (
+              <TableHead className={DIFF_ARCHIVE_TABLE_HEAD_CLASS}>Model</TableHead>
+            ) : null}
           </>
         ),
         renderTableRow: (row: ConfigArchiveTableRow) => {
@@ -1588,11 +1628,11 @@ export function DiffConfigArchiveEntityView({
                     )}
                   >
                     {section === "items" ? (
-                      <OpenRuneItemImage id={row.id} />
+                      <OpenRuneItemImage id={row.id} rev={revArg} />
                     ) : section === "npcs" ? (
                       <OpenRuneNpcImage id={row.id} />
                     ) : (
-                      <OpenRuneObjectImage id={row.id} />
+                      <OpenRuneObjectImage id={row.id} rev={revArg} />
                     )}
                   </div>
                 </TableCell>
@@ -1740,6 +1780,31 @@ export function DiffConfigArchiveEntityView({
                   />
                 );
               })}
+              {showsModelInfo ? (
+                <TableCell className={cn(DIFF_ARCHIVE_TABLE_CELL_CLASS, "min-w-0")}>
+                  {/*
+                    The button fills the column and truncates rather than sizing to its label:
+                    under `table-fixed`, a cell whose non-wrapping content is wider than its column
+                    pushes the whole table past its container and adds a horizontal scrollbar.
+                  */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={cn(DIFF_ARCHIVE_TABLE_ACTION_CLASS, "w-full min-w-0 justify-start")}
+                    title={`View model data for ${section} ${row.id}`}
+                    // Some sections make the row itself clickable; keep the two apart.
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setModelInfoId(row.id);
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    <Boxes className={cn(DIFF_ARCHIVE_TABLE_ACTION_ICON_CLASS, "shrink-0")} aria-hidden />
+                    <span className="truncate">View model</span>
+                  </Button>
+                </TableCell>
+              ) : null}
             </TableRow>
           );
         },
@@ -1762,6 +1827,11 @@ export function DiffConfigArchiveEntityView({
                   <Skeleton className="h-4 w-20" delayMs={Math.min(i, 24) * 18 + 10 + j * 6} shimmer={false} />
                 </TableCell>
               ))}
+              {showsModelInfo ? (
+                <TableCell className={DIFF_ARCHIVE_TABLE_CELL_CLASS}>
+                  <Skeleton className="h-6 w-full rounded-none" delayMs={Math.min(i, 24) * 18 + 16} shimmer={false} />
+                </TableCell>
+              ) : null}
             </TableRow>
           )),
         emptyColSpan: Math.max(1, 1 + colCount),
@@ -1769,7 +1839,7 @@ export function DiffConfigArchiveEntityView({
         readyAriaLabel: `${meta.title} table`,
       };
     },
-    [lookupGameval, lookupGamevalByName, getGamevalExtra, sectionGamevalType, meta.tableEntityPlural, meta.title, rowEntriesForCell, section, setOpenRef, showImageCol, fieldRenderSchemaByField, tableColumnPreferences, useGamevalColumn],
+    [lookupGameval, lookupGamevalByName, getGamevalExtra, sectionGamevalType, meta.tableEntityPlural, meta.title, rowEntriesForCell, section, setOpenRef, showImageCol, showsModelInfo, fieldRenderSchemaByField, tableColumnPreferences, useGamevalColumn],
   );
 
   const tableSearchDisabledModes = React.useMemo((): readonly DiffSearchFieldMode[] => {
@@ -1831,6 +1901,7 @@ export function DiffConfigArchiveEntityView({
       combinedRev={combinedRev}
       baseRev={baseRev}
       rev={rev}
+      textOnly={textOnly}
       configType={section}
       tableBase={TABLE_BASE}
       title={meta.title}
@@ -1857,6 +1928,17 @@ export function DiffConfigArchiveEntityView({
         TextLine={TextLineWithSchema}
         textRowHeight={TEXT_LINE_HEIGHT}
       />
+      {showsModelInfo ? (
+        <DiffModelInfoModal
+          type={section}
+          definitionId={modelInfoId}
+          rev={combinedRev}
+          open={modelInfoId != null}
+          onOpenChange={(open) => {
+            if (!open) setModelInfoId(null);
+          }}
+        />
+      ) : null}
       <GamevalReferenceDialog
         combinedRev={combinedRev}
         openRef={openRef}

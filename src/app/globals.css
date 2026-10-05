@@ -301,3 +301,29 @@
     animation-timing-function: linear;
   }
 }
+
+/* Editor settings (toggled via body classes from settings-context) */
+body.editor-font-ligatures {
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+body.editor-font-ligatures .font-mono {
+  font-variant-ligatures: common-ligatures;
+  font-feature-settings: "liga" 1, "calt" 1;
+}
+
+body:not(.editor-font-ligatures) .font-mono {
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
+body.editor-word-wrap .diff-editor-line {
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+body.editor-word-wrap .diff-editor-line-host {
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
+}

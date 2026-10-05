@@ -50,7 +50,11 @@ function isLeafActive(pathname: string, page: NavPage) {
 }
 
 function isGroupActive(pathname: string, page: NavPage) {
-  return page.children?.some((c) => pathname === c.path) ?? false;
+  return (
+    page.children?.some(
+      (c) => pathname === c.path || (c.path !== "/" && pathname.startsWith(`${c.path}/`)),
+    ) ?? false
+  );
 }
 
 function isPageDisabled(page: NavPage, isOnline: boolean): boolean {

@@ -1,13 +1,10 @@
 import { GAMEVAL_TYPE_MAP, type GamevalType } from "@/context/gameval-context";
+import { GAMEVAL_MIN_REVISION, GAMEVAL_VARCS_MIN_REVISION } from "@/lib/gameval-revisions";
 import type { NavConfig } from "@/lib/nav-config";
 
 import type { ConfigLine, ConfigRow, DiffMode, GamevalsFullSection, Section } from "./diff-types";
 
-/** Revisions below this do not expose gameval extras on the cache server (sprites, archives, etc.). */
-export const GAMEVAL_MIN_REVISION = 230;
-
-/** Var client script gamevals exist from this revision onward (cache server). */
-export const GAMEVAL_VARCS_MIN_REVISION = 232;
+export { GAMEVAL_MIN_REVISION, GAMEVAL_VARCS_MIN_REVISION } from "@/lib/gameval-revisions";
 
 /** Tab / URL suffix order for the combined gamevals explorer (matches `GAMEVAL_TYPE_MAP` insertion order). */
 export const GAMEVAL_FULL_TAB_ORDER: readonly GamevalType[] = Object.values(GAMEVAL_TYPE_MAP) as GamevalType[];
@@ -76,7 +73,41 @@ export function normalizeSectionIdFromApiType(rawType: string): string {
 /** Optional primary gameval type for a section (from `/cache/nav`). */
 export function sectionGamevalTypeForSection(section: string): GamevalType | null {
   const key = section.trim().toLowerCase();
-  return sectionGamevalType[key] ?? null;
+  const fromNav = sectionGamevalType[key];
+  if (fromNav) return fromNav;
+  // Fallback before `/cache/nav` applies (text headers still need gamevals).
+  switch (key) {
+    case "items":
+    case "item":
+      return "items";
+    case "npcs":
+    case "npc":
+      return "npcs";
+    case "objects":
+    case "object":
+    case "locs":
+    case "loc":
+      return "objects";
+    case "sequences":
+    case "sequence":
+    case "spotanim":
+    case "spotanims":
+      return key.startsWith("spot") ? "spotanims" : "sequences";
+    case "inv":
+    case "inventories":
+      return "inv";
+    case "varbit":
+    case "varbits":
+      return "varbits";
+    case "varp":
+    case "varps":
+      return "varp";
+    case "enums":
+    case "enum":
+      return null;
+    default:
+      return null;
+  }
 }
 
 function singularizeSectionPrefix(sectionId: string): string {
@@ -111,6 +142,7 @@ export function applyNavConfigSections(navConfig: NavConfig | null): void {
     DIFF_ALL_SECTIONS = [
       "sprites",
       "textures",
+      "models",
       "gamevals",
       ...GAMEVAL_FULL_SECTIONS,
       ...CONFIG_TYPES,
@@ -141,6 +173,7 @@ export function applyNavConfigSections(navConfig: NavConfig | null): void {
   DIFF_ALL_SECTIONS = [
     "sprites",
     "textures",
+    "models",
     "gamevals",
     ...GAMEVAL_FULL_SECTIONS,
     ...CONFIG_TYPES,
@@ -151,6 +184,7 @@ export function applyNavConfigSections(navConfig: NavConfig | null): void {
 export let DIFF_ALL_SECTIONS: Section[] = [
   "sprites",
   "textures",
+  "models",
   "gamevals",
   ...GAMEVAL_FULL_SECTIONS,
   ...CONFIG_TYPES,
@@ -325,6 +359,8 @@ const GAMEVALS_FULL_LINES_BY_SECTION = Object.fromEntries(
 export const CONFIG_FULL_ROWS: Record<Section, ConfigRow[]> = {
   sprites: [],
   gamevals: [],
+  // Models are fetched from /models/table; no static preview rows.
+  models: [],
   textures: [
     { id: 0, type: "context", entries: { averageRgb: "127", animationDirection: "0", animationSpeed: "2" } },
     { id: 1, type: "context", entries: { averageRgb: "216", animationDirection: "1", animationSpeed: "4" } },
@@ -373,6 +409,7 @@ export const CONFIG_FULL_ROWS: Record<Section, ConfigRow[]> = {
 export const CONFIG_DIFF_LINES: Record<Section, ConfigLine[]> = {
   sprites: [],
   gamevals: [],
+  models: [],
   textures: [
     { type: "context", line: "// 12" },
     { type: "change", line: "averageRgb=17211" },
