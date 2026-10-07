@@ -4,6 +4,23 @@ import * as React from "react";
 
 const STORAGE_SETTINGS = "openrune-app-settings";
 
+/**
+ * Bumped when a stored setting has to be re-defaulted. Storage written before a bump keeps every
+ * other value — only the keys listed in {@link REDEFAULTED_AT} are dropped, so the new default wins.
+ */
+const SETTINGS_VERSION = 2;
+
+/**
+ * Keys re-defaulted at each version. This discards a choice the visitor may have made deliberately,
+ * so only list a key when the old default was wrong rather than merely different.
+ *
+ * v2: `hideNonTransmittedConfigs` now hides Archives entries too and defaults on. Leaving it off for
+ * returning visitors would mean the nav kept listing sections the revision does not have.
+ */
+const REDEFAULTED_AT: Record<number, (keyof AppSettings)[]> = {
+  2: ["hideNonTransmittedConfigs"],
+};
+
 export type NavItemSize = "small" | "medium" | "large";
 export type ThemePreset =
   | "default"
@@ -34,7 +51,10 @@ export type AppSettings = {
   editorWordWrap: boolean;
   /** Enable JetBrains Mono ligatures (->, !=, =>, …) in monospace text. */
   editorFontLigatures: boolean;
-  /** Hide config nav entries that have no transmitted/decoded rows for the selected revision. */
+  /**
+   * Hide Archives and Configs nav entries that have no transmitted/decoded rows for the selected
+   * revision, rather than listing them greyed out. Off shows them disabled with a tooltip.
+   */
   hideNonTransmittedConfigs: boolean;
   navItemSize: NavItemSize;
   themePreset: ThemePreset;
@@ -55,7 +75,7 @@ const defaultSettings: AppSettings = {
   diffTextViewPreviews: true,
   editorWordWrap: false,
   editorFontLigatures: false,
-  hideNonTransmittedConfigs: false,
+  hideNonTransmittedConfigs: true,
   navItemSize: "medium",
   themePreset: "default",
   suggestionDisplay: {
@@ -83,7 +103,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setHydrated(true);
         return;
       }
-      const parsed = JSON.parse(raw) as Partial<AppSettings>;
+      const { settingsVersion = 1, ...stored } = JSON.parse(raw) as Partial<AppSettings> & {
+        settingsVersion?: number;
+      };
+      // Drop the keys each bump re-defaults, so the value below falls through to `defaultSettings`.
+      const parsed: Partial<AppSettings> = { ...stored };
+      for (let v = settingsVersion + 1; v <= SETTINGS_VERSION; v += 1) {
+        for (const key of REDEFAULTED_AT[v] ?? []) delete parsed[key];
+      }
       setSettings((prev) => ({
         ...prev,
         ...parsed,
@@ -102,7 +129,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (!hydrated) return;
     try {
-      localStorage.setItem(STORAGE_SETTINGS, JSON.stringify(settings));
+      localStorage.setItem(STORAGE_SETTINGS, JSON.stringify({ ...settings, settingsVersion: SETTINGS_VERSION }));
     } catch {
       // Ignore storage write errors.
     }

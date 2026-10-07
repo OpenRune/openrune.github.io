@@ -165,9 +165,10 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5 pr-4">
-                <Label htmlFor="hide-non-transmitted-configs">Hide non-transmitted configs</Label>
+                <Label htmlFor="hide-non-transmitted-configs">Hide entries the revision does not have</Label>
                 <p className="text-sm text-muted-foreground">
-                  Remove ID-only config files from the Config file list.
+                  Drop Archives and Configs entries with nothing in the selected revision instead of
+                  listing them greyed out.
                 </p>
               </div>
               <Switch

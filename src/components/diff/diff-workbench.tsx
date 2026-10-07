@@ -323,7 +323,12 @@ function DiffWorkbenchInner({ mode }: { mode: DiffMode }) {
 
   React.useEffect(() => {
     if (!sectionSupport) return;
-    const isArchive = section === "sprites" || section === "textures" || section === "gamevals";
+    // Driven by the nav rather than a hardcoded list: archives grew past sprites/textures/gamevals,
+    // and looking an archive up in `configs` returns undefined, which reads as "supported" — so an
+    // archive the revision lacks would stay selected after being hidden from the nav.
+    const isArchive = navConfig
+      ? navConfig.archives.some((entry) => entry.id === section)
+      : section === "sprites" || section === "textures" || section === "gamevals" || section === "models";
     const supported = isArchive
       ? sectionSupport.archives[section] !== false
       : sectionSupport.configs[section] !== false;

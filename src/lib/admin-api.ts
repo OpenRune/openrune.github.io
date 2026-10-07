@@ -44,6 +44,20 @@ export type AdminOverview = {
     total: number;
     /** A newly released revision being imported ahead of the queue. */
     pausedFor: number | null;
+    /**
+     * The upload phase that runs once every revision is imported. Absent until it starts; `rev` is
+     * null between revisions, and `files`/`filesTotal` count the objects of `stage` sent so far.
+     */
+    cdn?: {
+      pending: number[];
+      done: number[];
+      total: number;
+      rev: number | null;
+      stage: string | null;
+      files: number;
+      filesTotal: number;
+      percent: number;
+    } | null;
     startedAt: string;
     updatedAt: string;
   } | null;

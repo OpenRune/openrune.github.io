@@ -105,10 +105,16 @@ export function DiffSidebar({
   const archiveSections = navSections?.archives ?? DEFAULT_ARCHIVE_SECTIONS;
   const configSections: NavSection[] =
     navSections?.configs ?? CONFIG_TYPES.map((id) => ({ id, label: sentenceCaseNavLabel(id), apiType: id }));
-  const visibleConfigSections =
-    settings.hideNonTransmittedConfigs && sectionSupport
-      ? configSections.filter(({ id }) => sectionSupport.configs[id] !== false)
-      : configSections;
+
+  // Null until the manifest lands, and an id the manifest does not mention counts as available —
+  // so a slow fetch leaves the nav as it was rather than emptying it and filling it back in.
+  const support = settings.hideNonTransmittedConfigs ? sectionSupport : null;
+  const visibleArchiveSections = support
+    ? archiveSections.filter(({ id }) => support.archives[id] !== false)
+    : archiveSections;
+  const visibleConfigSections = support
+    ? configSections.filter(({ id }) => support.configs[id] !== false)
+    : configSections;
 
   const revisionDropdownOptions = React.useMemo(
     () => [
@@ -195,12 +201,15 @@ export function DiffSidebar({
         </header>
       ) : null}
 
+      {/* A heading over nothing is worse than no heading: when the revision has none of a group's
+          entries the whole group goes, not just its rows. */}
+      {visibleArchiveSections.length > 0 ? (
       <div className={cn(!hideRevisionControls && "border-t pt-2")}>
         <div className="flex items-center gap-2 px-3 py-1 text-xs font-medium text-muted-foreground">
           <IconArchive size={16} />
           Archives
         </div>
-        {archiveSections.map(({ id, label, minRevision }) => {
+        {visibleArchiveSections.map(({ id, label, minRevision }) => {
           const active = id === section;
           const counts = deltaFor(id);
           const isGamevalsArchive = id === "gamevals";
@@ -259,8 +268,10 @@ export function DiffSidebar({
           return <React.Fragment key={id}>{archiveButton}</React.Fragment>;
         })}
       </div>
+      ) : null}
 
-      <div className="pt-2">
+      {visibleConfigSections.length > 0 ? (
+      <div className={cn("pt-2", visibleArchiveSections.length === 0 && !hideRevisionControls && "border-t")}>
         <div className="flex items-center gap-2 px-3 py-1 text-xs font-medium text-muted-foreground">
           <IconFileSettings size={16} />
           Configs
@@ -305,6 +316,7 @@ export function DiffSidebar({
           return configButton;
         })}
       </div>
+      ) : null}
     </nav>
   );
 }

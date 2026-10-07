@@ -186,39 +186,44 @@ export function IngestionDashboard() {
 
           {overview?.backfill ? (
             <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span>
-                  Backfill · <strong>{overview.backfill.done.length}</strong> of{" "}
-                  <strong>{overview.backfill.total}</strong> done
-                  {overview.backfill.failed.length > 0 ? (
-                    <span className="text-destructive"> · {overview.backfill.failed.length} failed</span>
-                  ) : null}
-                </span>
-                <span>{overview.backfill.pending.length} queued</span>
-              </div>
-              <div className="mt-2 h-2 w-full overflow-hidden rounded bg-muted">
-                <div
-                  className="h-full bg-violet-500 transition-all"
-                  style={{
-                    width: `${overview.backfill.total === 0 ? 0 : Math.round(((overview.backfill.done.length + overview.backfill.failed.length) / overview.backfill.total) * 100)}%`,
-                  }}
-                />
-              </div>
-              {overview.backfill.pausedFor != null ? (
-                <p className="mt-1 text-amber-600 dark:text-amber-400">
-                  Paused for newly released revision {overview.backfill.pausedFor}; the queue resumes after it.
-                </p>
-              ) : overview.backfill.pending.length === 0 ? (
-                // Everything is imported and queryable; the run is uploading assets before it ends.
-                <p className="mt-1 text-muted-foreground">
-                  All revisions imported. Uploading sprites, textures and models to the CDN — the
-                  data is already live.
-                </p>
+              {/* The publish-cdn tool uploads already-imported revisions, so it has no import queue
+                  of its own — then the CDN block is the whole card. */}
+              {overview.backfill.total === 0 ? (
+                <CdnPhase cdn={overview.backfill.cdn} standalone />
               ) : (
-                <p className="mt-1 font-mono text-xs text-muted-foreground">
-                  Next: {overview.backfill.pending.slice(0, 12).join(", ") || "—"}
-                  {overview.backfill.pending.length > 12 ? ` … +${overview.backfill.pending.length - 12}` : ""}
-                </p>
+                <>
+                  <div className="flex items-center justify-between">
+                    <span>
+                      Backfill · <strong>{overview.backfill.done.length}</strong> of{" "}
+                      <strong>{overview.backfill.total}</strong> done
+                      {overview.backfill.failed.length > 0 ? (
+                        <span className="text-destructive"> · {overview.backfill.failed.length} failed</span>
+                      ) : null}
+                    </span>
+                    <span>{overview.backfill.pending.length} queued</span>
+                  </div>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded bg-muted">
+                    <div
+                      className="h-full bg-violet-500 transition-all"
+                      style={{
+                        width: `${Math.round(((overview.backfill.done.length + overview.backfill.failed.length) / overview.backfill.total) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                  {overview.backfill.pausedFor != null ? (
+                    <p className="mt-1 text-amber-600 dark:text-amber-400">
+                      Paused for newly released revision {overview.backfill.pausedFor}; the queue resumes after it.
+                    </p>
+                  ) : overview.backfill.pending.length === 0 ? (
+                    // Everything is imported and queryable; the run is uploading assets before it ends.
+                    <CdnPhase cdn={overview.backfill.cdn} />
+                  ) : (
+                    <p className="mt-1 font-mono text-xs text-muted-foreground">
+                      Next: {overview.backfill.pending.slice(0, 12).join(", ") || "—"}
+                      {overview.backfill.pending.length > 12 ? ` … +${overview.backfill.pending.length - 12}` : ""}
+                    </p>
+                  )}
+                </>
               )}
             </div>
           ) : null}
@@ -435,6 +440,58 @@ export function IngestionDashboard() {
         </Card>
       </div>
       ) : null}
+    </div>
+  );
+}
+
+type BackfillCdn = NonNullable<NonNullable<AdminOverview["backfill"]>["cdn"]>;
+
+/**
+ * Assets being PUT to the CDN one object at a time — either the phase that closes a backfill, or a
+ * standalone publish-cdn run over revisions that were already imported. Either way the data is
+ * already queryable, so this is the only thing still running; without the file counter a half-hour
+ * upload and a stalled one look exactly the same.
+ *
+ * `standalone` drops the border that separates it from the import progress above it.
+ */
+function CdnPhase({ cdn, standalone = false }: { cdn: BackfillCdn | null | undefined; standalone?: boolean }) {
+  // An older server has no cdn block; say what it used to say rather than nothing.
+  if (!cdn) {
+    return (
+      <p className="mt-1 text-muted-foreground">
+        All revisions imported. Uploading sprites, textures and models to the CDN — the data is
+        already live.
+      </p>
+    );
+  }
+  const stage = cdn.stage ?? "assets";
+  const revIndex = Math.min(cdn.done.length + 1, cdn.total);
+  return (
+    <div className={standalone ? "" : "mt-2 border-t border-border/60 pt-2"}>
+      <div className="flex items-center justify-between">
+        <span>
+          CDN upload ·{" "}
+          {cdn.rev != null ? (
+            <>
+              rev <strong>{cdn.rev}</strong> · {stage}
+            </>
+          ) : (
+            "starting"
+          )}
+        </span>
+        <span className="text-muted-foreground">
+          rev {revIndex} of {cdn.total}
+        </span>
+      </div>
+      <div className="mt-2 h-2 w-full overflow-hidden rounded bg-muted">
+        <div className="h-full bg-emerald-500 transition-all" style={{ width: `${cdn.percent}%` }} />
+      </div>
+      <p className="mt-1 text-muted-foreground">
+        {cdn.filesTotal > 0
+          ? `${formatNumber(cdn.files)} / ${formatNumber(cdn.filesTotal)} ${stage} uploaded`
+          : `Preparing ${stage}…`}{" "}
+        — these revisions are already imported, so the data is live throughout.
+      </p>
     </div>
   );
 }
